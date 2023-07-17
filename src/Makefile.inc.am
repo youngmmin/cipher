@@ -1,0 +1,73 @@
+#
+# Makefile
+#
+# build:
+#   2009-10-24  sjpark
+#
+# modified:
+#
+petraRootDir = @PETRA_ROOT_DIR@
+petraToolsDir = @PETRA_TOOLS_DIR@
+
+CXXFLAGS = -g -Wall -I. -I$(petraRootDir)/include -I$(petraToolsDir)/include @CXXFLAGS@
+
+SUFFIXES = .c .cpp .o
+
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+.cpp.o:
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+all: build install
+
+build:: \
+	build_init \
+	build_libs \
+	build_bins
+
+install:: \
+	install_libs \
+	install_bins
+
+build_stlib: $(stlib)
+
+build_shlib: $(shlib)
+
+build_bin: $(bin)
+
+install_shlib: $(shlib)
+	$(LN_S) -f $(PWD)/$(shlib) $(libdir)/$(shlib)
+	$(MAKE) name="$(shlib)" register_shlib
+
+install_stlib: $(stlib)
+	$(LN_S) -f $(PWD)/$(stlib) $(libdir)/$(stlib)
+	$(MAKE) name="$(stlib)" register_stlib
+
+install_bin: $(bin)
+	$(LN_S) -f $(PWD)/$(bin) $(bindir)/$(bin)
+	$(MAKE) name="$(bin)" register_bin
+
+uninstall:: \
+	uninstall_libs \
+	uninstall_bins
+
+uninstall_stlib:
+	-rm -f $(libdir)/$(stlib)
+
+uninstall_shlib:
+	-rm -f $(libdir)/$(shlib)
+
+uninstall_bin:
+	-rm -f $(bindir)/$(bin)
+
+clean::
+	-rm -rf .objs *.obj *.o *.i *.exe *.so *.sl *.dll *.a *.base *.exp > /dev/null 2>&1
+
+$(stlib):
+	$(AR) $(ARFLAGS) $(stlib) $(objs) $(opt)
+
+$(shlib):
+	$(SHLDXX) $(SHLDFLAGS) -o $(shlib) $(objs) $(LIBS) $(opt)
+
+$(bin):
+	$(CXX) $(LDFLAGS) -o $(bin) $(objs) $(LIBS) $(opt)
