@@ -50,6 +50,7 @@ pcp_file_cipher_objs = \
 	PfccGetFileInfo.$(OBJEXT) \
 	PfccGetStreamStat.$(OBJEXT) \
 	PfccGetTargetList.$(OBJEXT) \
+	PfccHasAgentSession.$(OBJEXT) \
 	PfccPcfsGetList.$(OBJEXT) \
 	PfccPcfsGetStat.$(OBJEXT) \
 	PfccPcfsMount.$(OBJEXT) \

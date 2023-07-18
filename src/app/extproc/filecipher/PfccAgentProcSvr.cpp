@@ -45,7 +45,6 @@ dgt_sint32 PfccAgentSessChecker::run() throw(DgcExcept)
 				AgentSessPool.removeSession(session);
 				continue;
 			} 
-#if 0
 			else if (session->checkConn() < 0) {
 				DgcExcept* e = EXCEPTnC;
 				if (e) {
@@ -54,10 +53,7 @@ dgt_sint32 PfccAgentSessChecker::run() throw(DgcExcept)
 				}
 				AgentSessPool.removeSession(session);
 				continue;
-			} else {
-				AgentSessPool.returnSession(session);
 			}
-#endif
 			AgentSessPool.returnSession(session);
 		}
 	}

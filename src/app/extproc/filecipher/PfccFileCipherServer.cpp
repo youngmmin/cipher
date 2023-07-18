@@ -32,6 +32,7 @@
 #include "PfccVerifyExpr.h"
 
 #include "PfccGetStreamStat.h"
+#include "PfccHasAgentSession.h"
 
 #if 1 // added by chchung 2018.7.17 for PCFS
 #include "PfccPcfsGetList.h"
@@ -234,6 +235,10 @@ dgt_sint32 PfccFileCipherFactory::initialize() throw(DgcExcept)
 #endif
 	if (addProcedure(new PfccGetStreamStat("PFC_GET_STREAM_STAT",AgentListener)) != 0) {
 		ATHROWnR(DgcError(SPOS,"addProcedure failed"),-1);
+	}
+	if (addProcedure(new PfccHasAgentSession("PFC_HAS_AGENT_SESSION", AgentListener)) != 0)
+	{
+		ATHROWnR(DgcError(SPOS, "addProcedure failed"), -1);
 	}
 
 	return 0;
