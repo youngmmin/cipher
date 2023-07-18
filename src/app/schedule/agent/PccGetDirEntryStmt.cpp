@@ -63,8 +63,15 @@ dgt_sint32 PccGetDirEntryStmt::execute(DgcMemRows* mrows, dgt_sint8 delete_flag)
 	struct dirent*  entry=(struct dirent*)&ll_entry;
 	struct dirent*  result;
 	dgt_sint32      rtn = 0;
-	if ((DirPtr=opendir(DirPath)) == NULL) {
-		THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"opendir[%s] failed",DirPath)),-1);
+	if ((DirPtr = opendir(DirPath)) == NULL)
+	{
+		IsDirectory = 0;
+		IsExecuted = 1;
+		return 0;
+	}
+	else
+	{
+		IsDirectory = 1;
 	}
 	dgt_sint32 curr_count = 0;
 	do {
@@ -106,9 +113,20 @@ dgt_sint32 PccGetDirEntryStmt::execute(DgcMemRows* mrows, dgt_sint8 delete_flag)
 
 dgt_uint8* PccGetDirEntryStmt::fetch() throw(DgcExcept)
 {
-	if (IsExecuted == 0) {
-		THROWnR(DgcDbNetExcept(DGC_EC_DN_INVALID_ST,new DgcError(SPOS,"can't fetch without execution")),0);
-        }
+	if (IsExecuted == 0)
+	{
+		THROWnR(DgcDbNetExcept(DGC_EC_DN_INVALID_ST, new DgcError(SPOS, "can't fetch without execution")), 0);
+	}
+	if (!IsDirectory)
+	{
+		if (NumEntry != 0)
+				return 0;
+
+		NumEntry++;
+		memset(&DirEntry, 0, sizeof(DirEntry));
+		DirEntry.total_count = -1;
+		return (dgt_uint8 *)&DirEntry;
+	}
 #if defined ( sunos5 ) || defined ( sunos5_x86 )
         struct ll_dirent        ll_entry;
 #else

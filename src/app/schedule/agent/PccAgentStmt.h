@@ -82,6 +82,7 @@ class PccGetDirEntryStmt : public PccAgentStmt {
 	dgt_sint32	TotalCount;
 	dgt_sint32	FetchCount;
 	dgt_sint64	LastFetchOffset;
+	dgt_sint8	IsDirectory;
   protected:
   public:
 	PccGetDirEntryStmt(PccAgentCryptJobPool& job_pool);
