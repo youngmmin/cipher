@@ -33,16 +33,6 @@ class PccCipherAgentService : public DgcWorker {
 	dgt_schar*					HeaderFlag;
 	dgt_sint32					BufferSize;
 	
-	// added by mjkim 19.05.31 for file pattern detecting
-	dgt_sint64					MaxDetection;
-	dgt_sint32					BinarySkipFlag;
-
-	// added by ihjin 181118 for fp masking ai machine
-	dgt_float32					Threshold;
-	dgt_schar*					BogonetLibName;
-	dgt_schar*					BogonetLibPath;
-	dgt_schar*					MsMachinePath;
-
 	dgt_void openLogStream(const dgt_schar* log_file_path);
 	dgt_sint32 setConf(PccAgentCryptJob* job,DgcBgrammer* bg) throw(DgcExcept);
 		

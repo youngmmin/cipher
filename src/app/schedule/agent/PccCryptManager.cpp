@@ -38,8 +38,6 @@ PccCryptManager::PccCryptManager(PccAgentCryptJobPool& job_pool, PccCorePool& co
 	ManagerID=manager_id;
 	TargetFileFlag = 0;
 	start_flag = 0;
-
-	MaxDetection = 10;
 }
 
 
@@ -246,147 +244,6 @@ dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(Dgc
 		WorkStage = 12;
 		napAtick();
 	}
-	WorkStage = 13;
-	return 0;
-}
-
-dgt_sint32 PccCryptManager::fileDetection(PccAgentCryptJob* curr_job) throw(DgcExcept)
-{
-	WorkStage = 5;
-	dgt_sint32	threads = 0;
-	dgt_sint32	migration_flag = 0;
-	DgcExcept*	e = 0;
-
-	threads = curr_job->repository().fileQueue().get(&TargetFile); // get a crypt target file queued by the Collector
-	if (threads == 0) { 
-		//get migrationfilequeue
-		threads = curr_job->repository().migrationFileQueue().get(&TargetFile); // get a crypt migration file queued by the Collector
-		if (threads > 0) migration_flag = 1;
-	}
-
-
-	TargetFileFlag = threads;
-	if (threads > 0) {
-		TargetFile.cryptStat()->input_files--;
-		WorkStage = 6;
-		threads = curr_job->repository().schedule().usingCores();
-		PccCores*	cores = 0;
-		for(dgt_sint32 i=0; i<MAX_GET_CORE_TRY && (cores=CorePool.getCores(threads?threads:1)) == 0; i++) {
-			if (threads > 1) threads--; // fail to get cores and decrease threads by 1
-			napAtick();
-		}
-		if (JobPool.traceLevel() > 1) DgcWorker::PLOG.tprintf(0,"schedule cores : [%d] allocate cores : [%d]\n",curr_job->repository().schedule().usingCores(),cores ? cores->numCores():0);
-		if (cores) {
-			WorkStage = 7;
-
-			if ((buildParam(TargetFile,curr_job,cores->numCores(), migration_flag)) < 0) { // build detect parameter string,  rtn>0 => # of threads, rtn<0 => exception
-				CorePool.returnCores(cores);
-				ATHROWnR(DgcError(SPOS,"buildParam failed\n"),-1);
-			}
-
-			WorkStage = 8;
-			struct timeval	ct;
-			//gettimeofday(&ct,0);
-			if (JobPool.traceLevel() > 1) {
-				DgcWorker::PLOG.tprintf(0,"fileDetection : \n"
-							"src[%s]\n"
-							"parameter[%s]\n",
-				TargetFile.srcFileName(),CryptParams);
-			}
-			//create Cryptor (Detector)
-			if (Cryptor) {
-				delete Cryptor;
-				Cryptor = 0;
-			}
-			Cryptor =  new PccFileCryptor(0,0,JobPool.traceLevel(),ManagerID);
-			TargetFile.cryptStat()->used_cores += cores->numCores();
-			dgt_sint32 rtn = 0;
-
-			 // detecting
-			if ((rtn=Cryptor->detect(SessionID,CryptParams,TargetFile.srcFileName(),MaxDetection,curr_job->jobID(),TargetFile.dirID())) < 0) {
-				//
-				// rtn = last_error_code
-				// error_string from cryptor couldn't be contained in exception because of it's size = 1025
-				//
-				if(rtn == PFC_FC_ERR_CODE_UNSUPPORTED_FILE_FORMAT || rtn == PFC_DVS_ERR_CODE_ZERO_FILE_SIZE) {
-					// if file size is zero or file_type is not matched.
-					//TargetFile.cryptStat()->output_files++;
-#if 1
-					if (curr_job->repository().nullityFileQueue().isFull()) curr_job->repository().nullityFileQueue().get(0); //delete oldest node when file queue is full
-					curr_job->repository().nullityFileQueue().put(TargetFile.dirID(),
-							TargetFile.zoneID(),
-							TargetFile.cryptMir(),
-							TargetFile.fileNode(),
-							TargetFile.cryptStat(),
-							TargetFile.srcFileName(),
-							TargetFile.srcFileNamePos(),
-							TargetFile.dstFileName(),
-							TargetFile.dstFileNamePos()); 
-#endif		
-					TargetFile.cryptStat()->used_micros++; //used_micros is invalidity file count
-					if (JobPool.traceLevel() > 0) DgcWorker::PLOG.tprintf(0,"skip detect [%s] : [%d:%s]\n",TargetFile.srcFileName(),rtn,Cryptor->errString());
-					if (EXCEPT) delete EXCEPTnC;
-				} else { //error
-#if 1	
-					if (curr_job->repository().failFileQueue().isFull()) curr_job->repository().failFileQueue().get(0); //delete oldest node when file queue is full
-					curr_job->repository().failFileQueue().put(TargetFile.dirID(),
-										   TargetFile.zoneID(),
-										   TargetFile.cryptMir(),
-										   TargetFile.fileNode(),
-										   TargetFile.cryptStat(),
-										   TargetFile.srcFileName(),
-										   TargetFile.srcFileNamePos(),
-										   TargetFile.dstFileName(),
-										   TargetFile.dstFileNamePos(),
-										   rtn,
-										   Cryptor->errString()); 
-#endif
-					TargetFile.cryptStat()->crypt_errors++;
-					if (JobPool.traceLevel() > 0) DgcWorker::PLOG.tprintf(0,"detect failed [%s] : [%d:%s]\n",TargetFile.srcFileName(),rtn,Cryptor->errString());
-					if (EXCEPT) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"exception occured while crypt : \n");
-							delete e;
-						}
-					}
-				}
-				WorkStage = 10;
-			} else {
-				TargetFile.cryptStat()->output_files++;
-				TargetFile.cryptStat()->output_bytes += Cryptor->numPttns();
-				//gettimeofday(&ct,0);
-				//TargetFile.cryptStat()->end_time=ct.tv_sec;
-				EncFileCnt++;
-				if (JobPool.traceLevel() > 0) {	
-					if (EncFileCnt % 1000 == 0 || EncFileCnt == 1 || EncFileCnt % 1000 == 1) DgcWorker::PLOG.tprintf(0,"[%lld]files success detect \n",EncFileCnt);
-				}
-			}
-			if (Cryptor) {
-				delete Cryptor;
-				Cryptor = 0;
-			}
-
-			WorkStage = 10;
-			CorePool.returnCores(cores);
-			//TargetFile.cryptStat()->end_time=dgtime((dgt_uint32*)&TargetFile.cryptStat()->end_time);
-		} else { //if (core) else
-			WorkStage = 11;
-			while(curr_job->repository().fileQueue().put(
-						TargetFile.dirID(),
-						TargetFile.zoneID(),
-						TargetFile.cryptMir(),
-						TargetFile.fileNode(),
-						TargetFile.cryptStat(),
-						TargetFile.srcFileName(),
-						TargetFile.srcFileNamePos(),
-						TargetFile.dstFileName(),
-						TargetFile.dstFileNamePos()) == 0) napAtick();
-		} //if (core) end
-	} else { //if (threads > 0) else 
-		WorkStage = 12;
-		napAtick();
-	} //if (threads > 0) end
 	WorkStage = 13;
 	return 0;
 }
@@ -646,23 +503,13 @@ dgt_sint32 PccCryptManager::run() throw(DgcExcept)
 					}
 				}
 			} else if (curr_job->repository().schedule().isWorkingTime()) {
-				if (curr_job->repository().getJobType() == PCC_AGENT_TYPE_DETECT_JOB) {
-					// file pattern detecting
-					if (fileDetection(curr_job) < 0) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"fileCryption failed : \n");
-							delete e;
-						}
-					}
-				} else {
-					// file cryptiong
-					if (fileCryption(curr_job) < 0) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"fileCryption failed : \n");
-							delete e;
-						}
+				if (fileCryption(curr_job) < 0)
+				{
+					DgcExcept *e = EXCEPTnC;
+					if (e)
+					{
+						DgcWorker::PLOG.tprintf(0, *e, "fileCryption failed : \n");
+						delete e;
 					}
 				}
 			}

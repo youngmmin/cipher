@@ -15,44 +15,6 @@
 
 #include "PccCipherAgentService.h"
 
-#if 0
-// added by ihjin 18.03.07
-// only for wooricard, solaris x86 32bit system
-// if pcp_crypt_agent process exists, checked at startup
-	int checkProcess(char *processName) {
-	int rtn, cnt;
-	pid_t mpid;
-	DIR *dir_p;
-	dgt_uint32 agent_pid;
-	dgt_proc_info procInfo;
-	struct dirent *dir_entry_p;
-	
-	rtn=cnt=0;
-	
-	dir_p = opendir("/proc/"); // Open /proc/ directory
-	while(NULL != (dir_entry_p = readdir(dir_p))) { // Reading /proc/ entries
-		if (strspn(dir_entry_p->d_name, "0123456789") == strlen(dir_entry_p->d_name)) {
-			agent_pid = dg_strtoll(dir_entry_p->d_name,0,10);
-			mpid = agent_pid;
-	
-			rtn = getProcInfo(mpid, &procInfo);
-	
-			if (rtn < 0) {
-			} else {
-				if (strstr(procInfo.pname, processName) != 0) {
-					if(++cnt > 1) {
-						closedir(dir_p);
-						return 1;
-					}
-				}
-			}
-		}
-	}
-	closedir(dir_p);
-	return 0;
-}
-#endif  /* 0, only for solaris x86 32bit */
-
 PccCipherAgentService::PccCipherAgentService()
 	: Repository(JobPool)
 {
@@ -67,10 +29,6 @@ PccCipherAgentService::PccCipherAgentService()
 	EncColName = 0;
 	HeaderFlag = 0;
 	BufferSize = 0;
-
-	// added by mjkim 19.05.31 for file pattern detecting
-	MaxDetection = 0;
-	BinarySkipFlag = 0;
 }
 
 
@@ -129,7 +87,6 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob* job,DgcBgrammer* bg)
 		}
 		if (JobPool.agentID() == 0) JobPool.setAgentID(agent_id);
 
-		if ((val=bg->getValue("agent.max_detection"))) MaxDetection = dg_strtoll(val,0,10);
 		if ((val=bg->getValue("agent.command_mode"))) CommandMode = (dgt_sint32)dg_strtoll(val,0,10);
 		if ((val=bg->getValue("agent.log_file_path"))) openLogStream(val);
 		if ((val=bg->getValue("agent.max_target_files"))) {
@@ -232,14 +189,8 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob* job,DgcBgrammer* bg)
 
 dgt_void PccCipherAgentService::in() throw(DgcExcept)
 {
-#if 0
-	// start agent_svr_session
-	if (!CommandMode) {
-		if (SessionPool.startSessions(JobPool,NoSessionSleepCount) < 0) ATHROW(DgcError(SPOS,"startSession failed"));
-	}
-#endif
 	// start managers
-	if (Repository.managerPool().addManagers(NumManagers>0 ? NumManagers : INIT_MANAGERS, AgentMode, EncColName, HeaderFlag, BufferSize, MaxDetection) < 0) {
+	if (Repository.managerPool().addManagers(NumManagers>0 ? NumManagers : INIT_MANAGERS, AgentMode, EncColName, HeaderFlag, BufferSize) < 0) {
 		DgcExcept*	e=EXCEPTnC;
 		while(Repository.managerPool().numManagers() > 0) {
 			Repository.managerPool().stopManagers(0);

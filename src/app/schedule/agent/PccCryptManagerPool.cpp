@@ -34,7 +34,7 @@ PccCryptManagerPool::~PccCryptManagerPool()
 	}
 }
 
-dgt_sint32 PccCryptManagerPool::addManagers(dgt_sint32 num_managers, dgt_sint32 agent_mode, dgt_schar* enc_col_name, dgt_schar* header_flag, dgt_sint32 buffer_size, dgt_sint64 max_detection) throw(DgcExcept)
+dgt_sint32 PccCryptManagerPool::addManagers(dgt_sint32 num_managers, dgt_sint32 agent_mode, dgt_schar* enc_col_name, dgt_schar* header_flag, dgt_sint32 buffer_size) throw(DgcExcept)
 {
 	dgt_sint32	start_count = 0;
 	for(dgt_sint32 i=0; i<num_managers; i++) {
@@ -45,7 +45,6 @@ dgt_sint32 PccCryptManagerPool::addManagers(dgt_sint32 num_managers, dgt_sint32 
 			} else {
 				manager = new PccCryptManager(JobPool,CorePool,i+1);
 			}
-			manager->setMaxDetection(max_detection);
 
 			if (manager->start(1)) {
 				DgcExcept*	e = EXCEPTnC;

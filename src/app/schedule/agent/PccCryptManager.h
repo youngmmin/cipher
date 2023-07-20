@@ -40,16 +40,12 @@ class PccCryptManager : public DgcWorker {
 	dgt_sint32			TargetFileFlag;
 	dgt_sint32			start_flag;
 
-	// added by mjkim 19.05.31 for file pattern detecting
-	dgt_sint64			MaxDetection;
-
 	PccCryptTargetFile	TargetFile;
 	PccFileCryptor*		Cryptor;
 	dgt_sint32 buildStreamParam(PccCryptTargetFile& tf, PccAgentCryptJob* curr_job);
 	dgt_sint32 buildParam(PccCryptTargetFile& tf, PccAgentCryptJob* curr_job, dgt_sint32 threads=0, dgt_sint32 migration_flag = 0); // return the number of cores when success
   protected:
 	dgt_sint32 streamCryption(PccAgentCryptJob* curr_job) throw(DgcExcept);
-	dgt_sint32 fileDetection(PccAgentCryptJob* curr_job) throw(DgcExcept);
 	dgt_sint32 fileCryption(PccAgentCryptJob* curr_job) throw(DgcExcept);
 	virtual dgt_void in() throw(DgcExcept);
 	virtual dgt_sint32 run() throw(DgcExcept);
@@ -60,8 +56,6 @@ class PccCryptManager : public DgcWorker {
 	dgt_sint32 workStage() { return WorkStage; }
 	dgt_void askStop() { StopFlag = 1; }
 	dgt_sint32 stopFlag() { return StopFlag; }
-
-	inline dgt_void setMaxDetection(dgt_sint64 max_detection) { MaxDetection = max_detection; }
 };
 
 #endif
