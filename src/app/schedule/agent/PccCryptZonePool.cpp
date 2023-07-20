@@ -43,11 +43,9 @@ dgt_sint32 PccCryptZonePool::setParams(DgcBgrammer* bg) throw(DgcExcept)
 	if (param_type == 0) {
 		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"unsupported params[%s]",bg->getText())),-1);
 	}
-#ifndef WIN32
+	
 	dgt_sint64	zone_id = dg_strtoll(val,0,10);
-#else
-	dgt_sint64	zone_id = (dgt_sint64)_strtoi64(val,0,10);
-#endif
+
 	PccCryptZone*	crypt_zone = getZoneByID(zone_id);
 	if (crypt_zone == 0) {
 		if (param_type == 1) {

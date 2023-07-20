@@ -57,11 +57,7 @@ dgt_uint8* PccPcfsGetListStmt::fetch() throw(DgcExcept)
 	strncpy(FsGetList.auto_mount,curr_fs_attr->auto_mount,10);
 	PccPcfsStat	pcfs_stat(FsGetList.pcfs_id);
 	pcfs_stat.getStat();
-#ifndef WIN32
 	if (pcfs_stat.statPtr()->pid == 0 || kill((pid_t)pcfs_stat.statPtr()->pid,0)) strncpy(FsGetList.status,"unmount",7);
-#else
-	if (pcfs_stat.statPtr()->pid == 0/* || kill((pid_t)pcfs_stat.statPtr()->pid,0)*/) strncpy(FsGetList.status,"unmount",7);
-#endif
 	else strncpy(FsGetList.status,"mount",5);
 	return (dgt_uint8*)&FsGetList;
 }

@@ -37,13 +37,11 @@ class PccCipherAgentService : public DgcWorker {
 	dgt_sint64					MaxDetection;
 	dgt_sint32					BinarySkipFlag;
 
-#ifndef WIN32
 	// added by ihjin 181118 for fp masking ai machine
 	dgt_float32					Threshold;
 	dgt_schar*					BogonetLibName;
 	dgt_schar*					BogonetLibPath;
 	dgt_schar*					MsMachinePath;
-#endif /* WIN32 */
 
 	dgt_void openLogStream(const dgt_schar* log_file_path);
 	dgt_sint32 setConf(PccAgentCryptJob* job,DgcBgrammer* bg) throw(DgcExcept);

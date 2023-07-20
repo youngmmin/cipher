@@ -71,19 +71,12 @@ dgt_sint32 PccCryptFileStmt::filter(const dgt_schar* src_dir, const dgt_schar* d
 	dgt_sint32      rtn = 0;
 	if (JobPool.traceLevel() > 10) DgcWorker::PLOG.tprintf(0,"src_dir [%s] filter start  \n",src_dir);
 	struct stat     fstat;
-#ifndef WIN32
 	for (;(rtn=readdir_r(DirPtr,entry,&result)) == 0;) { // success
 		memset(src_file,0,src_file_len);
 		memset(dst_file,0,dst_file_len);
 		sprintf(src_file,"%s/%s",src_dir,entry->d_name);
 		sprintf(dst_file,"%s/%s",dst_dir,entry->d_name);
-#else
-		for (;(result=readdir(DirPtr)) != NULL;) { // success
-		memset(src_file,0,src_file_len);
-		memset(dst_file,0,dst_file_len);
-		sprintf(src_file,"%s\\%s",src_dir,entry->d_name);
-		sprintf(dst_file,"%s\\%s",dst_dir,entry->d_name);
-#endif
+
 		if (result == NULL) break; // end of entry
 		if (stat(src_file,&fstat) < 0) {
 			THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"stat[%s] failed",entry->d_name)),-1);
@@ -97,20 +90,12 @@ dgt_sint32 PccCryptFileStmt::filter(const dgt_schar* src_dir, const dgt_schar* d
 				if (src_dir == dst_dir) {
 					filter(src_file,dst_file);
 				} else {
-#ifndef WIN32
 					if (mkdir(dst_file,0777) < 0 && errno != EEXIST) {
 						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed[%s]:\n",dst_file,strerror(errno));
 					} else {
 						filter(src_file,dst_file);
 					}
-#else
-					dgt_sint32 mkdir_rtn = CreateDirectory(dst_file, NULL);
-					if (mkdir_rtn || (mkdir_rtn == 0 && GetLastError() == ERROR_ALREADY_EXISTS)) {
-						filter(src_file,dst_file);
-					} else {
-						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed [%d]\n",dst_file,mkdir_rtn);
-					}
-#endif
+
 				}
 			}
 			 } else if (S_ISREG(fstat.st_mode)) { //when file
@@ -158,11 +143,8 @@ dgt_sint32 PccCryptFileStmt::buildParam() throw(DgcExcept)
 	rtn = session->getZoneParam(CryptFileIn->enc_zone_id,&out_param);
 	if (rtn) THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"get zone param failed [%lld]: Error Code - %d",CryptFileIn->enc_zone_id,rtn)),-1);
 
-#ifndef WIN32
 	out_param_len = dg_strlen(out_param);
-#else
-	out_param_len = strlen(out_param);
-#endif
+
 	//get out_extension
 	dgt_schar* val = 0;
 	DgcBgrammer* bg = 0;

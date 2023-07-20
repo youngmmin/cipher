@@ -43,16 +43,11 @@ PccCryptMir::~PccCryptMir()
 	}
 }
 
-#ifndef WIN32
 pcct_file_node* PccCryptMir::checkFileNode(struct stat* fstat,dgt_sint64 ino)
-#else
-pcct_file_node* PccCryptMir::checkFileNode(struct _stat64* fstat,dgt_sint64 ino)
-#endif
 {
 	for(;;) {
 		pcct_file_node*	file_node = 0;
 		if (DgcSpinLock::lock(&NodeListLock) == 0) {
-#ifndef WIN32
 			PccHashNode*	hnp = FileNodeList.findNode(fstat->st_ino);
 			if (hnp == 0) { // not found and create one
 				file_node = new pcct_file_node();
@@ -62,17 +57,7 @@ pcct_file_node* PccCryptMir::checkFileNode(struct _stat64* fstat,dgt_sint64 ino)
 			} else {
 				file_node = (pcct_file_node*)hnp->value();
 			}
-#else
-			PccHashNode*    hnp = FileNodeList.findNode(ino);
-                        if (hnp == 0) { // not found and create one
-                                file_node = new pcct_file_node();
-                                memset(file_node,0,sizeof(pcct_file_node));
-                                file_node->file_id = ino;
-                                FileNodeList.addNode(ino,file_node);
-                        } else {
-                                file_node = (pcct_file_node*)hnp->value();
-                        }
-#endif
+
 			if (file_node->lm_time == 0) {
 				file_node->lm_time = fstat->st_mtime;
 				file_node->file_size = fstat->st_size;

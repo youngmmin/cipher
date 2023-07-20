@@ -83,11 +83,6 @@ struct ll_dirent {
 
 #endif
 
-#ifdef WIN32
-#include "DgcCRC64.h"
-#endif
-
-
 dgt_sint8 PccCryptDir::cryptStatus(const dgt_schar* file_path) throw(DgcExcept)
 {
 	dgt_sint8 rtn = 0;
@@ -148,7 +143,7 @@ dgt_sint32 PccCryptDir::countCryptFile(dgt_schar* src_dir, dgt_sint8 encrypt_fla
 	dgt_sint32	rtn = 0;
 	dgt_sint32	src_dir_len = dg_strlen(src_dir);
 	dgt_schar*	src_file = src_dir;
-#ifndef WIN32
+
 	for (;(rtn=readdir_r(dir_ptr,entry,&result)) == 0;) { // success
 		if (result == NULL) break; // end of entry
 		sprintf(src_file + src_dir_len,"/%s",entry->d_name);
@@ -157,15 +152,7 @@ dgt_sint32 PccCryptDir::countCryptFile(dgt_schar* src_dir, dgt_sint8 encrypt_fla
 			DgcWorker::PLOG.tprintf(0,"stat[%s] failed[%s]:\n",src_file,strerror(errno));
 			continue;
 		}
-#else
-	for (;(entry=readdir(dir_ptr)) != NULL;) { // success
-		sprintf(src_file + src_dir_len,"\\%s",entry->d_name);
-		struct _stati64	fstat;
-		if (_stati64(src_file,&fstat) < 0) {
-			DgcWorker::PLOG.tprintf(0,"stat[%s] failed[%s]:\n",src_file,strerror(errno));
-			continue;
-		}
-#endif
+
 		if (S_ISDIR(fstat.st_mode)) { // directory
 			if (strcmp(entry->d_name,".") && strcmp(entry->d_name,"..")) crypt_count += countCryptFile(src_file, encrypt_flag);
 		} else if (S_ISREG(fstat.st_mode)) { // file
@@ -211,7 +198,6 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir,dgt_schar* src_dir,dgt_sch
 	dgt_sint32 dst_dir_len = dg_strlen(dst_dir);
 	dgt_schar* src_file = src_dir;
 	dgt_schar* dst_file = dst_dir;
-#ifndef WIN32
 	for (;(rtn=readdir_r(dir_ptr,entry,&result)) == 0;) { // success
 		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
 		if (result == NULL) break; // end of entry
@@ -223,49 +209,29 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir,dgt_schar* src_dir,dgt_sch
 			TmpCryptStat.check_errors++;
 			continue;
 		}
-#else
-	for (;(entry=readdir(dir_ptr)) != NULL;) { // success
-		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
-		sprintf(src_file + src_dir_len,"\\%s",entry->d_name);
-		sprintf(dst_file + dst_dir_len,"\\%s",entry->d_name);
-		struct _stati64	fstat;
-		if (_stati64(src_file,&fstat) < 0) {
-			DgcWorker::PLOG.tprintf(0,"stat[%s] failed[%s]:\n",src_file,strerror(errno));
-			TmpCryptStat.check_errors++;
-			continue;
-		}
-#endif
-		if (S_ISDIR(fstat.st_mode)) { // directory
-			if (strcmp(entry->d_name,".") && strcmp(entry->d_name,"..")) {
-				TmpCryptStat.target_dirs++;
-#ifndef WIN32
-				dgt_uint64 ino = entry->d_ino;
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_uint64 ino = (dgt_uint64)DgcCRC64::calCRC64(crc_val,(dgt_uint8*)src_file,strlen(src_file));				
-#endif
 
-				//PccCryptMir* child_mir = parent_mir->getChildMir(ino,fstat.st_mtime); // removed by jhpark 2017.11.21 : managing child_mir need a large amount of memory
-				PccCryptMir* child_mir = parent_mir; // modified by jhpark 2017.11.21
-				if (strlen(src_dir) == strlen(dst_dir) && strncmp(src_dir, dst_dir, strlen(src_dir)) == 0) {
-					filter0(child_mir,src_file,src_file,isTargetDir(src_file + strlen(SrcDir)));
-				} else {
-#ifndef WIN32
-					if (mkdir(dst_file,0777) < 0 && errno != EEXIST) {
-						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed[%s]:\n",dst_file,strerror(errno));
-						TmpCryptStat.check_errors++;
-					} else {
-						filter0(child_mir,src_file,dst_file,isTargetDir(src_file + strlen(SrcDir)));
-					}
-#else
-					dgt_sint32 mkdir_rtn = CreateDirectory(dst_file, NULL);
-					if (mkdir_rtn || (mkdir_rtn == 0 && GetLastError() == ERROR_ALREADY_EXISTS)) {
-						filter0(child_mir,src_file,dst_file,isTargetDir(src_file + strlen(SrcDir)));
-					} else {
-						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed [%d]\n",dst_file,mkdir_rtn);
+		if (S_ISDIR(fstat.st_mode)) { // directory
+			if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, ".."))
+			{
+				TmpCryptStat.target_dirs++;
+				dgt_uint64 ino = entry->d_ino;
+
+				PccCryptMir *child_mir = parent_mir; // modified by jhpark 2017.11.21
+				if (strlen(src_dir) == strlen(dst_dir) && strncmp(src_dir, dst_dir, strlen(src_dir)) == 0)
+				{
+					filter0(child_mir, src_file, src_file, isTargetDir(src_file + strlen(SrcDir)));
+				}
+				else
+				{
+					if (mkdir(dst_file, 0777) < 0 && errno != EEXIST)
+					{
+						DgcWorker::PLOG.tprintf(0, "mkdir[%s] failed[%s]:\n", dst_file, strerror(errno));
 						TmpCryptStat.check_errors++;
 					}
-#endif
+					else
+					{
+						filter0(child_mir, src_file, dst_file, isTargetDir(src_file + strlen(SrcDir)));
+					}
 				}
 			}
 		} else if (S_ISREG(fstat.st_mode)) { // file
@@ -294,14 +260,10 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir,dgt_schar* src_dir,dgt_sch
 				continue;
 			} else if (enc_check == 3) { //added by shson 20190313 for auto migration
 				TmpCryptStat.migration_target++;
-#ifndef WIN32
+
 				file_node = parent_mir->checkFileNode(&fstat);
 				pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] CryptZone->headerFlag()[%u] encrypt_flag[%u:%u]\n",entry->d_name,fstat.st_ino,file_node->cllt_time,CryptZone->headerFlag(),file_node->encrypt_flag,CryptZone->encryptFlag());
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_sint64 ino = DgcCRC64::calCRC64(crc_val,(dgt_uint8*)src_file,strlen(src_file));
-				file_node = parent_mir->checkFileNode(&fstat,ino);
-#endif
+
 				if (Status == PCC_STATUS_TYPE_MIGRATION && file_node->check_migration == 0) {
 				while(MigrationFileQueue.put(
 							DirID,
@@ -320,24 +282,16 @@ if(TraceLevel > 20) DgcWorker::PLOG.tprintf(0,"input migration file queue src_fi
 			} //else if (enc_check == 3) end
 			
 			TmpCryptStat.check_files++;
-			//if (parent_mir->changeFlag() == 0) continue; // removed by jhpark 2017.11.21 : it doesn't work because change_flag is always 1
-//pr_debug("entry->d_name[%s] isTargetFile[%d]\n",entry->d_name,isTargetFile(entry->d_name));
+			
 			if (isTargetFile(entry->d_name)) {
 				struct timeval	ct;
 				gettimeofday(&ct,0);
-#ifndef WIN32
 				if (file_node == 0) file_node = parent_mir->checkFileNode(&fstat);
-pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] CryptZone->headerFlag()[%u] encrypt_flag[%u:%u]\n",entry->d_name,fstat.st_ino,file_node->cllt_time,CryptZone->headerFlag(),file_node->encrypt_flag,CryptZone->encryptFlag());
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_sint64 ino = DgcCRC64::calCRC64(crc_val,(dgt_uint8*)src_file,strlen(src_file));
-				if (file_node == 0) file_node = parent_mir->checkFileNode(&fstat,ino);
-#endif
 				if (!file_node) continue;
+
 				if (file_node->cllt_time) continue; // already collected
 
 				if (file_node->ref_count == 1) CryptStat.target_files++;
-//pr_debug("check[%lld] target[%lld] input[%lld] output[%lld] error[%lld] micros[%lld]\n", CryptStat.check_files, CryptStat.target_files, CryptStat.input_files, CryptStat.output_files, CryptStat.crypt_errors, CryptStat.used_micros);
 
 				//for check already crypted file by shson 2018.10.01
 				if (CryptZone->backupFlag()) {
@@ -346,13 +300,10 @@ pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] CryptZone->headerFl
 						strcat(dst_file,"."); 
 						strcat(dst_file,CryptZone->outExtension()); 
 					}
-#ifndef WIN32
+
 					struct stat	check_fstat;
 					if (stat(dst_file,&check_fstat) == 0) 
-#else
-					struct _stati64	check_fstat;
-					if (_stati64(dst_file,&check_fstat) == 0) 
-#endif
+
 					{
 if(TraceLevel > 10) DgcWorker::PLOG.tprintf(0,"src_file[%s] is already crypted, dst_file[%s] \n",src_file,dst_file);
 						file_node->cllt_time=file_node->ctst_time=file_node->cted_time=fstat.st_mtime;
@@ -380,18 +331,11 @@ if(TraceLevel > 10) DgcWorker::PLOG.tprintf(0,"src_file[%s] is already crypted, 
 					CryptStat.input_bytes += fstat.st_size;
 
 if(TraceLevel > 20) DgcWorker::PLOG.tprintf(0,"input file queue src_file[%s] dst_file[%s]\n",src_file,dst_file);
-#if defined (PRINT_LOG)
-printf("queued child file => [%s] [%s]\n",dst_dir,entry->d_name);
-#endif
-#if 1 //for monotoring
+
 	CryptStat.check_dirs = TmpCryptStat.check_dirs;
 	CryptStat.check_errors = TmpCryptStat.check_errors;
 	CryptStat.target_dirs =	TmpCryptStat.target_dirs;
 	CryptStat.check_files =	TmpCryptStat.check_files;
-//	CryptStat.target_files = TmpCryptStat.target_files;
-//	CryptStat.input_files =	TmpCryptStat.input_files;
-//	CryptStat.input_bytes =	TmpCryptStat.input_bytes;
-#endif
 				} //if ((ct.tv_sec - fstat.st_mtime) > CryptZone->closeAfter())
 			} //if (isTargetFile(entry->d_name))
 		} //else if (S_ISREG(fstat.st_mode)) 
@@ -406,14 +350,10 @@ printf("queued child file => [%s] [%s]\n",dst_dir,entry->d_name);
 	CryptStat.check_errors = TmpCryptStat.check_errors;
 	CryptStat.target_dirs =	TmpCryptStat.target_dirs;
 	CryptStat.check_files =	TmpCryptStat.check_files;
-//	CryptStat.target_files = TmpCryptStat.target_files;
-//	CryptStat.input_files =	TmpCryptStat.input_files;
-//	CryptStat.input_bytes =	TmpCryptStat.input_bytes;
 	CryptStat.migration_target = TmpCryptStat.migration_target;
 
 	memset(&TmpCryptStat, 0, sizeof(TmpCryptStat));
 	}
-	//parent_mir->closeMir(); // removed by jhpark 2017.11.21
 }
 
 dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir,const dgt_schar* src_dir,const dgt_schar* dst_dir, dgt_uint8 is_target_dir) throw(DgcExcept)
@@ -448,7 +388,6 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir,const dgt_schar* src_dir,c
 	struct dirent*	result;
 	dgt_sint32	rtn = 0;
 
-#ifndef WIN32
 	for (;(rtn=readdir_r(dir_ptr,entry,&result)) == 0;) { // success
 		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
 		if (result == NULL) break; // end of entry
@@ -460,7 +399,6 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir,const dgt_schar* src_dir,c
 			DirFileList[CurrDirDepth].src_file = new dgt_schar[buf_len];
 			DirFileList[CurrDirDepth].src_file_blen = buf_len;
 		}
-//pr_debug("CurrDirDepth[%d] src_file_blen[%d] src_file_len[%d]\n",CurrDirDepth,DirFileList[CurrDirDepth].src_file_blen,src_file_len);
 		memset(DirFileList[CurrDirDepth].src_file,0,DirFileList[CurrDirDepth].src_file_blen);
 		sprintf(DirFileList[CurrDirDepth].src_file,"%s/%s",src_dir,entry->d_name);
 
@@ -471,25 +409,6 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir,const dgt_schar* src_dir,c
 			TmpCryptStat.check_errors++;
 			continue;
 		}
-#else
-	for (;(entry=readdir(dir_ptr)) != NULL;) { // success
-		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
-		dgt_sint32 src_file_len = dg_strlen(src_dir) + dg_strlen(entry->d_name) + 1;
-		if (DirFileList[CurrDirDepth].src_file_blen < src_file_len) {
-			if (DirFileList[CurrDirDepth].src_file) delete DirFileList[CurrDirDepth].src_file;
-			dgt_sint32 buf_len = dg_strlen(src_dir) + (dg_strlen(entry->d_name)>MAX_FILE_LEN ? dg_strlen(entry->d_name) : MAX_FILE_LEN) + 1;
-			DirFileList[CurrDirDepth].src_file = new dgt_schar[buf_len];
-			DirFileList[CurrDirDepth].src_file_blen = buf_len;
-		}
-		memset(DirFileList[CurrDirDepth].src_file,0,DirFileList[CurrDirDepth].src_file_blen);
-		sprintf(DirFileList[CurrDirDepth].src_file,"%s\\%s",src_dir,entry->d_name);
-		struct _stati64	fstat;
-		if (_stati64(DirFileList[CurrDirDepth].src_file,&fstat) < 0) {
-			DgcWorker::PLOG.tprintf(0,"stat[%s] failed[%s]:\n",DirFileList[CurrDirDepth].src_file,strerror(errno));
-			TmpCryptStat.check_errors++;
-			continue;
-		}
-#endif
 
 		dgt_sint32 dst_file_len = dg_strlen(dst_dir) + dg_strlen(entry->d_name) + 1;
 		if (DirFileList[CurrDirDepth].dst_file_blen < dst_file_len) {
@@ -508,12 +427,8 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir,const dgt_schar* src_dir,c
 				} 
 pr_debug("directory search : CurrDirDepth[%d] is_target_dir[%u] is_target_dir_flag[%d] isSearchDirDepth(CurrDirDepth)[%d]\n",CurrDirDepth,is_target_dir,is_target_dir_flag,isSearchDirDepth(CurrDirDepth));
 				TmpCryptStat.target_dirs++;
-#ifndef WIN32
 				dgt_uint64 ino = entry->d_ino;
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_uint64 ino = (dgt_uint64)DgcCRC64::calCRC64(crc_val,(dgt_uint8*)DirFileList[CurrDirDepth].src_file,strlen(DirFileList[CurrDirDepth].src_file));
-#endif
+
 pr_debug("search dir src_file[%s]\n",DirFileList[CurrDirDepth].src_file);
 
 				//PccCryptMir* child_mir = parent_mir->getChildMir(ino,fstat.st_mtime); // removed by jhpark 2017.11.21 : managing child_mir need a large amount of memory
@@ -521,7 +436,6 @@ pr_debug("search dir src_file[%s]\n",DirFileList[CurrDirDepth].src_file);
 				if (src_dir == dst_dir) {
 					filter1(child_mir,DirFileList[CurrDirDepth].src_file,DirFileList[CurrDirDepth].src_file,is_target_dir_flag);
 				} else {
-#ifndef WIN32
 					sprintf(DirFileList[CurrDirDepth].dst_file,"%s/%s",dst_dir,entry->d_name);
 					if (mkdir(DirFileList[CurrDirDepth].dst_file,0777) < 0 && errno != EEXIST) {
 						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed[%s]:\n",DirFileList[CurrDirDepth].dst_file,strerror(errno));
@@ -529,16 +443,6 @@ pr_debug("search dir src_file[%s]\n",DirFileList[CurrDirDepth].src_file);
 					} else {
 						filter1(child_mir,DirFileList[CurrDirDepth].src_file,DirFileList[CurrDirDepth].dst_file,is_target_dir_flag);
 					}	
-#else
-					sprintf(DirFileList[CurrDirDepth].dst_file,"%s\\%s",dst_dir,entry->d_name);
-					dgt_sint32 mkdir_rtn = CreateDirectory(DirFileList[CurrDirDepth].dst_file, NULL);
-					if (mkdir_rtn || (mkdir_rtn == 0 && GetLastError() == ERROR_ALREADY_EXISTS)) {
-						filter1(child_mir,DirFileList[CurrDirDepth].src_file,DirFileList[CurrDirDepth].dst_file);
-					} else {
-						DgcWorker::PLOG.tprintf(0,"mkdir[%s] failed [%d]\n",DirFileList[CurrDirDepth].dst_file,mkdir_rtn);
-						TmpCryptStat.check_errors++;
-					}
-#endif
 				}
 			}
 		} else if (S_ISREG(fstat.st_mode)) { // file
@@ -559,35 +463,24 @@ pr_debug("search dir src_file[%s]\n",DirFileList[CurrDirDepth].src_file);
 			TmpCryptStat.check_files++;
 			//if (parent_mir->changeFlag() == 0) continue; // removed by jhpark 2017.11.21 : it doesn't work because change_flag is always 1
 			pcct_file_node*	file_node = 0;
-//pr_debug("entry->d_name[%s] isTargetFile[%d]\n",entry->d_name,isTargetFile(entry->d_name));
-//pr_debug("file search : CurrDirDepth[%d] is_target_dir[%u] isEncDirDepth(CurrDirDepth)[%d]\n",CurrDirDepth,is_target_dir,CryptZone->isEncDirDepth(CurrDirDepth));
 			if (is_target_dir == 0 || isEncDirDepth(CurrDirDepth) == 0) continue;
 			if (isTargetFile(entry->d_name)) {
 				struct timeval	ct;
 				gettimeofday(&ct,0);
-#ifndef WIN32
 				file_node = parent_mir->checkFileNode(&fstat);
 pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] CryptZone->headerFlag()[%u] encrypt_flag[%u:%u]\n",entry->d_name,fstat.st_ino,file_node->cllt_time,CryptZone->headerFlag(),file_node->encrypt_flag,CryptZone->encryptFlag());
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_sint64 ino = DgcCRC64::calCRC64(crc_val,(dgt_uint8*)DirFileList[CurrDirDepth].src_file,strlen(DirFileList[CurrDirDepth].src_file));
-				file_node = parent_mir->checkFileNode(&fstat,ino);
-#endif
+
 				if (!file_node) continue;
 				if (file_node->cllt_time) continue; // already collected
 
 				if (file_node->ref_count == 1) CryptStat.target_files++;
-//pr_debug("check[%lld] target[%lld] input[%lld] output[%lld] error[%lld] micros[%lld]\n", CryptStat.check_files, CryptStat.target_files, CryptStat.input_files, CryptStat.output_files, CryptStat.crypt_errors, CryptStat.used_micros);
 
 				//
 				// not collected yet so need to check close time & crypt header
 				//
 				if ((ct.tv_sec - fstat.st_mtime) > CryptZone->closeAfter()) {
-#ifndef WIN32
 					sprintf(DirFileList[CurrDirDepth].dst_file,"%s/%s",dst_dir,entry->d_name);
-#else
-					sprintf(DirFileList[CurrDirDepth].dst_file,"%s\\%s",dst_dir,entry->d_name);
-#endif
+
 					while(FileQueue.put(
 							DirID,
 							CryptZone->zoneID(),
@@ -602,9 +495,6 @@ pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] CryptZone->headerFl
 					CryptStat.input_files++;
 					CryptStat.input_bytes += fstat.st_size;
 
-#if defined (PRINT_LOG)
-printf("queued child file => [%s] [%s]\n",dst_dir,entry->d_name);
-#endif
 				}
 			}
 		}
@@ -621,13 +511,9 @@ printf("queued child file => [%s] [%s]\n",dst_dir,entry->d_name);
 	CryptStat.check_errors = TmpCryptStat.check_errors;
 	CryptStat.target_dirs =	TmpCryptStat.target_dirs;
 	CryptStat.check_files =	TmpCryptStat.check_files;
-//	CryptStat.target_files = TmpCryptStat.target_files;
-//	CryptStat.input_files =	TmpCryptStat.input_files;
-//	CryptStat.input_bytes =	TmpCryptStat.input_bytes;
 
 	memset(&TmpCryptStat, 0, sizeof(TmpCryptStat));
 	}
-	//parent_mir->closeMir(); // removed by jhpark 2017.11.21
 }
 
 dgt_sint64 PccCryptDir::loadDetectRqst(PccCryptMir* parent_mir)
@@ -656,17 +542,10 @@ dgt_sint64 PccCryptDir::loadDetectRqst(PccCryptMir* parent_mir)
 	detect_rqst.rewind();
 	while (detect_rqst.next()) {
 		pcct_file_node* file_node = 0;
-#ifndef WIN32
 		struct stat tmp;
 		memset(&tmp,0,sizeof(struct stat));
 		memcpy(&tmp.st_ino, detect_rqst.getColPtr(2), sizeof(dgt_sint64));
 		file_node = parent_mir->checkFileNode(&tmp);
-#else
-		struct _stati64 tmp;
-		memset(&tmp,0,sizeof(struct _stati64));
-		memcpy(&tmp.st_ino, detect_rqst.getColPtr(2), sizeof(dgt_sint64));
-		file_node = parent_mir->checkFileNode(&tmp,tmp.st_ino);
-#endif
 		file_node->encrypt_flag = *(dgt_sint64*)detect_rqst.getColPtr(3) ? 2 : 0;
 		file_node->cllt_time = file_node->ctst_time = file_node->cted_time = ct.tv_sec;
 	}
@@ -686,7 +565,7 @@ dgt_void PccCryptDir::filter2(PccCryptMir* parent_mir,dgt_schar* src_dir, dgt_si
 		}
 		return;
 	}
-	//parent_mir->openMir(); // removed by jhpark 2017.11.21
+
 #if defined ( sunos5 ) || defined ( sunos5_x86 )
 	struct ll_dirent        ll_entry;
 #else
@@ -698,7 +577,6 @@ dgt_void PccCryptDir::filter2(PccCryptMir* parent_mir,dgt_schar* src_dir, dgt_si
 	dgt_sint32 src_dir_len = dg_strlen(src_dir);
 	dgt_schar* src_file = src_dir;
 
-#ifndef WIN32
 	for (;(rtn=readdir_r(dir_ptr,entry,&result)) == 0;) { // success
 		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
 		if (result == NULL) break; // end of entry
@@ -709,28 +587,11 @@ dgt_void PccCryptDir::filter2(PccCryptMir* parent_mir,dgt_schar* src_dir, dgt_si
 			TmpCryptStat.check_errors++;
 			continue;
 		}
-#else
-	for (;(entry=readdir(dir_ptr)) != NULL;) { // success
-		if (Status == PCC_STATUS_TYPE_DELETED || Status == PCC_STATUS_TYPE_PAUSE) break;
-		sprintf(src_file + src_dir_len,"\\%s",entry->d_name);
-		struct _stati64	fstat;
-		if (_stati64(src_file,&fstat) < 0) {
-			DgcWorker::PLOG.tprintf(0,"stat[%s] failed[%s]:\n",src_file,strerror(errno));
-			TmpCryptStat.check_errors++;
-			continue;
-		}
-#endif
+
 		if (S_ISDIR(fstat.st_mode)) { // directory
 			if (strcmp(entry->d_name,".") && strcmp(entry->d_name,"..")) {
 				TmpCryptStat.target_dirs++;
-#ifndef WIN32
 				dgt_uint64 ino = entry->d_ino;
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_uint64 ino = (dgt_uint64)DgcCRC64::calCRC64(crc_val,(dgt_uint8*)src_file,strlen(src_file));				
-#endif
-
-				//PccCryptMir* child_mir = parent_mir->getChildMir(ino,fstat.st_mtime); // removed by jhpark 2017.11.21 : managing child_mir need a large amount of memory
 				PccCryptMir* child_mir = parent_mir; // modified by jhpark 2017.11.21
 				filter2(child_mir,src_file,isTargetDir(src_file + strlen(SrcDir)));
 			}
@@ -738,24 +599,18 @@ dgt_void PccCryptDir::filter2(PccCryptMir* parent_mir,dgt_schar* src_dir, dgt_si
 			if (is_target_dir == 0) continue; //not target
 			pcct_file_node*	file_node = 0;
 			TmpCryptStat.check_files++;
-			//if (parent_mir->changeFlag() == 0) continue; // removed by jhpark 2017.11.21 : it doesn't work because change_flag is always 1
-//pr_debug("entry->d_name[%s] isTargetFile[%d]\n",entry->d_name,isTargetFile(entry->d_name));
+			
 			if (isTargetFile(entry->d_name)) {
 				struct timeval	ct;
 				gettimeofday(&ct,0);
-#ifndef WIN32
+
 				if (file_node == 0) file_node = parent_mir->checkFileNode(&fstat);
 pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] detected[%u]\n",entry->d_name,fstat.st_ino,file_node->cllt_time,file_node->encrypt_flag);
-#else
-				dgt_sint64 crc_val = 0;
-				dgt_sint64 ino = DgcCRC64::calCRC64(crc_val,(dgt_uint8*)src_file,strlen(src_file));
-				if (file_node == 0) file_node = parent_mir->checkFileNode(&fstat,ino);
-#endif
+
 				if (!file_node) continue;
 				if (file_node->cllt_time) continue; // already collected
 
 				if (file_node->ref_count == 1) CryptStat.target_files++;
-//pr_debug("check[%lld] target[%lld] input[%lld] output[%lld] error[%lld] micros[%lld]\n", CryptStat.check_files, CryptStat.target_files, CryptStat.input_files, CryptStat.output_files, CryptStat.crypt_errors, CryptStat.used_micros);
 
 				//
 				// not collected yet so need to check close time & crypt header
@@ -775,15 +630,10 @@ pr_debug("entry->d_name[%s] fstat.st_ino[%lld] cllt_time[%d] detected[%u]\n",ent
 					CryptStat.input_bytes += fstat.st_size;
 
 if(TraceLevel > 20) DgcWorker::PLOG.tprintf(0,"input file queue src_file[%s]\n",src_file);
-#if 1 //for monotoring
 	CryptStat.check_dirs = TmpCryptStat.check_dirs;
 	CryptStat.check_errors = TmpCryptStat.check_errors;
 	CryptStat.target_dirs =	TmpCryptStat.target_dirs;
 	CryptStat.check_files =	TmpCryptStat.check_files;
-//	CryptStat.target_files = TmpCryptStat.target_files;
-//	CryptStat.input_files =	TmpCryptStat.input_files;
-//	CryptStat.input_bytes =	TmpCryptStat.input_bytes;
-#endif
 				} //if ((ct.tv_sec - fstat.st_mtime) > CryptZone->closeAfter())
 			} //if (isTargetFile(entry->d_name))
 		} //else if (S_ISREG(fstat.st_mode)) 
@@ -798,14 +648,10 @@ if(TraceLevel > 20) DgcWorker::PLOG.tprintf(0,"input file queue src_file[%s]\n",
 	CryptStat.check_errors = TmpCryptStat.check_errors;
 	CryptStat.target_dirs =	TmpCryptStat.target_dirs;
 	CryptStat.check_files =	TmpCryptStat.check_files;
-//	CryptStat.target_files = TmpCryptStat.target_files;
-//	CryptStat.input_files =	TmpCryptStat.input_files;
-//	CryptStat.input_bytes =	TmpCryptStat.input_bytes;
 	CryptStat.migration_target = TmpCryptStat.migration_target;
 
 	memset(&TmpCryptStat, 0, sizeof(TmpCryptStat));
 	}
-	//parent_mir->closeMir(); // removed by jhpark 2017.11.21
 }
 
 dgt_sint32 PccCryptDir::filter() throw(DgcExcept)
@@ -824,19 +670,13 @@ dgt_sint32 PccCryptDir::filter() throw(DgcExcept)
 			setTmpDstPath(DstDir && *DstDir ? DstDir : SrcDir);
 			if (dirRuleVersion() != 2) CryptStat.output_files = countCryptFile(TmpDstPath,CryptZone->encryptFlag()); //collecting outfiles in destination directory for statistic
 		}
-#ifndef WIN32
+
 		struct stat	fstat;
 		if (stat(SrcDir,&fstat) < 0) {
 			unlock();
 			THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"stat[%s] failed",SrcDir)),-1);
 		}
-#else
-		struct _stati64	fstat;
-		if (_stati64(SrcDir,&fstat) < 0) {
-			unlock();
-			THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"stat[%s] failed",SrcDir)),-1);
-		}
-#endif
+
 		setTmpSrcPath(SrcDir);
 		setTmpDstPath(DstDir && *DstDir? DstDir : SrcDir);
 		if (CryptMir == 0) CryptMir = new PccCryptMir(fstat.st_ino);
@@ -945,7 +785,7 @@ dgt_sint32 PccCryptDir::isTargetDir(const dgt_schar* src_dir)
 	if (DirExprs == 0) {
 		return 1; // all directory
 	}
-#ifndef WIN32
+
 	regmatch_t	pttn_match[1];
 	exp_type*	preg;
 	DirExprs->rewind();
@@ -955,21 +795,7 @@ dgt_sint32 PccCryptDir::isTargetDir(const dgt_schar* src_dir)
 			return 1; // perfect pattern match
 		}
 	}
-#else
-	DirExprs->rewind();
-	exp_type*	preg;
-	while((preg=DirExprs->nextPttn())) { // each dir pattern
-		try {
-			std::tr1::smatch m;
-			std::string tmp_str(src_dir);
-			std::tr1::regex pattern(preg->exp);
-			if (std::tr1::regex_match(tmp_str, m, pattern)) {
-				return 1;
-			}
-		} catch (const std::tr1::regex_error& rerr) {
-		}
-	}
-#endif
+
 	return 0;
 }
 
@@ -978,7 +804,7 @@ dgt_sint32 PccCryptDir::isTargetFile(const dgt_schar* src_file)
 	if (FileExprs == 0) {
 		return 1; //all file
 	}
-#ifndef WIN32
+
 	regmatch_t	pttn_match[1];
 	exp_type*	preg;
 	FileExprs->rewind();
@@ -988,21 +814,6 @@ dgt_sint32 PccCryptDir::isTargetFile(const dgt_schar* src_file)
 			return 1;
 		}
 	}
-#else
-	FileExprs->rewind();
-	exp_type*       preg;
-	while((preg=FileExprs->nextPttn())) { // each file pattern
-		try {
-			std::tr1::smatch m;
-			std::string tmp_str(src_file);
-			std::tr1::regex pattern(preg->exp);
-			if (std::tr1::regex_match(tmp_str, m, pattern)) {
-				return 1;
-			}
-		} catch (const std::tr1::regex_error& rerr) {
-		}
 
-	}
-#endif
 	return 0;
 }

@@ -234,7 +234,6 @@ dgt_sint32 PccCryptZone::setZoneParams(DgcBgrammer* bg,dgt_schar* err_string) th
 		if ((val=bg->getValue("zone.out_extension")) && *val) strncpy(OutExtension,val,32);
 		if ((val=bg->getValue("zone.ext_ip")) && *val) strncpy(ExtIp,val,65);
 		if ((val=bg->getValue("zone.ext_port")) && *val) ExtPort = (dgt_uint16)strtol(val,0,10);
-#ifndef WIN32
 #ifdef linux
 		if ((val=bg->getValue("zone.s_limit")) && *val) Slimit = (dgt_float64)strtof(val,0);
 		if ((val=bg->getValue("zone.s_enable")) && *val) Senable = (dgt_sint32)strtol(val,0,10);
@@ -244,11 +243,6 @@ dgt_sint32 PccCryptZone::setZoneParams(DgcBgrammer* bg,dgt_schar* err_string) th
 		if ((val=bg->getValue("zone.s_enable")) && *val) Senable = (dgt_sint32)strtol(val,0,10);
 		if ((val=bg->getValue("zone.g_sigma")) && *val) Gsigma = (dgt_float64)atof(val);
 #endif /* linux */
-#else
-		if ((val=bg->getValue("zone.s_limit")) && *val) Slimit = (dgt_float64)strtol(val,0, 10);
-		if ((val=bg->getValue("zone.s_enable")) && *val) Senable = (dgt_sint32)strtol(val,0,10);
-		if ((val=bg->getValue("zone.g_sigma")) && *val) Gsigma = (dgt_float64)strtol(val,0, 10);
-#endif /* WIN32 */
 		if ((val=bg->getValue("zone.g_enable")) && *val) Genable = (dgt_sint32)strtol(val,0,10);
 		if ((val=bg->getValue("zone.c_enable")) && *val) Cenable = (dgt_sint32)strtol(val,0,10);
 		if ((val=bg->getValue("zone.r_angle")) && *val) Rangle = (dgt_sint32)strtol(val,0,10);
@@ -345,11 +339,7 @@ dgt_sint32 PccCryptZone::setSystemInfoParams(DgcBgrammer* bg,dgt_schar* err_stri
 		if ((val=bg->getValue("system_info.system_id")) == 0 || *val == 0) {
 			sprintf(err_string,"name not found"); rtn = -77002; break;
 		}
-#ifndef WIN32
 		SystemID = dg_strtoll(val,0,10);
-#else
-		SystemID = (dgt_sint64)_strtoi64(val,0,10);
-#endif
 		break;
 	}
 	strncpy(SystemInfoParam,bg->getText(),256);

@@ -38,11 +38,9 @@ dgt_sint32 PccGetDetectInfoStmt::execute(DgcMemRows* mrows, dgt_sint8 delete_fla
 	}
 	defineUserVars(mrows);
 	pcct_detect_info_in*	param_in = (pcct_detect_info_in*)mrows->data();
-#ifndef WIN32
+
 	DgcFileStream Stream(param_in->file_name,O_RDONLY);
-#else
-	DgcFileStream Stream(param_in->file_name,O_RDONLY|_O_BINARY);
-#endif
+
 	if (EXCEPT) THROWnR(DgcDbNetExcept(DGC_EC_DN_INVALID_ST,new DgcError(SPOS,"File[%s] open failed",param_in->file_name)),-1);
 
         PccFileCryptor detector;

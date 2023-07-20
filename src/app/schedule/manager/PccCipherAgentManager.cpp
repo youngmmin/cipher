@@ -486,7 +486,7 @@ dgt_sint32 PccCipherAgentManager::initialize(const dgt_schar* conf_file_path) th
 			if ((val=bg->getValue("manager.enc_tgt_sys_id"))) EncTgtSysID = dg_strtoll(val,0,10);
 
 			// crypt agent binary file path
-			if ((val=bg->getValue("manager.client_agent_bin_path"))) {
+			if ((val=bg->getValue("manager.crypt_agent_bin_path"))) {
 				dgt_sint32 len = dg_strlen(val);
 				CryptAgentBinPath = new dgt_schar[len+1];
 				memset(CryptAgentBinPath,0,len+1);
@@ -552,8 +552,8 @@ dgt_sint32 PccCipherAgentManager::initialize(const dgt_schar* conf_file_path) th
 			if ((val=bg->getValue("manager.master_soha_conn.secondary.svc"))) strcpy(SecondarySohaSvc,val);
 			if ((val=bg->getValue("manager.master_soha_conn.primary.ip"))) strcpy(PrimarySohaConnIP,val);
 			if ((val=bg->getValue("manager.master_soha_conn.secondary.ip"))) strcpy(SecondarySohaConnIP,val);
-			if ((val=bg->getValue("manager.master_soha_conn.primary.port"))) PrimarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("manager.master_soha_conn.primary.port"))) SecondarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
+			if ((val=bg->getValue("manager.master_soha_conn.primary.dgnet_port"))) PrimarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
+			if ((val=bg->getValue("manager.master_soha_conn.secondary.dgnet_port"))) SecondarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
 		}
 #if 0
 		if (bg->getNode("agent")) {
@@ -581,11 +581,7 @@ dgt_void PccCipherAgentManager::getCryptManagerStatus(pcct_manager_status* statu
 {
 	if (status) {
 		status->manager_id = encTgtSysID();
-#ifndef WIN32
 		status->manager_pid = (dgt_sint64)getpid();
-#else
-		status->manager_pid = (dgt_sint64)GetCurrentProcessId();
-#endif
 		status->num_agents = NumAgents;
 		status->soha_conn_status = SohaConnStatus;
 		memcpy(status->primary_soha_svc,PrimarySohaSvc,sizeof(PrimarySohaSvc));

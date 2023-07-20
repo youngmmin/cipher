@@ -121,16 +121,14 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob* job,DgcBgrammer* bg)
 		dgt_sint32	max_use_cores = 10;
 		dgt_sint32	collect_interval = 0;
 		dgt_schar*	val;
-#ifndef WIN32
+
 		if ((val=bg->getValue("agent.id"))) agent_id = dg_strtoll(val,0,10);
-#else
-		if ((val=bg->getValue("agent.id"))) agent_id = (dgt_sint64)_strtoi64(val,0,10);
-#endif
+
 		if (JobPool.agentID() == 0 && agent_id == 0) {
 			THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"agent.id not defined[%s]",bg->getText())),-1);
 		}
 		if (JobPool.agentID() == 0) JobPool.setAgentID(agent_id);
-#ifndef WIN32
+
 		if ((val=bg->getValue("agent.max_detection"))) MaxDetection = dg_strtoll(val,0,10);
 		if ((val=bg->getValue("agent.command_mode"))) CommandMode = (dgt_sint32)dg_strtoll(val,0,10);
 		if ((val=bg->getValue("agent.log_file_path"))) openLogStream(val);
@@ -194,27 +192,6 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob* job,DgcBgrammer* bg)
                                 BufferSize=(dgt_sint32)dg_strtoll(val,0,10);
                         }
 		}
-#else
-		if ((val=bg->getValue("agnet.max_detection"))) MaxDetection = (dgt_sint64)_strtoi64(val,0,10);
-		if ((val=bg->getValue("agent.command_mode"))) CommandMode = (dgt_sint64)_strtoi64(val,0,10);
-		if ((val=bg->getValue("agent.log_file_path"))) openLogStream(val);
-		if ((val=bg->getValue("agent.max_target_files"))) {
-			file_queue_size = (dgt_sint32)_strtoi64(val,0,10);
-			JobPool.setFileQueueSize(file_queue_size);
-		}
-		if ((val=bg->getValue("agent.max_use_cores"))) max_use_cores = (dgt_sint32)_strtoi64(val,0,10);
-		Repository.corePool().setCores(max_use_cores);
-		if ((val=bg->getValue("agent.init_managers"))) NumManagers = (dgt_sint32)_strtoi64(val,0,10);
-		if ((val=bg->getValue("agent.no_session_sleep_count"))) NoSessionSleepCount = (dgt_sint64)_strtoi64(val,0,10);
-		if ((val=bg->getValue("agent.collecting_interval"))) {
-			collect_interval = (dgt_sint32)_strtoi64(val,0,10);
-			JobPool.setCollectInterval(collect_interval);
-		}
-		if ((val=bg->getValue("agent.trace_level"))) {
-			trace_level = (dgt_sint32)_strtoi64(val,0,10);
-			JobPool.setTraceLevel(trace_level);
-		}
-#endif
 
 		if (CommandMode) {
 			if (job->start(PCC_AGENT_TYPE_TEMPORARY_JOB,1,file_queue_size,collect_interval) < 0) {
@@ -373,7 +350,7 @@ dgt_sint32 PccCipherAgentService::initialize(
 	JobPool.setCollectInterval(collect_interval);
 	NoSessionSleepCount = no_sess_sleep_conunt;
 	JobPool.setTraceLevel(trace_level);
-#ifndef WIN32
+
 	// for unix domain socket stream
 	dgt_sint32 addr_len = dg_strlen(uds_listen_dir) + 100;
 	UdsListenAddr = new dgt_schar[addr_len];
@@ -382,7 +359,6 @@ dgt_sint32 PccCipherAgentService::initialize(
 	if (SessionPool.initialize(num_sessions, primary_sess_ip,primary_sess_port,secondary_sess_ip,secondary_sess_port) < 0){
 		ATHROWnR(DgcError(SPOS,"initialize session_pool failed"),-1);
 	}
-#endif
 	return 0;
 }
 
@@ -441,11 +417,7 @@ dgt_void PccCipherAgentService::getCryptAgentStatus(pcct_agent_status* status)
 {
 	if (status) {
 		status->agent_id = agentID();
-#ifndef WIN32
 		status->agent_pid = (dgt_sint64)getpid();
-#else
-		status->agent_pid = (dgt_sint64)GetCurrentProcessId();
-#endif
 		status->max_target_files = JobPool.fileQueueSize();
 		status->max_use_cores = Repository.corePool().totalCores();
 		status->num_managers = Repository.managerPool().numManagers();
@@ -455,7 +427,6 @@ dgt_void PccCipherAgentService::getCryptAgentStatus(pcct_agent_status* status)
 
 
 #include "revision.h"
-#ifndef WIN32
 #include "DgcSigManager.h"
 
 void help_message()
@@ -530,54 +501,17 @@ int main(dgt_sint32 argc,dgt_schar** argv)
 	}
 
 	PccCipherAgentService*	agent_service = new PccCipherAgentService();
-#if 0/*{{{*/
-	if(argc == 16) {
-		dgt_sint64 agent_id = argv[1]?dg_strtoll(argv[1],0,10):0;
-		dgt_schar* uds_listen_dir = argv[3];
-		dgt_schar* log_dir = argv[4];
-		dgt_sint32 max_target_files = argv[5]?(dgt_sint32)dg_strtoll(argv[5],0,10):0;
-		dgt_sint32 max_use_cores = argv[6]?(dgt_sint32)dg_strtoll(argv[6],0,10):0;
-		dgt_sint32 init_managers = argv[7]?(dgt_sint32)dg_strtoll(argv[7],0,10):0;
-		dgt_sint32 collect_interval = argv[8]?(dgt_sint32)dg_strtoll(argv[8],0,10):0;
-		dgt_sint32 no_sess_sleep_conunt = argv[9]?(dgt_sint32)dg_strtoll(argv[9],0,10):0;
-		dgt_sint32 trace_level = argv[10]?(dgt_sint32)dg_strtoll(argv[10],0,10):0;
-		dgt_sint32 num_sessions = argv[11]?(dgt_sint32)dg_strtoll(argv[11],0,10):0;
-		dgt_schar* primary_sess_ip = argv[12];
-		dgt_uint16 primary_sess_port = argv[13]?(dgt_sint32)dg_strtoll(argv[13],0,10):0;
-		dgt_schar* secondary_sess_ip = argv[14];
-		dgt_uint16 secondary_sess_port = argv[15]?(dgt_sint32)dg_strtoll(argv[15],0,10):0;
-		if (agent_service->initialize(agent_id,
-								uds_listen_dir,
-								log_dir,
-								max_target_files,
-								max_use_cores,
-								init_managers,
-								collect_interval,
-								no_sess_sleep_conunt,
-								trace_level,
-								num_sessions,
-								primary_sess_ip,
-								primary_sess_port,
-								secondary_sess_ip,
-								secondary_sess_port) < 0) {
-			DgcExcept*  e = EXCEPTnC;
-			e->print();
-			DgcWorker::PLOG.tprintf(0,*e,"initialize[%s] failed:\n",argv[1]);
-			delete e;
-			printf("initialize[%s] failed.\n",argv[1]);
-			return -2;
-		}
-#endif/*}}}*/
-//	} else {
-		if (agent_service->initialize(conf_file_path, agent_id) < 0) {
-			DgcExcept*  e = EXCEPTnC;
-			e->print();
-			DgcWorker::PLOG.tprintf(0,*e,"initialize[%s] failed:\n",conf_file_path);
-			delete e;
-			printf("initialize[%s] failed.\n",conf_file_path);
-			return -2;
-		}
-//	}
+	
+	if (agent_service->initialize(conf_file_path, agent_id) < 0)
+	{
+		DgcExcept *e = EXCEPTnC;
+		e->print();
+		DgcWorker::PLOG.tprintf(0, *e, "initialize[%s] failed:\n", conf_file_path);
+		delete e;
+		printf("initialize[%s] failed.\n", conf_file_path);
+		return -2;
+	}
+
 	if (strcasecmp(cmd,"start")) {
 		DgcExcept* msg_e = 0;
 		// set msg_type
@@ -999,118 +933,3 @@ int main(dgt_sint32 argc,dgt_schar** argv)
 	delete agent_service;
 	return 0;	
 }
-#else
-#include "Windows.h"
-SERVICE_STATUS_HANDLE g_hSrv; 
-DWORD g_NowState; 
-BOOL g_bPause; 
-HANDLE Exit_Event; 
-int ServiceMain1(DWORD argc, LPTSTR *argv); 
-void ServiceHandler (DWORD fdwControl);
-void SetStatus ( DWORD dwState, DWORD dwAccept);
-
-void ServiceHandler (DWORD fdwControl)  
-{ 
-    if(fdwControl == g_NowState) 
-        return ; 
-   
-    switch(fdwControl){ 
-       
-        case SERVICE_CONTROL_PAUSE: 
-            SetStatus (SERVICE_PAUSE_PENDING,0); 
-            g_bPause=TRUE; 
-            SetStatus (SERVICE_PAUSED, 3); 
-            break; 
-   
-        case SERVICE_CONTROL_CONTINUE: 
-            SetStatus (SERVICE_CONTINUE_PENDING,0); 
-            g_bPause=FALSE; 
-            SetStatus (SERVICE_RUNNING, 3); 
-            break; 
-   
-        case SERVICE_CONTROL_STOP: 
-            SetStatus (SERVICE_STOP_PENDING,0); 
-            SetStatus (SERVICE_STOPPED,0); 
-            break; 
-       
-        case SERVICE_CONTROL_INTERROGATE: 
-        default: 
-            SetStatus(g_NowState, 3); 
-            break; 
-           
-    } 
-   
-} 
- 
-void SetStatus ( DWORD dwState, DWORD dwAccept) 
-{ 
-	SERVICE_STATUS ss; 
-	ss.dwServiceType = SERVICE_WIN32_OWN_PROCESS; 
-	ss.dwCurrentState = dwState; 
-	ss.dwControlsAccepted = dwAccept; 
-	ss.dwWin32ExitCode = 0; 
-	ss.dwServiceSpecificExitCode = 0; 
-	ss.dwCheckPoint=0; 
-	ss.dwWaitHint =0; 
-	g_NowState = dwState; 
-	SetServiceStatus (g_hSrv, &ss); 
-}
-int main(int argc, char* argv[]) 
-{ 
-	SERVICE_TABLE_ENTRY ste[] =
-	{ 
-		{"PetraFileCipher",(LPSERVICE_MAIN_FUNCTION)ServiceMain1}, 
-		{NULL, NULL} 
-		}; 
-	StartServiceCtrlDispatcher(ste); 
-	return 0;
-}
-
-#if 1 // added by chchung 2018.9.28 for PCFS auto mount
-#include "PccPcfsConfig.h"
-#endif
-
-int ServiceMain1(DWORD argc, LPTSTR *argv)
-{
-	g_hSrv = RegisterServiceCtrlHandler("PetraFileCipher", (LPHANDLER_FUNCTION)ServiceHandler); 
-	if (g_hSrv == 0) { 
-		return -1; 
-	} 
-	SetStatus(SERVICE_START_PENDING, 3); 
-	SetStatus (SERVICE_RUNNING, 3); 
-	PccCipherAgentService*	agent_service = new PccCipherAgentService();
-	if (agent_service->initialize("C:\\Program Files\\sinsiway\\petra\\api\\agent.conf") < 0) {
-		DgcExcept*  e = EXCEPTnC;
-		e->print();
-		DgcWorker::PLOG.tprintf(0,*e,"initialize failed:\n");
-		delete e;
-		printf("initialize failed.\n");
-		return 2;
-	}
-		DgcWorker::PLOG.tprintf(0,"revision : %d\n",cipher_revision());
-	if (agent_service->commandMode()) return 0;
-
-#if 1 // added by chchung, 2018.9.28 for PCFS auto mount
-        PccPcfsConfig   pcfs_config;
-        if (pcfs_config.parse() > 0) {
-                for(dgt_uint16 i=0; i<pcfs_config.numFs(); i++) {
-                        if (strncasecmp(pcfs_config.fsAttrsByIdx(i)->auto_mount,"yes",3) == 0) {
-                                pcfs_config.mount(i,pcfs_config.MTT_MOUNT);
-                                DgcWorker::PLOG.tprintf(0,"sent a mount request for pcfs[%s]\n",pcfs_config.fsAttrsByIdx(i)->mount_dir);
-                        }
-                }
-        }
-        DgcExcept*  e = EXCEPTnC;
-        if (e) {
-                e->print();
-                DgcWorker::PLOG.tprintf(0,*e,"pcfs auto-mount failed:\n");
-                delete e;
-        }
-#endif
-
-
-	agent_service->wa()->ThreadID=pthread_self();
-	DgcWorker::entry((dgt_void*)agent_service);
-	return 0;	
-}
-#endif

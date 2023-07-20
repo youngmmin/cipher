@@ -90,11 +90,7 @@ dgt_sint32 PccValidationFileStmt::execute(DgcMemRows* mrows, dgt_sint8 delete_fl
 		if (rtn) THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"get zone param failed :",rtn)),-1);
 
 		if (JobPool.traceLevel() > 10) DgcWorker::PLOG.tprintf(0,"zone param :%s \n",out_param);
-#ifndef WIN32
 		out_param_len = dg_strlen(out_param);
-#else
-		out_param_len = strlen(out_param);
-#endif
 		dgt_schar* parameters = new dgt_schar[out_param_len+1024];
 		memset(parameters,0,out_param_len+1024);
 

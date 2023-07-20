@@ -18,12 +18,6 @@
 
 #include "DgcFileStream.h"
 
-#ifdef WIN32
-//#include "win_dirent.h"
-#include "dirent_win32.h"
-#endif
-
-
 class PccAgentStmt : public DgcObject {
   private:
   protected:

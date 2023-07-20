@@ -111,11 +111,7 @@ dgt_sint32 PccCryptSchedule::setParams(DgcBgrammer* bg) throw(DgcExcept)
 	dgt_schar*		val;
 	pcct_week_schedule	ws;
 	memset(&ws,0,sizeof(ws));
-#ifndef WIN32
 	if ((val=bg->getValue("schedule.id")) && *val) ws.id = dg_strtoll(val,0,10);
-#else
-	if ((val=bg->getValue("schedule.id")) && *val) ws.id = (dgt_sint64)_strtoi64(val,0,10);
-#endif
 	if ((val=bg->getValue("schedule.week_map")) && *val) ws.week_map = (dgt_uint8)strtol(val,0,10);
 	if ((val=bg->getValue("schedule.start_hour")) && *val) ws.start_hour = (dgt_uint8)strtol(val,0,10);
 	if ((val=bg->getValue("schedule.end_hour")) && *val) ws.end_hour = (dgt_uint8)strtol(val,0,10);
@@ -124,11 +120,7 @@ dgt_sint32 PccCryptSchedule::setParams(DgcBgrammer* bg) throw(DgcExcept)
 	if ((val=bg->getValue("schedule.use_cores")) && *val) ws.use_cores = (dgt_uint16)strtol(val,0,10);
 	if ((val=bg->getValue("schedule.buffer_size")) && *val) ws.buffer_size = (dgt_uint32)strtol(val,0,10);
 	if ((val=bg->getValue("schedule.buffer_count")) && *val) ws.buffer_count = (dgt_uint32)strtol(val,0,10);
-#ifndef WIN32
 	if ((val=bg->getValue("schedule.run_size")) && *val) ws.run_size = dg_strtoll(val,0,10);
-#else
-	if ((val=bg->getValue("schedule.run_size")) && *val) ws.run_size = (dgt_sint64)_strtoi64(val,0,10);
-#endif
 	if (setWeekSchedule(&ws) < 0) {
 		ATHROWnR(DgcError(SPOS,"setWeekSchedule failed"),-1);
 	}

@@ -59,11 +59,9 @@ class PccCryptMir : public DgcObject {
 	dgt_void decReference() { RefCount--; }
 	dgt_sint8 isRefered() { return RefCount; }
 	dgt_sint32 reset();
-#ifndef WIN32
+	
 	pcct_file_node* checkFileNode(struct stat* fstat,dgt_sint64 ino=0);
-#else
-	pcct_file_node* checkFileNode(struct _stati64* fstat,dgt_sint64 ino=0);
-#endif
+
 	dgt_void setLastModified(dgt_time last_modified);
 	PccCryptMir* getChildMir(dgt_uint64 file_id,dgt_time last_modified);
 	dgt_void closeMir();

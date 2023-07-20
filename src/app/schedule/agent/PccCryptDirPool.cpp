@@ -127,15 +127,11 @@ dgt_sint32 PccCryptDirPool::setCryptDirParams(DgcBgrammer* bg) throw(DgcExcept)
 	dgt_schar*	dst_dir = 0;
 	pct_crypt_zone_dir_rule dir_rule;
 	memset(&dir_rule,0,sizeof(pct_crypt_zone_dir_rule));
-#ifndef WIN32
+
 	if ((val=bg->getValue("crypt_dir.id")) && *val) dir_id = dg_strtoll(val,0,10);
 	if ((val=bg->getValue("crypt_dir.zone_id")) && *val) zone_id = dg_strtoll(val,0,10);
 	if ((val=bg->getValue("crypt_dir.status")) && *val) status = (dgt_uint8)dg_strtoll(val,0,10);
-#else
-	if ((val=bg->getValue("crypt_dir.id")) && *val) dir_id = (dgt_sint64)_strtoi64(val,0,10);
-	if ((val=bg->getValue("crypt_dir.zone_id")) && *val) zone_id = (dgt_sint64)_strtoi64(val,0,10);
-	if ((val=bg->getValue("crypt_dir.status")) && *val) status = (dgt_uint8)_strtoi64(val,0,10);
-#endif
+
 	src_dir=bg->getValue("crypt_dir.src_dir");
 	dst_dir=bg->getValue("crypt_dir.dst_dir");
 	if (dir_id == 0 || zone_id == 0) {
@@ -164,12 +160,9 @@ dgt_sint32 PccCryptDirPool::setDirPttn(DgcBgrammer* bg) throw(DgcExcept)
 	dgt_sint32 rtn = 0;
 	dgt_schar err_string[1024];
 	memset(err_string, 0, sizeof(err_string));
-	if ((val=bg->getValue("dir_pttn.enc_job_tgt_id")) && *val) {
-#ifndef WIN32
-	dir_id = dg_strtoll(val,0,10);
-#else
-	dir_id = (dgt_sint64)_strtoi64(val,0,10);
-#endif
+	if ((val = bg->getValue("dir_pttn.enc_job_tgt_id")) && *val)
+	{
+		dir_id = dg_strtoll(val, 0, 10);
 	}
 	PccCryptDir*   crypt_dir = getCryptDirWithDid(dir_id);
 	if (crypt_dir == 0) {
@@ -202,11 +195,7 @@ dgt_sint32 PccCryptDirPool::setFilePttn(DgcBgrammer* bg) throw(DgcExcept)
 	dgt_schar err_string[1024];
 	memset(err_string, 0, sizeof(err_string));
 	if ((val=bg->getValue("file_pttn.enc_job_tgt_id")) && *val) {
-#ifndef WIN32
 	dir_id = dg_strtoll(val,0,10);
-#else
-	dir_id = (dgt_sint64)_strtoi64(val,0,10);
-#endif
 	}
 	PccCryptDir*   crypt_dir = getCryptDirWithDid(dir_id);
 	if (crypt_dir == 0) {

@@ -58,11 +58,7 @@ class PccCipherAgentSvrSession : public DgcWorker {
 
 	inline	dgt_void resetIBuf() { PktStream->resetIBuf(); };
 	inline	dgt_sint32 setPacket(dgt_uint8 type=0) throw(DgcOsExcept,DgcStreamExcept) { return PktStream->setPacket(type); };
-#ifndef WIN32
 	inline	dgt_sint32 moveNext() { return PktStream->moveNext(); };
-#else
-	inline	dgt_sint32 moveNext() { return PktStream->moveNext(1); };
-#endif
 	inline	dgt_void mvicdpl() { PktStream->mvicdpl(); };
 	inline	dgt_uint8 icpt() { return PktStream->icpt(); };
 	inline	DgcPacket* newPacket(dgt_uint8 type,DgcPacket* packet=0) throw(DgcOsExcept,DgcStreamExcept) { return PktStream->newPacket(type,packet); };

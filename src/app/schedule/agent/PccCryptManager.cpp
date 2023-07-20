@@ -141,10 +141,6 @@ dgt_sint32 PccCryptManager::buildParam(PccCryptTargetFile& tf, PccAgentCryptJob*
 	return 0;
 }
 
-
-#ifdef WIN32
-#include "DgcCRC64.h"
-#endif
 dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(DgcExcept)
 {
 	WorkStage = 5;
@@ -177,7 +173,6 @@ dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(Dgc
 			}
 			Cryptor =  new PccFileCryptor(0,0,JobPool.traceLevel(),ManagerID);
 			dgt_sint32 rtn = 0;
-#ifndef WIN32
 			dgt_sint32 file_rtn=0;
 			struct stat file_info;
 			struct passwd *user;
@@ -187,7 +182,6 @@ dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(Dgc
 					Cryptor->setOsUser(user->pw_name);
     				}
 			}
-#endif
 			 // crypting
 			if ((rtn=Cryptor->crypt(SessionID,CryptParams,TargetFile.srcFileName(),OutFileName,AgentMode,EncColName,HeaderFlag,BufferSize)) < 0) {
 				//
@@ -220,13 +214,11 @@ dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(Dgc
 				// added by mwpark
 				// 18.10.02
 				// change file permission
-#ifndef WIN32
 				if (AgentMode > 0) {
 					if (file_rtn !=1) {
 						chown(OutFileName, file_info.st_uid, file_info.st_gid);
 					}
 				}
-#endif
 			} //if ((rtn=Cryptor->crypt(...)) < 0) else end
 
 			//added by shson 2019.07.04 for stream encryption statistic
@@ -453,7 +445,6 @@ dgt_sint32 PccCryptManager::fileCryption(PccAgentCryptJob* curr_job) throw(DgcEx
 			// added by mwpark 18.10.01
 			// for controlling os_user(file`s owner) 
 			//
-#ifndef WIN32
 			dgt_sint32 file_rtn=0;
 			struct stat file_info;
 			struct passwd *user;
@@ -463,7 +454,6 @@ dgt_sint32 PccCryptManager::fileCryption(PccAgentCryptJob* curr_job) throw(DgcEx
 					Cryptor->setOsUser(user->pw_name);
     				}
 			}
-#endif
 			dgt_sint32 rtn = 0;
 			 // crypting
 			if ((rtn=Cryptor->crypt(SessionID,CryptParams,TargetFile.srcFileName(),OutFileName,AgentMode,EncColName,HeaderFlag,BufferSize)) < 0) {
@@ -508,13 +498,11 @@ dgt_sint32 PccCryptManager::fileCryption(PccAgentCryptJob* curr_job) throw(DgcEx
 				// added by mwpark
 				// 18.10.02
 				// change file permission
-#ifndef WIN32
 				if (AgentMode > 0) {
 					if (file_rtn !=1) {
 						chown(OutFileName, file_info.st_uid, file_info.st_gid);
 					}
 				}
-#endif
 	
 			}
 			if (Cryptor) {
@@ -569,16 +557,11 @@ dgt_sint32 PccCryptManager::fileCryption(PccAgentCryptJob* curr_job) throw(DgcEx
 				//
 				memset(OutFileName,0,OutFileNameLen);
 				sprintf(OutFileName,"%s._PFC",TargetFile.dstFileName());
-#ifndef WIN32
+
 				struct stat	fstat;
 				if (stat(OutFileName,&fstat) == 0) {
 					pcct_file_node*	out_file_node = TargetFile.cryptMir()->checkFileNode(&fstat);
-#else	
-				struct _stat64     fstat;
-				if (_stati64(OutFileName,&fstat) == 0) {
-					dgt_sint64 crc_val=0;
-					pcct_file_node*	out_file_node = TargetFile.cryptMir()->checkFileNode(&fstat,DgcCRC64::calCRC64(crc_val,(dgt_uint8*)OutFileName,strlen(OutFileName)));
-#endif
+
 					out_file_node->file_size = TargetFile.fileNode()->file_size;
 					out_file_node->lm_time = TargetFile.fileNode()->lm_time;
 					out_file_node->cllt_time = TargetFile.fileNode()->cllt_time;

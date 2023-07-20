@@ -75,28 +75,16 @@ dgt_sint32 PccGetDirEntryStmt::execute(DgcMemRows* mrows, dgt_sint8 delete_flag)
 	}
 	dgt_sint32 curr_count = 0;
 	do {
-#ifndef WIN32
 		if ((rtn=readdir_r(DirPtr,entry,&result)) == 0) { // success
-#else
-		if ((result=readdir(DirPtr)) != NULL) { // success
-#endif
 				if (result == NULL) break; //readdir end
-#ifndef WIN32
 				if (strcmp(entry->d_name,".") == 0) continue;
-#else
-				if (strcmp(result->d_name,".") == 0) continue;
-#endif
 				curr_count++;
 				TotalCount++; 
 				if (FetchCount == curr_count) LastFetchOffset = telldir(DirPtr); //save the last fetch file offset
 				if (dir_entry_in->offset != 0 && dir_entry_in->offset == telldir(DirPtr)) curr_count = 0;  //this is offset before the last fetch 
 		} else { //readdir failed
-#ifndef WIN32
 				TotalCount = 0;
 				THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"readdir_r[%s] failed",DirPath)),0);
-#else
-                break; //reached end stream windows
-#endif
 		}
 	  } while(1); 
 		// rest count is small than fetch count or case same TotalCount and FetchCount
@@ -136,21 +124,13 @@ dgt_uint8* PccGetDirEntryStmt::fetch() throw(DgcExcept)
 	struct dirent*  result;
 	dgt_sint32      rtn = 0;
 	while(1) {
-#ifndef WIN32
         if ((rtn=readdir_r(DirPtr,entry,&result)) == 0) { // success
-#else
-        if ((result=readdir(DirPtr)) != NULL) { // success
-#endif
 		if (result == NULL || NumEntry == FetchCount) {
         		THROWnR(DgcDbNetExcept(NOT_FOUND,new DgcError(SPOS,"not found")),0);
 		}
-#ifndef WIN32
 				if (strcmp(entry->d_name,".") == 0) continue;
-#else
-				if (strcmp(result->d_name,".") == 0) continue;
-#endif
+
 NumEntry++;
-#ifndef WIN32
 		memset(&DirEntry,0,sizeof(DirEntry));
 		strncpy(DirEntry.name,entry->d_name,256);
 		DirEntry.curr_offset = LastFetchOffset;
@@ -186,51 +166,12 @@ NumEntry++;
 			}
 #endif
 		}
-#else/*{{{*/
-		memset(&DirEntry,0,sizeof(DirEntry));
-		strncpy(DirEntry.name,result->d_name,256);
-		DirEntry.curr_offset = LastFetchOffset;
-		DirEntry.total_count = TotalCount;
-		memset(SrcFile,0,1257);
-		sprintf(SrcFile,"%s\\%s",DirPath,result->d_name);
-		struct _stati64     fstat;
-                if (_stati64(SrcFile,&fstat) == 0) {
-                        DirEntry.file_id = fstat.st_ino;
-                        DirEntry.file_size = fstat.st_size;
-                        DirEntry.last_update = fstat.st_mtime;
-                        DirEntry.type = S_ISDIR(fstat.st_mode) ? 1 : 2; // 1 -> direcroty, 2 -> file
-#if 0
-                        if (S_ISREG(fstat.st_mode)) {
-                                dgt_sint8       rtn;
-                                if ((rtn=PccHeaderManager::isEncrypted(SrcFile)) < 0) delete EXCEPTnC;
-                                else if (rtn > 0) DirEntry.encrypt_flag = 1;
-                                if (CryptDir && CryptDir->isTargetFile(result->d_name)) {
-                                        DirEntry.dir_id = CryptDir->dirID();
-                                        DirEntry.zone_id = CryptDir->cryptZone()->zoneID();
-                                }
-                        } else if (DirEntry.type == 1 && CryptDir && CryptDir->isTargetDir(result->d_name)) {
-                                DirEntry.dir_id = CryptDir->dirID();
-                                DirEntry.zone_id = CryptDir->cryptZone()->zoneID();
-                        }
-#else
-			if (S_ISREG(fstat.st_mode)) {
-				dgt_sint8	rtn=0;
-				if ((rtn=PccHeaderManager::isEncrypted(SrcFile)) < 0) delete EXCEPTnC;
-				else if (rtn > 0) {
-					DirEntry.encrypt_flag = rtn;	
-				} 
-			}
-#endif
-                } else DirEntry.type = 1;//_stati64 failed :nullity file ex)c:\Users\ALL Users
-#endif/*}}}*/
+
 		return (dgt_uint8*)&DirEntry;
 	} else {
-#ifndef WIN32
 		NumEntry = 0;
 		THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"readdir_r[%s] failed",DirPath)),0);
-#else
-		//reached end stream in windows
-#endif
+
 	}
 		break;
 		} //while end

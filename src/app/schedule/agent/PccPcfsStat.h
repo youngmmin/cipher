@@ -15,11 +15,7 @@
 #include "DgcFileStream.h"
 #include "PccPcfsMsg.h"
 
-#ifndef WIN32
 static const dgt_schar*	DFLT_PCFS_STAT_PATH = "/var/tmp/.petra/pcfs.stat";
-#else
-static const dgt_schar*	DFLT_PCFS_STAT_PATH = "c:\\program files\\sinsiway\\petra\\pcfs\\pcfs.stat";
-#endif
 
 class PccPcfsStat : public DgcObject {
   private:
@@ -59,12 +55,10 @@ class PccPcfsStat : public DgcObject {
 		if (EXCEPT == 0) {
 			if (stat_file.seek(PcfsID*sizeof(pcfst_fs_stat),SEEK_SET) >= 0) {
 				stat_file.recvData((dgt_uint8*)fs_stat,sizeof(pcfst_fs_stat));
-#ifndef WIN32
 				if (fs_stat->pid == 0 || (kill((pid_t)fs_stat->pid,0) && errno == ESRCH)) {
 					// no pcfs daemon
 					memset(fs_stat,0,sizeof(pcfst_fs_stat));
 				}
-#endif
 			}
 		}
 		fs_stat->pcfs_id = PcfsID;

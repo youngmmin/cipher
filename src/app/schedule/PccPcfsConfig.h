@@ -23,18 +23,10 @@ typedef struct {
 	dgt_schar*	param_path;
 } pcfst_fs_attr_list;
 
-#ifndef WIN32
 static const dgt_schar* DFLT_FS_LIST_PATH = "/var/tmp/.petra/pcfs.conf";
 static const dgt_schar* PCFS_DAEMON_BIN = "pcfs4lnx";
 static const dgt_schar* PCFS_UMOUNT_DIR = "/usr/local/bin";
 static const dgt_schar* PCFS_UMOUNT_BIN = "fusermount3";
-#else
-#include <shellapi.h> // shell32.lib
-static const dgt_schar* PCFS_WIN_ROOT_PATH = "c:\\program files\\sinsiway\\petra\\pcfs";
-static const dgt_schar* DFLT_FS_LIST_PATH = "c:\\program files\\sinsiway\\petra\\pcfs\\conf\\pcfs.conf";
-static const dgt_schar* PCFS_DAEMON_BIN = "pcfs4win.exe";
-static const dgt_schar* PCFS_UMOUNT_BIN = "dokanctl.exe";
-#endif
 
 class PccPcfsConfig : public DgcObject {
   private:
@@ -85,7 +77,6 @@ class PccPcfsConfig : public DgcObject {
 
 	dgt_sint32 mount(dgt_uint16 pcfs_id,dgt_uint16 type) throw(DgcExcept)
 	{
-#ifndef WIN32
 		if (pcfs_id < NumFs) {
 			dgt_schar	pcfs_id_str[32]={0,};
 			dgt_schar	proc_path[257]={0,};
@@ -123,35 +114,6 @@ class PccPcfsConfig : public DgcObject {
 			return 0;
 		}
 		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"invalid pcfs id[%u]",pcfs_id)),-1);
-#else 
-		// for windows, executing the file system process
-		if (pcfs_id < NumFs) {
-			dgt_schar	proc_path[257] = { 0, };
-			dgt_schar   params[257] = { 0, };
-
-			if (type == MTT_MOUNT) {
-				sprintf(proc_path, "%s\\%s", PCFS_WIN_ROOT_PATH, PCFS_DAEMON_BIN);
-				sprintf(params, "/r %s /l %s /y %u /z \"%s\"", 
-					            FsList[pcfs_id].root_dir,        // root dir
-					            FsList[pcfs_id].device,          // mount device
-					            pcfs_id,                         // id
-					            FsList[pcfs_id].param_path       // parameter file path
-				);
-                // FsList[pcfs_id].mount_dir can be created
-				// with the command of "MKLINK /D device:\ mount_drive"	
-			}
-			else {
-				sprintf(proc_path, "%s\\%s", PCFS_WIN_ROOT_PATH, PCFS_UMOUNT_BIN);
-				sprintf(params, "/u %s",
-					FsList[pcfs_id].device       // mount device
-				);
-			}
-
-			ShellExecuteA(NULL, "open", proc_path, params, NULL, SW_SHOW);
-			return 0;
-		}
-		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"not supported win32[%u]",pcfs_id)),-1);
-#endif
 	}
 };
 

@@ -8,7 +8,7 @@
 #
 include ../../../Makefile.inc
 
-CXXFLAGS:=-I.. ${CXXFLAGS}
+CXXFLAGS:=-I.. -I../../../lib -I../../../apisession ${CXXFLAGS}
 
 #############################################################################
 # global definitions

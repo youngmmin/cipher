@@ -19,15 +19,8 @@
 #include "PccCryptTargetFileQueue.h"
 #include "PcaApiSessionPool.h"
 #include "../../../../lib/cipher/PccRegExprList.h"
-#ifdef WIN32
-//#include "win_dirent.h"
-#include "dirent_win32.h"
-#endif
-#ifndef WIN32
 #include <regex.h>
-#else
-#include <regex>
-#endif
+
 
 typedef struct {
 	dgt_sint32 dir_depth;
@@ -84,17 +77,10 @@ class PccCryptDir : public DgcObject {
 
 	inline dgt_sint8 lock() { return DgcSpinLock::lock(&DirLock); };
 	inline dgt_void unlock() { DgcSpinLock::unlock(&DirLock); };
-#ifndef WIN32
 	inline dgt_void setSrcDir(const dgt_schar* src_dir) { memset(SrcDir,0,MAX_FILE_LEN+1); strncpy(SrcDir,src_dir,dg_strlen(src_dir)); };
 	inline dgt_void setDstDir(const dgt_schar* dst_dir) { memset(DstDir,0,MAX_FILE_LEN+1); strncpy(DstDir,dst_dir,dg_strlen(dst_dir)); };
 	inline dgt_void setTmpSrcPath(const dgt_schar* src_dir) { memset(TmpSrcPath,0,4500); strncpy(TmpSrcPath,src_dir,dg_strlen(src_dir)); };
 	inline dgt_void setTmpDstPath(const dgt_schar* dst_dir) { memset(TmpDstPath,0,4500); strncpy(TmpDstPath,dst_dir,dg_strlen(dst_dir)); };
-#else
-	inline dgt_void setSrcDir(const dgt_schar* src_dir) { memset(SrcDir,0,MAX_FILE_LEN+1); strncpy(SrcDir,src_dir,strlen(src_dir)); };
-	inline dgt_void setDstDir(const dgt_schar* dst_dir) { memset(DstDir,0,MAX_FILE_LEN+1); strncpy(DstDir,dst_dir,strlen(dst_dir)); };
-	inline dgt_void setTmpSrcPath(const dgt_schar* src_dir) { memset(TmpSrcPath,0,4500); strncpy(TmpSrcPath,src_dir,strlen(src_dir)); };
-	inline dgt_void setTmpDstPath(const dgt_schar* dst_dir) { memset(TmpDstPath,0,4500); strncpy(TmpDstPath,dst_dir,strlen(dst_dir)); };
-#endif
 	inline dgt_void setStatus(dgt_uint8 status) { Status = status; CryptStat.job_status = status; };
 	inline dgt_void setDirRule(pct_crypt_zone_dir_rule* dir_rule) { if (dir_rule) memcpy(&DirRule, dir_rule, sizeof(pct_crypt_zone_dir_rule)); };
 
