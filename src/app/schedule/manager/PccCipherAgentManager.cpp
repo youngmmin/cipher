@@ -185,48 +185,7 @@ dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, const dgt
 		setsid();
 		dgt_schar v_agent_id[20];
 		sprintf(v_agent_id,"%lld",agent_id);
-#if 0
-		dgt_schar v_max_target_files[10];
-		dgt_schar v_max_use_cores[10];
-		dgt_schar v_init_managers[10];
-		dgt_schar v_collect_interval[10];
-		dgt_schar v_no_sess_sleep_conunt[10];
-		dgt_schar v_trace_level[10];
-		dgt_schar v_num_sessions[10];
-		dgt_schar* v_primary_sess_ip = 0;
-		dgt_schar v_primary_sess_port[10];
-		dgt_schar* v_secondary_sess_ip = 0;
-		dgt_schar v_secondary_sess_port[10];
-		sprintf(v_max_target_files,"%d",CryptAgentParam.max_target_files);
-		sprintf(v_max_use_cores,"%d",CryptAgentParam.max_use_cores);
-		sprintf(v_init_managers,"%d",CryptAgentParam.init_managers);
-		sprintf(v_collect_interval,"%d",CryptAgentParam.collect_interval);
-		sprintf(v_no_sess_sleep_conunt,"%d",CryptAgentParam.no_sess_sleep_conunt);
-		sprintf(v_trace_level,"%d",CryptAgentParam.trace_level);
-		sprintf(v_num_sessions,"%d",CryptAgentParam.num_sessions);
-		v_primary_sess_ip = CryptAgentParam.primary_sess_ip;
-		sprintf(v_primary_sess_port,"%u",CryptAgentParam.primary_sess_port);
-		v_secondary_sess_ip = CryptAgentParam.secondary_sess_ip;
-		sprintf(v_secondary_sess_port,"%u",CryptAgentParam.secondary_sess_port);
-		dgt_schar* args[17]={
-				(dgt_schar*)"pcp_crypt_agent",
-				v_agent_id,
-				(dgt_schar*)cmd,
-				UdsListenDir,
-				LogFileDir,
-				v_max_target_files,
-				v_max_use_cores,
-				v_init_managers,
-				v_collect_interval,
-				v_no_sess_sleep_conunt,
-				v_trace_level,
-				v_num_sessions,
-				v_primary_sess_ip,
-				v_primary_sess_port,
-				v_secondary_sess_ip,
-				v_secondary_sess_port,
-				(dgt_schar*)0};
-#else
+
 		dgt_schar* prog_name = 0;
 		prog_name = (dgt_schar*)"pcp_crypt_agent";
 
@@ -239,7 +198,6 @@ dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, const dgt
 				v_agent_id,
 				(dgt_schar*)cmd, 
 				NULL};
-#endif
 		execv(proc_path, args);
 		DgcWorker::PLOG.tprintf(0,"execv[%s] failed due to [%s].\n",proc_path,strerror(errno));
 		exit(errno);
