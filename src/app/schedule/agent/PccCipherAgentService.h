@@ -25,7 +25,6 @@ class PccCipherAgentService : public DgcWorker {
 	PccAgentCryptJob*			CryptJob;
 	dgt_sint32					NumManagers;
 	dgt_sint32					NoSessionSleepCount;
-	dgt_sint32					CommandMode;
 	dgt_schar*					UdsListenAddr;
 	dgt_uint8					StopFlag;
 	dgt_sint32					AgentMode;
@@ -46,7 +45,6 @@ class PccCipherAgentService : public DgcWorker {
 
 	inline dgt_void askStop() { StopFlag = 1; };
 	inline const dgt_schar* udsListenAddr() { return UdsListenAddr; };
-	inline dgt_sint32 commandMode() { return CommandMode; }
 	inline dgt_sint64 agentID() { return JobPool.agentID(); };
 	inline PccAgentCryptJobPool* jobPool() { return &JobPool; };
 	dgt_sint32 initialize(

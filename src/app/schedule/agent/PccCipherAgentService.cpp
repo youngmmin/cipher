@@ -22,7 +22,6 @@ PccCipherAgentService::PccCipherAgentService()
 	CryptJob = 0;
 	NumManagers = 0;
 	NoSessionSleepCount = 0;
-	CommandMode = 0;
 	UdsListenAddr = 0;
 	StopFlag = 0;
 	AgentMode = 0;
@@ -67,125 +66,109 @@ dgt_void PccCipherAgentService::openLogStream(const dgt_schar* log_file_path)
     	}
 }
 
-
-dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob* job,DgcBgrammer* bg) throw(DgcExcept)
+dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job, DgcBgrammer *bg) throw(DgcExcept)
 {
-	if (bg->getNode("agent")) {
-		dgt_sint32	trace_level = 0;
-		dgt_sint64	agent_id = 0;
-		dgt_sint32	file_queue_size = 0;
-		dgt_sint32	fail_file_queue_size = 0;
-		dgt_sint32	nullity_file_queue_size = 0;
-		dgt_sint32	max_use_cores = 10;
-		dgt_sint32	collect_interval = 0;
-		dgt_schar*	val;
+	dgt_sint32 trace_level = 0;
+	dgt_sint64 agent_id = 0;
+	dgt_sint32 file_queue_size = 0;
+	dgt_sint32 fail_file_queue_size = 0;
+	dgt_sint32 nullity_file_queue_size = 0;
+	dgt_sint32 max_use_cores = 0;
+	dgt_sint32 collect_interval = 0;
+	dgt_schar *val;
 
-		if ((val=bg->getValue("agent.id"))) agent_id = dg_strtoll(val,0,10);
-
-		if (JobPool.agentID() == 0 && agent_id == 0) {
-			THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"agent.id not defined[%s]",bg->getText())),-1);
-		}
-		if (JobPool.agentID() == 0) JobPool.setAgentID(agent_id);
-
-		if ((val=bg->getValue("agent.command_mode"))) CommandMode = (dgt_sint32)dg_strtoll(val,0,10);
-		if ((val=bg->getValue("agent.log_file_path"))) openLogStream(val);
-		if ((val=bg->getValue("agent.max_target_files"))) {
-			file_queue_size = (dgt_sint32)dg_strtoll(val,0,10);
-			if (file_queue_size) JobPool.setFileQueueSize(file_queue_size);
-		}
-		if ((val=bg->getValue("agent.max_fail_files"))) {
-			fail_file_queue_size = (dgt_sint32)dg_strtoll(val,0,10);
-			if (fail_file_queue_size) JobPool.setFailFileQueueSize(fail_file_queue_size);
-		}
-		if ((val=bg->getValue("agent.max_nullity_files"))) {
-			nullity_file_queue_size = (dgt_sint32)dg_strtoll(val,0,10);
-			if (nullity_file_queue_size) JobPool.setNullityFileQueueSize(nullity_file_queue_size);
-		}
-		if ((val=bg->getValue("agent.max_use_cores"))) max_use_cores = (dgt_sint32)dg_strtoll(val,0,10);
-		Repository.corePool().setCores(max_use_cores);
-		if ((val=bg->getValue("agent.init_managers"))) NumManagers = (dgt_sint32)dg_strtoll(val,0,10);
-		if ((val=bg->getValue("agent.no_session_sleep_count"))) NoSessionSleepCount = (dgt_sint32)dg_strtoll(val,0,10);
-		if (!NoSessionSleepCount) NoSessionSleepCount = 5;
-		if ((val=bg->getValue("agent.collecting_interval"))) {
-			collect_interval = (dgt_sint32)dg_strtoll(val,0,10);
-			JobPool.setCollectInterval(collect_interval);
-		}
-		if ((val=bg->getValue("agent.trace_level"))) {
-			trace_level = (dgt_sint32)dg_strtoll(val,0,10);
-			JobPool.setTraceLevel(trace_level);
-		}
-
-
-		// for unix domain socket stream
-		if ((val=bg->getValue("agent.uds_listen_addr"))) {
-			dgt_sint32 addr_len = dg_strlen(val) + 100;
-			UdsListenAddr = new dgt_schar[addr_len];
-			sprintf(UdsListenAddr,"%s/pcp_crypt_agent_%lld.s",val,JobPool.agentID());
-		} else {
-			UdsListenAddr = new dgt_schar[129];
-			sprintf(UdsListenAddr,"/var/tmp/.petra/pcp_crypt_agent_%lld.s",JobPool.agentID());
-		}
-
-		// added by mwpark 18.10.03
-		// for performance test
-		// agent_mode = 0: default
-		//              1: private session & controlling file owner
-		//              2: no bgrammer, key, header flag, buffer_size (config_file)
-		if ((val=bg->getValue("agent.mode"))) {
-			AgentMode=(dgt_sint32)dg_strtoll(val,0,10);
-                }
-		if (AgentMode >= 2) {
-			if ((val=bg->getValue("agent.enc_col_name"))) {
-				EncColName=new dgt_schar[128];
-				memset(EncColName,0,128);
-				memcpy(EncColName,val,strlen(val));
-	                }
-			if ((val=bg->getValue("agent.header_flag"))) {
-				HeaderFlag=new dgt_schar[128];
-				memset(HeaderFlag,0,128);
-				memcpy(HeaderFlag,val,strlen(val));
-	                }
-			if ((val=bg->getValue("agent.buffer_size"))) {
-                                BufferSize=(dgt_sint32)dg_strtoll(val,0,10);
-                        }
-		}
-
-		if (CommandMode) {
-			if (job->start(PCC_AGENT_TYPE_TEMPORARY_JOB,1,file_queue_size,collect_interval) < 0) {
-				DgcExcept* e = EXCEPTnC;
-				job->unlockShare();
-				if (JobPool.dropJob(job->jobID()) < 0) {
-					DgcExcept*  drop_job_e = EXCEPTnC;
-					DgcWorker::PLOG.tprintf(0,*drop_job_e,"dropJob[%lld] failed while setConf:",job->jobID());
-					delete drop_job_e;
-				}
-				RTHROWnR(e,DgcError(SPOS,"start[job] failed"),-1);
-			}
-		}
-	} else {
-		if (job == 0) {
-			THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"no job started")),-1);
-		}
-		dgt_sint32 rtn=0;
-		if (bg->getNode("session")) {
-			SessionPool.initialize(bg);
-		} else if (bg->getNode("schedule")) {
-			rtn=job->repository().schedule().setParams(bg);
-			//job->repository().corePool().setCores(CryptJob->repository().schedule().usingCores());
-		} else if (bg->getNode("crypt_dir")) {
-			rtn=job->repository().dirPool().setParams(bg);
-		} else if (bg->getNode("manager")) {
-			//skip
-		} else {
-			rtn=job->repository().zonePool().setParams(bg);
-		}
-		if (rtn) {
-			ATHROWnR(DgcError(SPOS,"setParams failed"),-1);
-		}
+	if ((val = bg->getValue("agent.id"))){
+		agent_id = dg_strtoll(val, 0, 10);
+	}	
+	else {
+		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE, new DgcError(SPOS, "agent.id not defined[%s]", bg->getText())), -1);
 	}
+
+	if (JobPool.agentID() == 0)
+		JobPool.setAgentID(agent_id);
+	
+	if ((val = bg->getValue("agent.log_file_path")))
+	openLogStream(val);
+	if ((val = bg->getValue("agent.max_target_files")))
+	{
+	file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
+	if (file_queue_size)
+		JobPool.setFileQueueSize(file_queue_size);
+	}
+	if ((val = bg->getValue("agent.max_fail_files")))
+	{
+	fail_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
+	if (fail_file_queue_size)
+		JobPool.setFailFileQueueSize(fail_file_queue_size);
+	}
+	if ((val = bg->getValue("agent.max_nullity_files")))
+	{
+	nullity_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
+	if (nullity_file_queue_size)
+		JobPool.setNullityFileQueueSize(nullity_file_queue_size);
+	}
+	if ((val = bg->getValue("agent.max_use_cores")))
+	max_use_cores = (dgt_sint32)dg_strtoll(val, 0, 10);
+	Repository.corePool().setCores(max_use_cores);
+	if ((val = bg->getValue("agent.init_managers")))
+	NumManagers = (dgt_sint32)dg_strtoll(val, 0, 10);
+	if ((val = bg->getValue("agent.no_session_sleep_count")))
+	NoSessionSleepCount = (dgt_sint32)dg_strtoll(val, 0, 10);
+	if (!NoSessionSleepCount)
+	NoSessionSleepCount = 5;
+	if ((val = bg->getValue("agent.collecting_interval")))
+	{
+	collect_interval = (dgt_sint32)dg_strtoll(val, 0, 10);
+	JobPool.setCollectInterval(collect_interval);
+	}
+	if ((val = bg->getValue("agent.trace_level")))
+	{
+	trace_level = (dgt_sint32)dg_strtoll(val, 0, 10);
+	JobPool.setTraceLevel(trace_level);
+	}
+	// for unix domain socket stream
+	if ((val = bg->getValue("agent.uds_listen_addr")))
+	{
+	dgt_sint32 addr_len = dg_strlen(val) + 100;
+	UdsListenAddr = new dgt_schar[addr_len];
+	sprintf(UdsListenAddr, "%s/pcp_crypt_agent_%lld.s", val, JobPool.agentID());
+	}
+	else
+	{
+	UdsListenAddr = new dgt_schar[129];
+	sprintf(UdsListenAddr, "/var/tmp/.petra/pcp_crypt_agent_%lld.s", JobPool.agentID());
+	}
+	// added by mwpark 18.10.03
+	// for performance test
+	// agent_mode = 0: default
+	//              1: private session & controlling file owner
+	//              2: no bgrammer, key, header flag, buffer_size (config_file)
+	if ((val = bg->getValue("agent.mode")))
+	{
+	AgentMode = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	if (AgentMode >= 2)
+	{
+	if ((val = bg->getValue("agent.enc_col_name")))
+	{
+		EncColName = new dgt_schar[128];
+		memset(EncColName, 0, 128);
+		memcpy(EncColName, val, strlen(val));
+	}
+	if ((val = bg->getValue("agent.header_flag")))
+	{
+		HeaderFlag = new dgt_schar[128];
+		memset(HeaderFlag, 0, 128);
+		memcpy(HeaderFlag, val, strlen(val));
+	}
+	if ((val = bg->getValue("agent.buffer_size")))
+	{
+		BufferSize = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	}
+	
 	return 0;
 }
-
 
 dgt_void PccCipherAgentService::in() throw(DgcExcept)
 {
@@ -203,7 +186,8 @@ dgt_void PccCipherAgentService::in() throw(DgcExcept)
 		}
 		RTHROW(e,DgcError(SPOS,"addManagers failed"));
 	}
-	if (!CommandMode) DgcWorker::PLOG.tprintf(0,"agent[%lld] service starts\n",JobPool.agentID());
+
+	DgcWorker::PLOG.tprintf(0,"agent[%lld] service starts\n",JobPool.agentID());
 }
 
 
@@ -212,7 +196,6 @@ dgt_sint32 PccCipherAgentService::run() throw(DgcExcept)
 	if (StopFlag) return 1;
 	//check session connection and reconnection about broken session
 	dgt_sint32 rtn = 0;
-	if (!CommandMode) {
 		if ((rtn=SessionPool.cleanBrokenSessions()) < 0) {
 			DgcExcept* e = EXCEPTnC;
 			if (e) {
@@ -228,7 +211,6 @@ dgt_sint32 PccCipherAgentService::run() throw(DgcExcept)
 				delete e;
 			}
 		}
-	}
 	sleep(NoSessionSleepCount);
 	return 0;
 }
@@ -260,7 +242,7 @@ dgt_void PccCipherAgentService::out() throw(DgcExcept)
 		}
 	} else CryptJob = 0;
 
-	if(!CommandMode) DgcWorker::PLOG.tprintf(0,"agent[%lld] service ends.\n",JobPool.agentID());
+	DgcWorker::PLOG.tprintf(0,"agent[%lld] service ends.\n",JobPool.agentID());
 }
 
 
@@ -328,38 +310,7 @@ dgt_sint32 PccCipherAgentService::initialize(const dgt_schar* conf_file_path, dg
 	while((bg=params.getNext())) {
 		if (setConf(CryptJob,bg) < 0) ATHROWnR(DgcError(SPOS,"setParams failed"),-1);
 	}
-
-
-	if (CommandMode) {
-		// start managers
-		if (Repository.managerPool().addManagers(NumManagers>0 ? NumManagers : INIT_MANAGERS) < 0) {
-			DgcExcept*	e=EXCEPTnC;
-			while(Repository.managerPool().numManagers() > 0) {
-				Repository.managerPool().stopManagers(0);
-				sleep(3);
-				if (Repository.managerPool().cleanManagers(1) < 0) {
-					DgcExcept* e=EXCEPTnC;
-					DgcWorker::PLOG.tprintf(0,*e,"cleanManagers failed:\n");
-					delete e;
-				}
-			}
-			RTHROWnR(e,DgcError(SPOS,"addManagers failed"),-1);
-		}
-
-		DgcWorker::PLOG.tprintf(0,"agent service starts - command_mode\n");
-		while(CryptJob->collector()->isAlive()) {
-			napAtick();
-		}
-		DgcWorker::PLOG.tprintf(0,"collect ends - command_mode\n");
-		while(CryptJob->repository().fileQueue().fileCount() > 0) napAtick();
-		dgt_sint32 stop_cnt = 0;
-		while (stop_cnt < Repository.managerPool().numManagers()) {
-			stop_cnt += Repository.managerPool().stopManagers(0);
-			napAtick();	
-		}
-		DgcWorker::PLOG.tprintf(0,"crypt ends - command_mode\n");
-		//sleep(10);
-	}
+	
 	return 0;
 }
 
@@ -612,275 +563,298 @@ int main(dgt_sint32 argc,dgt_schar** argv)
 
 	/* start command begins */
 
-
-	if (agent_service->commandMode()) {
-		DgcWorker::PLOG.tprintf(0,"agent service ends.\n");
-		delete agent_service;
-		return 0;
-	} else {
-		// 1. be a background process and group leader
-		pid_t pid;
-		dg_signal(SIGCHLD,SIG_IGN);
-		if ((pid=fork()) < 0) {
-			DgcExcept*  e = EXCEPTnC;
-			if (e) {
-				e->print();
-				DgcWorker::PLOG.tprintf(0,*e,"fork failed:\n");
-				delete e;
-			} else {
-				DgcWorker::PLOG.tprintf(0,"fork failed: [unknown error]\n");
-			}
-			return -3;
+	// 1. be a background process and group leader
+	pid_t pid;
+	dg_signal(SIGCHLD, SIG_IGN);
+	if ((pid = fork()) < 0)
+	{
+		DgcExcept *e = EXCEPTnC;
+		if (e)
+		{
+			e->print();
+			DgcWorker::PLOG.tprintf(0, *e, "fork failed:\n");
+			delete e;
 		}
-		// 2. parent exits and child is to be a deamon
-		if (pid != 0) exit(0);
-		// 3. be a group leader
-		setsid();
-		// 4. catch and set all catchable signals
-		DgcSigManager::p()->regDefault();
-
-		// 5. start unix server
-#if 0
-// added by ihjin 18.03.07
-// only for wooricard, solaris x86 32bit system
-// if pcp_crypt_agent process exists, checked at startup
-		int temp = 0;
-		if((temp=checkProcess("pcp_crypt_agent")) != 1) { // find pcp_crypt_agent process
-			remove(agent_service->udsListenAddr());
-		} else {
-			DgcExcept*  e = EXCEPTnC;
-			if (e) {
-				e->print();
-				DgcWorker::PLOG.tprintf(0,*e,"pcp_crypt_agent  process already exists. agent_service[%lld] listenServer[%s] failed:\n",agent_service->agentID(),agent_service->udsListenAddr());
-				delete e;
-			} else {
-				DgcWorker::PLOG.tprintf(0,"pcp_crypt_agent  process already exists. agent_service[%lld] listenServer[%s] failed:\n",agent_service->agentID(),agent_service->udsListenAddr());
-			}
-			printf("pcp_crypt_agent process already exists\n");
-			printf("please check process\n");
-			return -4;
+		else
+		{
+			DgcWorker::PLOG.tprintf(0, "fork failed: [unknown error]\n");
 		}
-#endif  /* 0, only for solaris x86 32bit */
+		return -3;
+	}
+	// 2. parent exits and child is to be a deamon
+	if (pid != 0)
+		exit(0);
+	// 3. be a group leader
+	setsid();
+	// 4. catch and set all catchable signals
+	DgcSigManager::p()->regDefault();
 
-		DgcUnixServer server_stream(5,5);
-		if (server_stream.listenServer(agent_service->udsListenAddr()) == 0) {
-			DgcExcept*  e = EXCEPTnC;
-			if (e) {
-				e->print();
-				DgcWorker::PLOG.tprintf(0,*e,"agent_service[%lld] listenServer[%s] failed:\n",agent_service->agentID(),agent_service->udsListenAddr());
-				delete e;
-			} else {
-				DgcWorker::PLOG.tprintf(0,"agent_service[%lld] listenServer[%s] failed: [unknown error]\n",agent_service->agentID(),agent_service->udsListenAddr());
-			}
-			return -4;
+	// 5. start unix server
+
+	DgcUnixServer server_stream(5, 5);
+	if (server_stream.listenServer(agent_service->udsListenAddr()) == 0)
+	{
+		DgcExcept *e = EXCEPTnC;
+		if (e)
+		{
+			e->print();
+			DgcWorker::PLOG.tprintf(0, *e, "agent_service[%lld] listenServer[%s] failed:\n", agent_service->agentID(), agent_service->udsListenAddr());
+			delete e;
 		}
-
-		// 6. start agent_service
-		agent_service->wa()->ThreadID=pthread_self();
-		//DgcWorker::entry((dgt_void*)agent_service);
-		if (agent_service->start() < 0) {
-			DgcExcept*  e = EXCEPTnC;
-			if (e) {
-				e->print();
-				DgcWorker::PLOG.tprintf(0,*e,"starting agent_service[%lld] failed:\n",agent_service->agentID());
-				delete e;
-			}
-			delete agent_service;
-			return -5;
+		else
+		{
+			DgcWorker::PLOG.tprintf(0, "agent_service[%lld] listenServer[%s] failed: [unknown error]\n", agent_service->agentID(), agent_service->udsListenAddr());
 		}
-
-
-		printf("- pcp_crypt_agent[%lld]'s starting.\n",agent_service->agentID());
-		//
-		// 7. wait & serve
-		// msg_type : 1 - stop, 2- status
-		//
-		DgcSession	session;
-		session.setSessType(DGC_MSB,DGC_NUM_TYPE,(dgt_uint8*)DGC_TYPE_LENGTH,(dgt_uint8*)DGC_TYPE_STRIDE);
-
-		while(1) {
-			DgcCommStream* stream = 0;
-			if ((stream=(DgcCommStream*)server_stream.acceptConnection(5))) {
-				DgcPacketStream	pkt_stream(&session,stream);
-				DgcDgMsgStream	msg_stream(&session,&pkt_stream);
-				// recv msg_type
-				if (msg_stream.recvMessage(10) <= 0) {
-					DgcExcept*	e = EXCEPTnC;
-					if (e) {
-						DgcWorker::PLOG.tprintf(0,*e,"recvMessage[msg_type] failed:\n");
-						delete e;
-					} else {
-						DgcWorker::PLOG.tprintf(0,"recvMessage[msg_type] timeout.\n");
-					}
-					continue;
-				}
-				DgcMessage*	msg = 0;
-				if((msg=msg_stream.currMsg())->opi() != DGIEXT) {
-					DgcWorker::PLOG.tprintf(0,"not msg_type message[%d]\n",msg->opi());
-					continue;
-				}
-				DgcMsgDgiExt* ext = (DgcMsgDgiExt*)msg;
-				dgt_uint16 msg_type = ext->getExcept()->classid();
-				msg_stream.resetIBuf();
-
-				// check msg_type
-				if (msg_type == PCC_AGENT_UDS_MSG_TYPE_STOP) {
-					DgcExcept* result_e = 0;
-					DgcMsgDgiExt result_ext;
-
-					// askStop to terminate crypt_managers normal
-					// for preventing from creating damaged encryption file
-					agent_service->askStop();
-					napAtick();
-					// wake up workers
-					agent_service->sendSignal(SIGUSR2);
-
-					result_e = new DgcExcept(0,0);
-					result_ext.putExcept(result_e);
-					dgt_sint32 wait_time = 0;
-					while (agent_service->isAlive()) {
-						DgcWorker::PLOG.tprintf(0,"agent_service[%lld] : waiting until stoppd \n",agent_service->agentID());
-						if (wait_time > 300) {
-							if (agent_service->stop() < 0) {
-								if (result_e) delete result_e;
-								DgcExcept* e = EXCEPTnC;
-								DgcWorker::PLOG.tprintf(0,*e,"agent_service[%lld] : stop failed:\n",agent_service->agentID());
-								delete e;
-								exit(-1);
-							}
-						}
-						result_e->setErrCode(++wait_time);
-						if (msg_stream.sendMessage(&result_ext) != 0) {
-							DgcExcept* e = EXCEPTnC;
-							if (e) {
-								DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-								delete e;
-							}
-						}
-						sleep(1);
-					}
-					// send success msg
-					result_e->setErrCode(0);
-
-					if (msg_stream.sendMessage(&result_ext) != 0) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-							delete e;
-						}
-					}
-					if (result_e && !result_e->errCode()) {
-						delete result_e;
-						break; // terminate while loop for exit
-					}
-					if (result_e) delete result_e;
-				} else if (msg_type == PCC_AGENT_UDS_MSG_TYPE_STATUS || msg_type == PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS) {
-					// send status msg
-					pcct_agent_status agent_status;
-					agent_service->getCryptAgentStatus(&agent_status);
-					dgt_schar body[257];
-					dgt_schar ps[65];
-					sprintf(body,"agent_id[%lld] pid[%lld] max_target_files[%d] max_use_cores[%d] num_managers[%d] num_jobs[%d]",
-							agent_status.agent_id,
-							agent_status.agent_pid,
-							agent_status.max_target_files,
-							agent_status.max_use_cores,
-							agent_status.num_managers,
-							agent_status.num_jobs);
-					PtMsgDgiLetter status_msg;
-					status_msg.setBody(body);
-					sprintf(ps,"%d",agent_status.num_jobs);
-					status_msg.setPs(ps);
-					if (msg_stream.sendMessage(&status_msg) != 0) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-							delete e;
-						}
-					}
-
-					if (agent_status.num_jobs > 1) {
-						dgt_schar* job_body = new dgt_schar[512];
-						PtMsgDgiLetter job_status_msg;
-						for(dgt_sint32 i=0; i<agent_status.num_jobs; i++) {
-							PccAgentCryptJob*	curr_job = agent_service->jobPool()->jobByIdx(i);
-							dgt_sint64 job_id = 0;
-							dgt_sint32 job_type = 0;
-							dgt_uint8 job_status = 0;
-							dgt_sint32 num_dirs = 0;
-							if (curr_job) {
-								job_id = curr_job->jobID();
-								job_type = curr_job->repository().getJobType();
-								job_status = curr_job->collector()?curr_job->collector()->jobStatus():0;
-								num_dirs = curr_job->repository().dirPool().numDirs();
-							}
-							sprintf(job_body,"job_id[%lld] job_type[%d] job_status[%u] num_dirs[%d]", job_id, job_type, job_status, num_dirs);
-							job_status_msg.setBody(job_body);
-							sprintf(ps,"%d",num_dirs);
-							job_status_msg.setPs(ps);
-							if (msg_stream.sendMessage(&job_status_msg) != 0) {
-								DgcExcept* e = EXCEPTnC;
-								if (e) {
-									DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-									delete e;
-								}
-							}
-							if (msg_type == PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS) {
-								if (num_dirs > 0) {
-									dgt_schar* dir_body = new dgt_schar[4098];
-									PtMsgDgiLetter dir_status_msg;
-									for (dgt_sint32 j=0; j<num_dirs; j++) {
-										PccCryptDir*	curr_dir = curr_job->repository().dirPool().getCryptDir(j);
-										dgt_sint64 dir_id = 0;
-										dgt_schar* src_dir = 0;
-										dgt_schar* dst_dir = 0;
-										dgt_sint32 dir_status = 0;
-										if (curr_dir) {
-											dir_id = curr_dir->dirID();
-											src_dir = (dgt_schar*)curr_dir->srcDir();
-											dst_dir = (dgt_schar*)curr_dir->dstDir();
-											dir_status = curr_dir->status();
-										}
-										sprintf(dir_body,"dir_id[%lld] dir_status[%d] src_dir[%s] dst_dir[%s]", dir_id, dir_status, src_dir, dst_dir);
-										dir_status_msg.setBody(dir_body);
-										if (msg_stream.sendMessage(&dir_status_msg) != 0) {
-											DgcExcept* e = EXCEPTnC;
-											if (e) {
-												DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-												delete e;
-											}
-										}
-									}
-									if (dir_body) delete dir_body;
-								}
-							}
-						}
-						if (job_body) delete job_body;
-					}
-				} else if (msg_type == PCC_AGENT_UDS_MSG_TYPE_GET_PID) {
-					// send pid
-					pcct_agent_status agent_status;
-					agent_service->getCryptAgentStatus(&agent_status);
-					dgt_schar body[33];
-					sprintf(body,"%lld",agent_status.agent_pid);
-					PtMsgDgiLetter status_msg;
-					status_msg.setBody(body);
-					if (msg_stream.sendMessage(&status_msg) != 0) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"sendMessage failed:\n");
-							delete e;
-						}
-					}
-				} else {
-					DgcWorker::PLOG.tprintf(0,"agent_service[%lld] invalid msg[%u] :\n",agent_service->agentID(),msg_type);
-				}
-			}
-			napAtick();
-		}
+		return -4;
 	}
 
-	printf("- pcp_crypt_agent[%lld] stopped\n",agent_service->agentID());
+	// 6. start agent_service
+	agent_service->wa()->ThreadID = pthread_self();
+	// DgcWorker::entry((dgt_void*)agent_service);
+	if (agent_service->start() < 0)
+	{
+		DgcExcept *e = EXCEPTnC;
+		if (e)
+		{
+			e->print();
+			DgcWorker::PLOG.tprintf(0, *e, "starting agent_service[%lld] failed:\n", agent_service->agentID());
+			delete e;
+		}
+		delete agent_service;
+		return -5;
+	}
+
+	printf("- pcp_crypt_agent[%lld]'s starting.\n", agent_service->agentID());
+	//
+	// 7. wait & serve
+	// msg_type : 1 - stop, 2- status
+	//
+	DgcSession session;
+	session.setSessType(DGC_MSB, DGC_NUM_TYPE, (dgt_uint8 *)DGC_TYPE_LENGTH, (dgt_uint8 *)DGC_TYPE_STRIDE);
+
+	while (1)
+	{
+		DgcCommStream *stream = 0;
+		if ((stream = (DgcCommStream *)server_stream.acceptConnection(5)))
+		{
+			DgcPacketStream pkt_stream(&session, stream);
+			DgcDgMsgStream msg_stream(&session, &pkt_stream);
+			// recv msg_type
+			if (msg_stream.recvMessage(10) <= 0)
+			{
+				DgcExcept *e = EXCEPTnC;
+				if (e)
+				{
+					DgcWorker::PLOG.tprintf(0, *e, "recvMessage[msg_type] failed:\n");
+					delete e;
+				}
+				else
+				{
+					DgcWorker::PLOG.tprintf(0, "recvMessage[msg_type] timeout.\n");
+				}
+				continue;
+			}
+			DgcMessage *msg = 0;
+			if ((msg = msg_stream.currMsg())->opi() != DGIEXT)
+			{
+				DgcWorker::PLOG.tprintf(0, "not msg_type message[%d]\n", msg->opi());
+				continue;
+			}
+			DgcMsgDgiExt *ext = (DgcMsgDgiExt *)msg;
+			dgt_uint16 msg_type = ext->getExcept()->classid();
+			msg_stream.resetIBuf();
+
+			// check msg_type
+			if (msg_type == PCC_AGENT_UDS_MSG_TYPE_STOP)
+			{
+				DgcExcept *result_e = 0;
+				DgcMsgDgiExt result_ext;
+
+				// askStop to terminate crypt_managers normal
+				// for preventing from creating damaged encryption file
+				agent_service->askStop();
+				napAtick();
+				// wake up workers
+				agent_service->sendSignal(SIGUSR2);
+
+				result_e = new DgcExcept(0, 0);
+				result_ext.putExcept(result_e);
+				dgt_sint32 wait_time = 0;
+				while (agent_service->isAlive())
+				{
+					DgcWorker::PLOG.tprintf(0, "agent_service[%lld] : waiting until stoppd \n", agent_service->agentID());
+					if (wait_time > 300)
+					{
+						if (agent_service->stop() < 0)
+						{
+							if (result_e)
+								delete result_e;
+							DgcExcept *e = EXCEPTnC;
+							DgcWorker::PLOG.tprintf(0, *e, "agent_service[%lld] : stop failed:\n", agent_service->agentID());
+							delete e;
+							exit(-1);
+						}
+					}
+					result_e->setErrCode(++wait_time);
+					if (msg_stream.sendMessage(&result_ext) != 0)
+					{
+						DgcExcept *e = EXCEPTnC;
+						if (e)
+						{
+							DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+							delete e;
+						}
+					}
+					sleep(1);
+				}
+				// send success msg
+				result_e->setErrCode(0);
+
+				if (msg_stream.sendMessage(&result_ext) != 0)
+				{
+					DgcExcept *e = EXCEPTnC;
+					if (e)
+					{
+						DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+						delete e;
+					}
+				}
+				if (result_e && !result_e->errCode())
+				{
+					delete result_e;
+					break; // terminate while loop for exit
+				}
+				if (result_e)
+					delete result_e;
+			}
+			else if (msg_type == PCC_AGENT_UDS_MSG_TYPE_STATUS || msg_type == PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS)
+			{
+				// send status msg
+				pcct_agent_status agent_status;
+				agent_service->getCryptAgentStatus(&agent_status);
+				dgt_schar body[257];
+				dgt_schar ps[65];
+				sprintf(body, "agent_id[%lld] pid[%lld] max_target_files[%d] max_use_cores[%d] num_managers[%d] num_jobs[%d]",
+						agent_status.agent_id,
+						agent_status.agent_pid,
+						agent_status.max_target_files,
+						agent_status.max_use_cores,
+						agent_status.num_managers,
+						agent_status.num_jobs);
+				PtMsgDgiLetter status_msg;
+				status_msg.setBody(body);
+				sprintf(ps, "%d", agent_status.num_jobs);
+				status_msg.setPs(ps);
+				if (msg_stream.sendMessage(&status_msg) != 0)
+				{
+					DgcExcept *e = EXCEPTnC;
+					if (e)
+					{
+						DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+						delete e;
+					}
+				}
+
+				if (agent_status.num_jobs > 1)
+				{
+					dgt_schar *job_body = new dgt_schar[512];
+					PtMsgDgiLetter job_status_msg;
+					for (dgt_sint32 i = 0; i < agent_status.num_jobs; i++)
+					{
+						PccAgentCryptJob *curr_job = agent_service->jobPool()->jobByIdx(i);
+						dgt_sint64 job_id = 0;
+						dgt_sint32 job_type = 0;
+						dgt_uint8 job_status = 0;
+						dgt_sint32 num_dirs = 0;
+						if (curr_job)
+						{
+							job_id = curr_job->jobID();
+							job_type = curr_job->repository().getJobType();
+							job_status = curr_job->collector() ? curr_job->collector()->jobStatus() : 0;
+							num_dirs = curr_job->repository().dirPool().numDirs();
+						}
+						sprintf(job_body, "job_id[%lld] job_type[%d] job_status[%u] num_dirs[%d]", job_id, job_type, job_status, num_dirs);
+						job_status_msg.setBody(job_body);
+						sprintf(ps, "%d", num_dirs);
+						job_status_msg.setPs(ps);
+						if (msg_stream.sendMessage(&job_status_msg) != 0)
+						{
+							DgcExcept *e = EXCEPTnC;
+							if (e)
+							{
+								DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+								delete e;
+							}
+						}
+						if (msg_type == PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS)
+						{
+							if (num_dirs > 0)
+							{
+								dgt_schar *dir_body = new dgt_schar[4098];
+								PtMsgDgiLetter dir_status_msg;
+								for (dgt_sint32 j = 0; j < num_dirs; j++)
+								{
+									PccCryptDir *curr_dir = curr_job->repository().dirPool().getCryptDir(j);
+									dgt_sint64 dir_id = 0;
+									dgt_schar *src_dir = 0;
+									dgt_schar *dst_dir = 0;
+									dgt_sint32 dir_status = 0;
+									if (curr_dir)
+									{
+										dir_id = curr_dir->dirID();
+										src_dir = (dgt_schar *)curr_dir->srcDir();
+										dst_dir = (dgt_schar *)curr_dir->dstDir();
+										dir_status = curr_dir->status();
+									}
+									sprintf(dir_body, "dir_id[%lld] dir_status[%d] src_dir[%s] dst_dir[%s]", dir_id, dir_status, src_dir, dst_dir);
+									dir_status_msg.setBody(dir_body);
+									if (msg_stream.sendMessage(&dir_status_msg) != 0)
+									{
+										DgcExcept *e = EXCEPTnC;
+										if (e)
+										{
+											DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+											delete e;
+										}
+									}
+								}
+								if (dir_body)
+									delete dir_body;
+							}
+						}
+					}
+					if (job_body)
+						delete job_body;
+				}
+			}
+			else if (msg_type == PCC_AGENT_UDS_MSG_TYPE_GET_PID)
+			{
+				// send pid
+				pcct_agent_status agent_status;
+				agent_service->getCryptAgentStatus(&agent_status);
+				dgt_schar body[33];
+				sprintf(body, "%lld", agent_status.agent_pid);
+				PtMsgDgiLetter status_msg;
+				status_msg.setBody(body);
+				if (msg_stream.sendMessage(&status_msg) != 0)
+				{
+					DgcExcept *e = EXCEPTnC;
+					if (e)
+					{
+						DgcWorker::PLOG.tprintf(0, *e, "sendMessage failed:\n");
+						delete e;
+					}
+				}
+			}
+			else
+			{
+				DgcWorker::PLOG.tprintf(0, "agent_service[%lld] invalid msg[%u] :\n", agent_service->agentID(), msg_type);
+			}
+		}
+		napAtick();
+	}
+
+	printf("- pcp_crypt_agent[%lld] stopped\n", agent_service->agentID());
 	delete agent_service;
-	return 0;	
+	return 0;
 }
