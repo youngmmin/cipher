@@ -38,7 +38,6 @@ class PccCipherAgentSvrSessionPool : public DgcObject {
 	dgt_sint32 cleanBrokenSessions() throw(DgcExcept);
 	dgt_sint32 startNewSessions(PccAgentCryptJobPool& job_pool, dgt_sint32 no_sess_sleep_cnt) throw(DgcExcept);
 
-	dgt_sint32 initialize(dgt_sint32 num_sessions, dgt_schar* p_ip, dgt_uint16 p_port, dgt_schar* s_ip=0, dgt_uint16 s_port=0) throw(DgcExcept);
 	dgt_sint32 initialize(DgcBgrammer* sess_info) throw(DgcExcept);
 
 };

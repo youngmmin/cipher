@@ -496,17 +496,17 @@ dgt_sint32 PccCipherAgentManager::initialize(const dgt_schar *conf_file_path) th
 				delete log_file_path;
 			}
 
-			if ((val = bg->getValue("manager.master_soha_conn.primary.svc")))
+			if ((val = bg->getValue("manager.soha.primary.svc")))
 				strcpy(PrimarySohaSvc, val);
-			if ((val = bg->getValue("manager.master_soha_conn.secondary.svc")))
+			if ((val = bg->getValue("manager.soha.secondary.svc")))
 				strcpy(SecondarySohaSvc, val);
-			if ((val = bg->getValue("manager.master_soha_conn.primary.ip")))
+			if ((val = bg->getValue("manager.soha.primary.ip")))
 				strcpy(PrimarySohaConnIP, val);
-			if ((val = bg->getValue("manager.master_soha_conn.secondary.ip")))
+			if ((val = bg->getValue("manager.soha.secondary.ip")))
 				strcpy(SecondarySohaConnIP, val);
-			if ((val = bg->getValue("manager.master_soha_conn.primary.dgnet_port")))
+			if ((val = bg->getValue("manager.soha.primary.dgnet_port")))
 				PrimarySohaConnPort = (dgt_uint16)dg_strtoll(val, 0, 10);
-			if ((val = bg->getValue("manager.master_soha_conn.secondary.dgnet_port")))
+			if ((val = bg->getValue("manager.soha.secondary.dgnet_port")))
 				SecondarySohaConnPort = (dgt_uint16)dg_strtoll(val, 0, 10);
 		}
 	}

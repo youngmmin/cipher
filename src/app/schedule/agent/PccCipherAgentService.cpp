@@ -218,6 +218,24 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job, DgcBgrammer *bg
 		}
 	}
 
+	if (job == 0)
+	{
+		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE, new DgcError(SPOS, "no job started")), -1);
+	}
+
+	
+	dgt_sint32 rtn = 0;
+	if (val = bg->getValue("session")){
+		rtn = SessionPool.initialize(bg);
+	} else {
+		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE, new DgcError(SPOS, "session not defined[%s]", bg->getText())), -1);
+	}
+
+	if (rtn)
+	{
+		ATHROWnR(DgcError(SPOS, "setParams failed"), -1);
+	}
+
 	return 0;
 }
 
@@ -295,57 +313,6 @@ dgt_void PccCipherAgentService::out() throw(DgcExcept)
 
 	DgcWorker::PLOG.tprintf(0,"agent[%lld] service ends.\n",JobPool.agentID());
 }
-
-
-dgt_sint32 PccCipherAgentService::initialize(
-		dgt_sint64 agent_id,
-		dgt_schar* uds_listen_dir,
-		dgt_schar* log_dir,
-		dgt_sint32 max_target_files,
-		dgt_sint32 max_use_cores,
-		dgt_sint32 init_managers,
-		dgt_sint32 collect_interval,
-		dgt_sint32 no_sess_sleep_conunt,
-		dgt_sint32 trace_level,
-		dgt_sint32 num_sessions,
-		dgt_schar* primary_sess_ip,
-		dgt_uint16 primary_sess_port,
-		dgt_schar* secondary_sess_ip,
-		dgt_uint16 secondary_sess_port) throw(DgcExcept)
-{
-	// create job (job_id == 0) to executing PccGetDirEntryStmt
-	if ((CryptJob=JobPool.newJob(0)) == 0) ATHROWnR(DgcError(SPOS,"newJob failed"),-1);
-	if (CryptJob->lockShare() < 0) ATHROWnR(DgcError(SPOS,"lockShare job_id[%lld] failed",CryptJob->jobID()),-1);
-
-	if (agent_id == 0) {
-		THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,new DgcError(SPOS,"agent.id not defined")),-1);
-	}
-
-	dgt_sint32 path_len = dg_strlen(log_dir) + 30;
-	dgt_schar* log_file_path = new dgt_schar[path_len];
-	sprintf(log_file_path,"%s/cipher_agent.log",log_dir);
-	openLogStream(log_file_path);
-	delete log_file_path;
-
-	JobPool.setAgentID(agent_id);
-	JobPool.setFileQueueSize(max_target_files);
-	Repository.corePool().setCores(max_use_cores);
-	NumManagers = init_managers;
-	JobPool.setCollectInterval(collect_interval);
-	NoSessionSleepCount = no_sess_sleep_conunt;
-	JobPool.setTraceLevel(trace_level);
-
-	// for unix domain socket stream
-	dgt_sint32 addr_len = dg_strlen(uds_listen_dir) + 100;
-	UdsListenAddr = new dgt_schar[addr_len];
-	sprintf(UdsListenAddr,"%s/pcp_crypt_agent_%lld.s",uds_listen_dir,agent_id);
-
-	if (SessionPool.initialize(num_sessions, primary_sess_ip,primary_sess_port,secondary_sess_ip,secondary_sess_port) < 0){
-		ATHROWnR(DgcError(SPOS,"initialize session_pool failed"),-1);
-	}
-	return 0;
-}
-
 
 dgt_sint32 PccCipherAgentService::initialize(const dgt_schar* conf_file_path, dgt_sint64 agent_id) throw(DgcExcept)
 {
