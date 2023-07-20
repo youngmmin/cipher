@@ -1,0 +1,171 @@
+/*
+ * crdb.sql
+ *
+ * Copyright (c) 2005 - 2009 by Sinsiway Inc.,
+ * All Rights Reserved.
+ *
+ */
+
+!echo "Creating CIPHER..."
+
+drop server EXT_KEYMGR;
+create server EXT_KEYMGR perm '0000111000000'
+  executable '%soha_home%/bin/ext_keymgr';
+
+drop procedure CREATE_KEYTAB;
+create procedure CREATE_KEYTAB perm '0000111110110'
+  in(
+	passwd		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure EXPORT_KEYTAB;
+create procedure EXPORT_KEYTAB perm '0000111110110'
+  in(
+	key_id		sb8,
+	old_passwd	schr(33),
+	new_passwd	schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure IMPORT_KEYTAB;
+create procedure IMPORT_KEYTAB perm '0000111110110'
+  in(
+	key_tab_seg	schr(129)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure ADD_AGENT;
+create procedure ADD_AGENT perm '0000111110110'
+  in(
+  	agent_id	schr(33),	/* agent id, soha user id */
+	dbms_type	schr(33),	/* database type, oracle */
+	listen_ip	schr(65),	/* dbms listen ip */
+	listen_port	ub2,		/* dbms listen port */
+	service_name	schr(33),	/* dbms service name */
+	sys_link	schr(33),	/* sys user link */
+	admin_link	schr(33),	/* cipher admin user link */
+	dbms_option	schr(129)	/* additional option for dbms connection */
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure GEN_SCRIPT;
+create procedure GEN_SCRIPT perm '0000111110110'
+  in(
+	table_id	sb8,
+	version_no	ub2
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure GET_SCRIPT;
+create procedure GET_SCRIPT perm '0000111110110'
+  in(
+	table_id	sb8,
+	version_no	ub2,
+	step_no		ub1,
+	stmt_no		ub1
+  )
+  out(
+	seg_text	schr(65)
+  );
+
+drop procedure RUN_SCRIPT;
+create procedure RUN_SCRIPT perm '0000111110110'
+  in(
+	table_id	sb8,
+	version_no	ub2,
+	step_no		ub1,
+	stmt_no		ub1
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure OPEN_KEYTAB;
+create procedure OPEN_KEYTAB perm '0000111110110'
+  in(
+	passwd		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure CLOSE_KEYTAB;
+create procedure CLOSE_KEYTAB perm '0000111110110'
+  in(
+	passwd		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure ACTIVE_KEYTAB;
+create procedure ACTIVE_KEYTAB perm '0000111110110'
+  in(
+	key_id		sb8,
+	passwd		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure INACTIVE_KEYTAB;
+create procedure INACTIVE_KEYTAB perm '0000111110110'
+  in(
+	passwd		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure CHANGE_PASSWD;
+create procedure CHANGE_PASSWD perm '0000111110110'
+  in(
+	old_pw		schr(33),
+	new_pw		schr(33)
+  )
+  out(
+	result		schr(129)
+  );
+
+drop procedure GET_KEYTAB;
+create procedure GET_KEYTAB perm '0000111110110'
+  out(
+	keytab		achr(2048),	/* keytab in binary */
+	keytab_len	sb4,		/* keytab length */
+	signature	achr(128),	/* signature of keytab */
+	signature_len	sb4		/* signature length */
+  );
+
+drop procedure GET_KEYINFO;
+create procedure GET_KEYINFO perm '0000111110110'
+  in(
+	sess_info	schr(512),	/* session info in brace grammer */
+	encrypt_id	sb4
+  )
+  out(
+	date_type       schr(33),
+	data_length     sb4,
+	data_precision  sb4,
+	data_scale      sb4,
+	nullable_flag   sb4,
+	cipher_id	sb4,
+	key_id		sb4,
+	key_size	sb4,
+	bmode		ub1,
+	start_pos	sb4,
+	enc_length	sb4,
+	mask_char	schr(33),
+	priv		sb4
+  );
+

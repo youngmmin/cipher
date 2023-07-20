@@ -1,0 +1,351 @@
+/**********************************************************
+* File Cipher External Procedure
+**********************************************************/
+!echo "Creating FileCipher Procedure ..."
+
+
+DROP SERVER EXT_FILECIPHER;
+CREATE SERVER EXT_FILECIPHER PERM '000011100000'
+  EXECUTABLE '%soha_home%/bin/ext_filecipher';
+
+drop procedure PFC_SET_AGENT_PARAM;
+create procedure PFC_SET_AGENT_PARAM perm '0000111110110'
+ in(
+        agent_id        sb8,
+	job_id		sb8
+ )
+ out(
+        param_size	ub4
+);
+
+
+drop procedure PFC_GET_FILE_INFO;
+create procedure PFC_GET_FILE_INFO perm '0000111110110'
+in(
+           agent_id sb8,
+           dir_path schr(1024),
+	    offset   sb8,
+	    fetch_count sb4
+)
+out(
+           file_id              sb8,
+           dir_id               sb8,
+           zone_id            sb8,
+           file_size  sb8,
+           last_update       ub4,
+           type                ub1,
+           encrypt_flag       ub1,
+           name               schr(256),
+	    curr_offset        sb8,
+	    total_count        sb4
+);
+
+
+drop procedure PFC_GET_AGENT_STAT;
+create procedure PFC_GET_AGENT_STAT perm '0000111110110'
+in(
+           agent_id sb8,
+           job_id              sb8
+)
+out(
+           job_id             sb8,
+           dir_id             sb8,
+           agent_id           sb8,
+           zone_id            sb8,
+           filters            sb8,
+           check_dirs         sb8,
+           check_errors       sb8,
+           target_dirs        sb8,
+           check_files        sb8,
+           target_files       sb8,
+           input_files        sb8,
+           output_files       sb8,
+           crypt_errors       sb8,
+           used_cores         sb8,
+           used_micros        sb8,
+           input_bytes        sb8,
+           output_bytes       sb8,
+           system_id          sb8,
+           start_time         ub4,
+           end_time           ub4,
+           job_status         sb4,
+           dir_status         sb4,
+           migration_target   sb8,
+           reserved           sb8
+);
+
+drop procedure PFC_GET_DIR_CRYPT_STAT;
+create procedure PFC_GET_DIR_CRYPT_STAT perm '0000111110110'
+in(
+           agent_id           sb8,
+           job_id             sb8,
+           enc_zone_id        sb8,
+           enc_job_tgt_id     sb8
+)
+out(
+           job_id             sb8,
+           dir_id             sb8,
+           agent_id           sb8,
+           zone_id            sb8,
+           filters            sb8,
+           check_dirs         sb8,
+           check_errors       sb8,
+           target_dirs        sb8,
+           check_files        sb8,
+           target_files       sb8,
+           input_files        sb8,
+           output_files       sb8,
+           crypt_errors       sb8,
+           used_cores         sb8,
+           used_micros        sb8,
+           input_bytes        sb8,
+           output_bytes       sb8,
+           system_id          sb8,
+           start_time         ub4,
+           end_time           ub4,
+           job_status         sb4,
+           dir_status         sb4,
+           migration_target   sb8,
+           reserved           sb8
+);
+
+drop procedure PFC_DELETE_CRYPT_STAT;
+create procedure PFC_DELETE_CRYPT_STAT perm '0000111110110'
+ in(
+	dir_id		sb8
+ )
+ out(
+	rtn		sb4
+);
+
+drop procedure PFC_ALERT_DEAD_PROCESS;
+create procedure PFC_ALERT_DEAD_PROCESS perm '0000111110110'
+ in(
+        enc_tgt_sys_id  sb8,
+        dead_pid        sb8,
+        pname           schr(129)
+ )
+ out(
+        rtn             sb4
+);
+
+drop procedure PFC_CRYPT_FILE;
+create procedure PFC_CRYPT_FILE perm '0000111110110'
+ in(
+	agent_id		sb8,
+	ptu_id			sb8,
+	enc_zone_id		sb8,
+	crypt_flag		ub1,
+	client_ip		schr(128),
+	src_file   schr(2049),
+	dst_file   schr(2049)
+ )
+ out(
+	rtn_code		sb4,
+	err_msg			schr(1025)
+);
+
+
+drop procedure PFC_REMOVE_FILE;
+create procedure PFC_REMOVE_FILE perm '0000111110110'
+ in(
+	agent_id		sb8,
+	file_path		schr(2049)
+ )
+ out(
+	rtn_code		sb4,
+	err_msg			schr(1025)
+);
+
+drop procedure PFC_GET_TARGET_LIST;
+create procedure PFC_GET_TARGET_LIST perm '0000111110110'
+ in(
+    agent_id        sb8,
+    job_id          sb8,
+	target_type     sb1
+ )
+ out(
+    job_id          sb8,
+    enc_zone_id     sb8,
+    dir_id          sb8,
+    src_file_name   schr(2049),
+    dst_file_name   schr(2049),
+	input_time      ub4,
+    error_code      sb4,
+    error_msg       schr(1025)
+);
+
+drop procedure PFC_RECOLLECT_CRYPT_DIR;
+create procedure PFC_RECOLLECT_CRYPT_DIR perm '0000111110110'
+in(
+	agent_id  sb8,
+	job_id    sb8,
+	dir_id    sb8
+)
+out(
+	rtn_code        sb4,
+	rtn_message     schr(1025)
+);
+
+drop procedure PFC_VALIDATION_FILE;
+create procedure PFC_VALIDATION_FILE perm '0000111110110'
+ in(
+	agent_id		sb8,
+	ptu_id			sb8,
+	client_ip		schr(128),
+	file_path		schr(2049)
+ )
+ out(
+	rtn_code		sb4,
+	err_msg			schr(1025)
+);
+
+/* added by chchung 2018.7.17 for PCFS */
+drop procedure PFC_PCFS_GET_LIST;
+create procedure PFC_PCFS_GET_LIST perm '0000111110110'
+ in(
+    agent_id        sb8
+ )
+ out(
+    pcfs_id         ub2,
+    name            schr(33),
+    root_dir        schr(257),
+    mount_dir       schr(257),
+    device          schr(33),
+    auto_mount      schr(11),
+    status          schr(11)
+);
+
+drop procedure PFC_PCFS_MOUNT;
+create procedure PFC_PCFS_MOUNT perm '0000111110110'
+ in(
+    agent_id        sb8,
+    pcfs_id         ub2,
+    mount_type      ub2
+ )
+ out(
+    rtn_msg         schr(300)
+);
+
+drop procedure PFC_PCFS_GET_STAT;
+create procedure PFC_PCFS_GET_STAT perm '0000111110110'
+ in(
+    agent_id        sb8,
+    pcfs_id         ub2
+ )
+ out(
+    pcfs_id         ub2,
+    encrypt_files   sb8,
+    decrypt_files   sb8,
+    pass_files      sb8,
+    encrypt_calls   sb8,
+    decrypt_calls   sb8,
+    pass_read_calls sb8,
+    pass_write_calls sb8,
+    encrypt_bytes   sb8,
+    decrypt_bytes   sb8,
+    pass_read_bytes sb8,
+    pass_write_bytes sb8,
+    all_calls       sb8,
+    start_time      sb8,
+    pid             sb8
+);
+
+drop procedure PFC_SYNC_TABLE;
+create procedure PFC_SYNC_TABLE perm '0000111110110'
+in(
+       table_name               schr(256),
+       artificial_id            sb8,
+       delete_flag              sb1
+)
+out(
+        enc_job_id              sb8,
+        agent_last_update       sb4
+);
+
+drop procedure PFC_VERIFY_CRYPT_PARAM;
+create procedure PFC_VERIFY_CRYPT_PARAM perm '0000111110110'
+in(
+       crypt_param              schr(513)
+)
+out(
+	rtn_code		sb4,
+	err_msg			schr(256)
+);
+
+drop procedure PFC_VERIFY_EXPR;
+create procedure PFC_VERIFY_EXPR perm '0000111110110'
+in(
+	expr			schr(1024),
+	reg			schr(4096)
+)
+out(
+	rtn_code		sb4,
+	err_msg			schr(1025)
+);
+
+drop procedure PFC_GET_DETECT_STAT;
+create procedure PFC_GET_DETECT_STAT perm '0000111110110'
+in(
+    job_id sb8
+)
+out(
+    file_id    sb8,
+    pttn_num   sb8,
+    pttn_files sb8,
+    path       schr(2048)
+);
+
+drop procedure PFC_GET_DETECT_INFO;
+create procedure PFC_GET_DETECT_INFO perm '0000111110110'
+in(
+    agent_id	sb8,
+    file_name   schr(2048),
+    parameter	schr(1024)
+)
+out(
+    start_offset sb8,
+    end_offset	 sb8,
+    data_seq	 sb4,
+    expr	 schr(1024),
+    data	 schr(1024)
+);
+
+
+drop procedure PFC_VERIFY_DETECT_INFO;
+create procedure PFC_VERIFY_DETECT_INFO perm '0000111110110'
+in(
+    agent_id    sb8,
+    job_id	sb8,
+    dir_id	sb8,
+    file_id     sb8
+)
+out(
+    rtn_code	sb4,
+    err_msg	schr(1025)
+);
+
+
+drop procedure PFC_GET_STREAM_STAT;
+create procedure PFC_GET_STREAM_STAT perm '0000111110110'
+in(
+    agent_id        sb8,
+	job_id          sb8,
+	file_id         sb8,
+	file_type	 	sb4,
+	fetch_count 	sb4
+ )
+out(
+    file_id     	sb8,
+    dir_id          sb8,
+    enc_zone_id     sb8,
+	src_file_size	sb8,
+	dst_file_size	sb8,
+	lm_time      	ub4,
+    src_file_name   schr(2049),
+    dst_file_name   schr(2049),
+    error_code      sb4,
+    error_msg       schr(1025),
+	job_id			sb8,
+	total_count     sb4
+);

@@ -1,0 +1,1955 @@
+/*******************************************************************
+ *   FILE TYPE          :       SQL SCRIPT
+ *   CLASSES            :       PC_TAB_PROC.SQL
+ *   IMPLEMENTOR        :       JAEHUN
+ *   CREATE DATE        :       2011. 11. 11
+ *   DESCRIPTION        :       TABLE AND EXTERN PROCEDURE CREATION SCRIPT FOR PETRA CIPHER
+ *   MODIFICATION HISTORY
+ *   DATE                    MODIFICATION
+--------------------------------------------------------------------
+
+********************************************************************/
+!echo "Creating cipher objects..."
+
+/* for temporary sequence */
+CREATE SEQUENCE PT_AID_SEQ(1001, 0, 10000,  %seq_increase% , 0, 0, 1,1);
+
+CREATE SEQUENCE PTS_AID_SEQ(%seq_start_no%, 0, 10000, %seq_increase%, 0, 0, 1,1);
+
+CREATE SEQUENCE PTS_STMT_SEQ(%seq_start_no%, 0, 10000, %seq_increase%, 0, 0, 1,1);
+
+CREATE SEQUENCE PTS_SESS_SEQ(%seq_start_no%, 0, 10000, %seq_increase%, 0, 0, 1,1);
+
+
+CREATE TABLE PCT_KEY
+(
+  KEY_ID	SB8,		/* KEY ID */
+  LAST_UPDATE	SB8,		/* SYNC WATCH */
+  LOAD_DATE	UB4,		/* LOAD DATE */
+/*  OPEN_DATE	UB4,		/* OPEN DATE */
+/*  OPEN_STATUS	UB1,		/* OPEN STATUS */
+  OPEN_MODE	UB1,		/* OPEN MODE */
+  SMK		SCHR(100),	/* MASTER KEY */
+  SEKS    	SCHR(3000),	/* ENCRYPTION KEY SET */
+  SKS		SCHR(100),	/* ENCRYPTION KEY SIGNATURE */
+  DESCRIPTION	SCHR(129),	/* DESCRIPTION */
+  RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_KEY_IDX1 ON PCT_KEY(KEY_ID);
+
+
+/* ENCRYPTION AGENT FOR A DBMS */
+CREATE TABLE PCT_DB_AGENT
+(
+  DB_AGENT_ID			SB8,				/* PK */
+  LAST_UPDATE   	        SB8,			/* SYNC WATCH */
+  PRIMARY_KEY_SERVICE_ID	SB8,            /* FK TO PT_PROD_SERVICE */
+  SECONDARY_KEY_SERVICE_ID	SB8,            /* FK TO Primary KeyServer SERVICE_ID */
+  THIRD_KEY_SERVICE_ID		SB8,            /* FK TO Secondary KeyServer SERVICE_ID */
+  SERVICE_ID			SB8,            /* FK TO Third KeyServer SERVICE_ID */
+  DB_ID				SB8,            /* FK TO PT_DATABASE */
+  INSTANCE_ID			SB8,            /* DATABASE INSTANCE ID from PT_DB_INSTANCE */
+  INST_STEP			SB4,            /*
+                                           0: init
+                                           1: .. .. ..
+                                           2: ..... .. ..(BITS, LIB_TYPE, LINK .... ..)
+                                           3: Configuration .. ..(CONF_DIR  ..)
+                                           4: DB ... .. ..(NLS_LANG ..)
+                                           5: AGENT ... ..
+                                           6: SAMPLE ... ... ..
+                                           -1: .. .. ..
+                                           -2: ..... .. ..
+                                           -3: Configuration .. ..
+                                           -4: DB ... .. ...
+                                           -5: AGENT ... ..( .. .. : ..., kred agent .. .. .. ..)
+                                           -6: SAMPLE ... ... ...
+                                        */
+  ERR_CODE              SB4,
+  CURR_INSTALL_STEP     SB2,            /* CURRENT INSTALL STEP */
+  CURR_INSTALL_STMT     SB2,            /* CURRENT INSTALL STATEMENT */
+  PARALLEL_DEGREE	UB2,
+  BITS                  UB1,            /* 1: 32bits    2: 64bits */
+  LIB_TYPE              UB1,            /* 1: thin      2: thick        3:local */
+  ADMIN_LINK            SCHR(33),       /* ADMIN USER LINK */
+  PRIMARY_GW_LINK       SCHR(33),       /* primary gateway LINK */
+  SECONDARY_GW_LINK     SCHR(33),       /* secondary gateway LINK */
+  AGENT_LINK            SCHR(33),       /* agent LINK */
+  KRED_LINK             SCHR(33),       /* kred agent LINK */
+  ERR_MSG               SCHR(512),
+  PRIMARY_LINK          SCHR(512),      /* Directory for Petra Cipher LIB symbolic link1 */
+  SECONDARY_LINK        SCHR(512),      /* Directory for Petra Cipher LIB symbolic link2 */
+  THIRD_LINK            SCHR(512),      /* Directory for Petra Cipher LIB symbolic link3 */
+  CONF_DIR              SCHR(512),      /* Configuration Directory */
+  NLS_LANG              SCHR(512),
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_DB_AGENT_IDX1 ON PCT_DB_AGENT(DB_AGENT_ID);
+CREATE UNIQUE INDEX PCT_DB_AGENT_IDX2 ON PCT_DB_AGENT(SERVICE_ID);
+
+
+/* ENCRYPTION AGENT FOR API */
+CREATE TABLE PCT_API_AGENT
+(
+  API_AGENT_ID			SB8,		/* PK */
+/*  LAST_UPDATE           	SB8,		/* SYNC WATCH */
+  SERVICE_ID		        SB8,            /* FK TO PT_PROD_SERVICE */
+  PRIMARY_KEY_SERVICE_ID        SB8,            /* FK TO PT_PROD_SERVICE */
+  SECONDARY_KEY_SERVICE_ID      SB8,            /* FK TO Primary KeyServer SERVICE_ID */
+  THIRD_KEY_SERVICE_ID          SB8,            /* FK TO Secondary KeyServer SERVICE_ID */
+  INSTANCE_ID			SB8,		/* FK TO PT_REMOTE_INSTANCE */
+  INST_STEP             	SB4,            /*
+                                        	   0: init
+                                        	   1: ..... .. ..(BITS, LIB_TYPE, LINK .... ..)
+                                        	   2: Configuration .. ..(CONF_DIR  ..)
+                                        	   3: AGENT ... ..
+                                        	   -1: .. .. ..
+                                        	   -2: ..... .. ..
+                                        	   -3: Configuration .. ..
+                                        	*/
+  ERR_CODE              	SB4,
+  LANGUAGE_TYPE         	UB1,            /* 1:JAVA       2:C/C++ 3:C#    */
+  BITS                  	UB1,            /* 1: 32bits    2: 64bits */
+  LIB_TYPE              	UB1,            /* 1: thin      2: thick        3:local */
+  ERR_MSG               	SCHR(512),
+  PRIMARY_LINK          	SCHR(512),      /* Directory for Petra Cipher LIB symbolic link1 */
+  SECONDARY_LINK        	SCHR(512),      /* Directory for Petra Cipher LIB symbolic link2 */
+  THIRD_LINK            	SCHR(512),      /* Directory for Petra Cipher LIB symbolic link3 */
+  CLASS_LINK            	SCHR(512),      /* Directory for Petra Cipher LIB symbolic link3 */
+  CONF_DIR              	SCHR(512),
+  NLS_LANG              	SCHR(512),
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_API_AGENT_IDX1 ON PCT_API_AGENT(API_AGENT_ID);
+CREATE UNIQUE INDEX PCT_API_AGENT_IDX2 ON PCT_API_AGENT(SERVICE_ID);
+
+
+/* ENCRYPTION AGENT FOR KRED */
+CREATE TABLE PCT_KRED_AGENT
+(
+  KRED_AGENT_ID			SB8,		/* PK */
+/*  LAST_UPDATE           	SB8,		/* SYNC WATCH */
+  SERVICE_ID            	SB8,            /* FK TO PT_PROD_SERVICE */
+  PRIMARY_KEY_SERVICE_ID        SB8,            /* FK TO PT_PROD_SERVICE */
+  SECONDARY_KEY_SERVICE_ID      SB8,            /* FK TO Primary KeyServer SERVICE_ID */
+  THIRD_KEY_SERVICE_ID          SB8,            /* FK TO Secondary KeyServer SERVICE_ID */
+  INST_STEP             	SB4,            /*
+                                	           0: init
+                                        	   1: Configuration .. ..(CONF_DIR  ..)
+                                        	   2: AGENT ... ..
+                                        	   -1: .. .. ..
+                                        	   -2: ..... .. ..
+                                        	*/
+  ERR_CODE              	SB4,
+  START_STATUS          	UB1,            /* 0: STOP 1:Running */
+  ERR_MSG               	SCHR(512),
+  CONF_DIR              	SCHR(512),
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_KRED_AGENT_IDX1 ON PCT_KRED_AGENT(KRED_AGENT_ID);
+CREATE UNIQUE INDEX PCT_KRED_AGENT_IDX2 ON PCT_KRED_AGENT(SERVICE_ID);
+
+
+/* ENCRYPTION AGENT`s Library Configuration Value */
+CREATE TABLE PCT_AGENT_LIB_CONF
+(
+  AGENT_LIB_CONF_ID	SB8,			/* PK */
+/*  LAST_UPDATE		SB8,			/* SYNC WATCH */
+  SERVICE_ID            SB8,
+  VAL_NUMBER            SB8,
+  VERSION               SB4,
+  USE_COMMENT           UB1,            /* 0: not comment , 1: comment */
+  CONF_NAME             SCHR(256),
+  VAL_STRING            SCHR(512),
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_AGENT_LIB_CONF_IDX1 ON PCT_AGENT_LIB_CONF(AGENT_LIB_CONF_ID,SERVICE_ID);
+
+
+CREATE TABLE PCT_AGENT_ERROR
+(
+  ERR_CODE		SB8,
+  INTERNAL_FLAG		UB1,
+  CAUSE			SCHR(512),	
+  ACTION		SCHR(512),
+  RESERVED		SCHR(33)
+)
+perm '0000111111100'
+extent(1,1,0);
+CREATE UNIQUE INDEX PCT_AGENT_ERROR_IDX1 ON PCT_AGENT_ERROR(ERR_CODE);
+
+/* SCHEMA WHO OWNS ANY ENCRYPTION TARGET TABLE */
+CREATE TABLE PCT_ENC_SCHEMA
+(
+  SCHEMA_ID             SB8,            /* SCHEMA ID, AN ARTIFITIAL KEY */
+  LAST_UPDATE		SB8,			/* SYNC WATCH */
+  DB_ID		        SB8,            
+  SCHEMA_NAME           SCHR(33),       /* TARGET SCHEMA NAME */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_SCHEMA_IDX1 ON PCT_ENC_SCHEMA(SCHEMA_ID);
+CREATE UNIQUE INDEX PCT_ENC_SCHEMA_IDX2 ON PCT_ENC_SCHEMA(DB_ID,SCHEMA_NAME);
+
+
+/* COUPON */
+CREATE TABLE PCT_ENC_COUPON
+(
+  COUPON_ID             SB8,		/* COUPON ID, AN ARTIFITIAL KEY */
+  LAST_UPDATE		SB8,		/* SYNC WATCH */
+  COUPON_TYPE		SB1,		/* 1:jumin, 2:license, 3:passport, 4:cardno, 5:accno, 6:foreign_no, etc (7:16bytes, 8:128bytes, 9:1024bytes) */
+  COUPON_NAME		SCHR(33),	/* COUPON NAME */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_COUPON_IDX1 ON PCT_ENC_COUPON(COUPON_ID);
+DELETE PCT_ENC_COUPON;
+INSERT INTO PCT_ENC_COUPON(COUPON_ID,COUPON_NAME,COUPON_TYPE) VALUES(:1,:2,:3);
+<
+1^'JUMIN_TYPE'^1
+2^'LICENSE_TYPE'^2
+3^'PASSPORT_TYPE'^3
+4^'CARDNO_TYPE'^4
+5^'ACCNO_TYPE'^5
+6^'FOREIGN_TYPE'^6
+7^'16 bytes'^7
+8^'128 bytes'^8
+9^'1024 bytes'^9
+>
+
+
+CREATE TABLE PCT_ENCRYPT_KEY(
+  KEY_ID                SB8,  
+  LAST_UPDATE           SB8,			/* SYNC WATCH */
+  COUPON_ID		SB8,			/* FK TO PCT_ENC_COUPON, IF NOT COUPON TYPE ENCRYPTION, IT'S 0 */
+  ENC_LENGTH            UB4,            /* ENCRYPTION LENGTH */
+  KEY_NO                UB2,            /* KEY NO IN KEY SET RANGING FROM 0 TO 1792 */
+  KEY_SIZE              UB2,            /* KEY SIZE IN BITS, 128, 192, 256, 384(SHA ONLY), 512(SHA ONLY)  */
+  CIPHER_TYPE           UB1,            /* 0:DEFAULT, 1:'AES', 2:'SEED', 3:'ARIA', 4:'SHA' */
+  ENC_MODE              UB1,            /* ENCRYPT MODE, 0:ECB, 1:CBC, 2:CFB, 3:OFB */
+  IV_TYPE		UB1,			/* INITIAL VECTOR TYPE, 0:NO IV, 1:RANDOM IV, 2:RANDOM WITHIN PREDEFINED IV, 3-7:PREDEFINED IV */
+  N2N_FLAG		UB1,			/* NULL TO NULL FLAG */
+  B64_TXT_ENC_FLAG	UB1,			/* BASE64 TEXT ENCODING FLAG */
+  ENC_START_POS		UB1,			/* ENCRYPTION START POSITION STARTING FROM 1 */
+  KEY_NAME              SCHR(33),
+  MASK_CHAR             SCHR(33),       /* MASKING CHARACTER STRING FOR SELECTING WITH NO PRIVILIGE */
+  CHAR_SET              SCHR(33),       /* CHARACTER SET */
+  EXPIRE_DATE		UB4,		
+  EXPIRE_ACTION		UB1,		/* 0:no action, 1:not provide key */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENCRYPT_KEY_IDX1 ON PCT_ENCRYPT_KEY(KEY_ID);
+
+
+/* encrypting target */
+CREATE TABLE PCT_ENC_TARGET
+(
+  ENC_TARGET_ID         SB8,            /* taget ID */
+  LAST_UPDATE           SB8,		/* SYNC WATCH */
+  DEFAULT_KEY_ID        SB8,            /* default key ID */
+  TARGET_NAME           SCHR(33),       /* target NAME */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_TARGET_IDX1 ON PCT_ENC_TARGET(ENC_TARGET_ID);
+CREATE UNIQUE INDEX PCT_ENC_TARGET_IDX2 ON PCT_ENC_TARGET(TARGET_NAME);
+
+
+CREATE TABLE PCT_ENC_SYNONYM(
+  ENC_TAB_ID		SB8,		/* FK TO PCT_ENC_TABLE*/
+  OWNER			SB8,		/* SYNONYM`s OWNER */
+  SYNONYM_NAME		SB8,		/* TABLE OWNER */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_SYNONYM_IDX1 ON PCT_ENC_SYNONYM(ENC_TAB_ID,OWNER,SYNONYM_NAME);
+
+
+CREATE TABLE PCT_ENC_TAB_COMMENT(
+  ENC_TAB_ID		SB8,		/* ENCRYPT TABLE ID */
+  COMMENTS		SB8,	/* TABLE COMMENTS */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_TAB_COMMENT_IDX1 ON PCT_ENC_TAB_COMMENT(ENC_TAB_ID);
+
+
+CREATE TABLE PCT_ENC_TAB_DEP_OBJ(
+  ENC_TAB_ID		SB8,		/* FK TO PCT_ENC_TABLE */
+  SCHEMA_NAME		SB8,		/* SCHEMA NAME */
+  OBJECT_NAME		SB8,		/* OBJECT NAME */
+  OBJECT_TYPE		UB4,		/* OBJECT TYPE 1:FUNCTION 2:PROCEDURE 3:TRIGGER 4:PACKAGE 5:PACKAGE BODY 6:SYNONYM*/
+  INIT_STATUS		UB4,		/* INIT STATUS 0:INVALID 1:VAILD */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_TAB_DEP_OBJ_IDX1 ON PCT_ENC_TAB_DEP_OBJ(ENC_TAB_ID,SCHEMA_NAME,OBJECT_NAME,OBJECT_TYPE);
+
+
+CREATE TABLE PCT_ENC_TAB_PRIV(
+  ENC_TAB_ID		SB8,		/* FK TO PCT_ENC_TABLE */
+  PRIVILEGE		UB1,		/* 1:SELECT 2:INSERT 3:UPDATE 4:DELETE */
+  GRANTEE		SCHR(128),	/* NAME OF THE USER TO WHOM ACCESS WAS GRANTED */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_TAB_PRIV_IDX1 ON PCT_ENC_TAB_PRIV(ENC_TAB_ID,GRANTEE,PRIVILEGE);
+
+
+CREATE TABLE PCT_ENC_TABLE(
+  ENC_TAB_ID			SB8,			/* ENCRYPT TABLE ID AN ARTIFITIAL KEY */
+  LAST_UPDATE			SB8,			/* SYNC WATCH */
+  SCHEMA_ID			SB8,			/* FK TO PCT_ENC_SCHEMA */
+  CURR_ENC_STEP         	SB2,
+  CURR_ENC_STMT         	SB2,
+  DEGREE			UB1,			/* DEGREE */
+  PARTITIONED			UB1,			/* PARTITIONED */
+  IOT_TYPE			UB1,			/* IOT_TYPE */
+  ENC_TYPE              	UB1,
+  INIT_ENC_TYPE         	UB1,
+  SYNONYM_FLAG          	UB1,
+  GRANT_FLAG            	UB1,
+  OBJ_FLAG              	UB1,
+  RLS_FLAG              	UB1,
+  DOUBLE_VIEW_FLAG      	UB1,
+  USER_VIEW_FLAG      		UB1,
+  DML_TRG_FLAG      		UB1,
+  CAST_FLAG			UB1,
+  ORG_COL_NAME_FLAG		UB1,
+  KEEP_ORG_TAB_FLAG		UB1,
+  TRAN_TRG_FLAG			UB1,
+  TABLE_NAME			SCHR(130),		/* TABLE NAME */
+  RENAMED_TAB_NAME		SCHR(130),		/* RENAMED TABLE NAME */
+  TAB_TRIGGER_NAME		SCHR(130),		/* TABLE TRIGGER NAME */
+  VIEW_TRIGGER_NAME		SCHR(130),		/* VIEW TRIGGER NAME */
+  FIRST_VIEW_NAME		SCHR(130),		/* FIRST VIEW NAME */
+  SECOND_VIEW_NAME		SCHR(130),		/* SECOND VIEW NAME */
+  TRAN_TAB_NAME			SCHR(130),		/* TRANSACTION TABLE NAME */
+  ORG_RENAMED_TAB_NAME		SCHR(130),		/* ORIGINAL RENAMED TABLE NAME */
+  TARGET_TABLESPACE_NAME	SCHR(130),		/* TARGET TABLESPACD NAME */
+  TABLESPACE_NAME		SCHR(130),		/* CURRENT TABLESPACE NAME */
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_TABLE_IDX1 ON PCT_ENC_TABLE(ENC_TAB_ID);
+CREATE UNIQUE INDEX PCT_ENC_TABLE_IDX2 ON PCT_ENC_TABLE(SCHEMA_ID,TABLE_NAME);
+
+
+CREATE TABLE PCT_ENC_COLUMN(
+  ENC_COL_ID			SB8,			/* ENCRYPTION COLUMN ID, AN ARTIFITIAL KEY */
+  LAST_UPDATE			SB8,			/* SYNC WATCH */
+  ENC_TAB_ID			SB8,			/* FK TO PCT_ENC_TABLE */
+  KEY_ID			SB8,
+  ENC_TARGET_ID			SB8,
+  DATA_LENGTH			SB4,			/* COLUMN DATA LENGTH */
+  DATA_PRECISION		SB4,            
+  DATA_SCALE			SB4,            
+  NULLABLE_FLAG			SB4,			/* NULLABLE FLAG */
+  COLUMN_ORDER          	SB4,			/* COLUMN ORDER STARTING FROM 1 */
+  CURR_ENC_STEP			SB2,
+  MULTI_BYTE_FLAG		UB1,			/* 0: SINGLE BYTE, 1:MULTIBYTE */
+  STATUS			UB1,			/* 0: not encrypt column , 1: encrypt column */
+  IS_IDENTITY			UB1,
+  DEFAULT			SB8,			/* DEFAULT VLAUE */
+  CHAR_SET			SCHR(33),		/* CHARACTER SET NAME */
+  RENAMED_COL_NAME		SCHR(130),		/* RENAMED COLUMN NAME */
+  DOMAIN_INDEX_NAME		SCHR(130),		/* DOMAIN_INDEX_NAME */
+  FBI_INDEX_NAME		SCHR(130),		/* DOMAIN_INDEX_NAME */
+  NORMAL_INDEX_NAME		SCHR(130),		/* DOMAIN_INDEX_NAME */
+  INDEX_COL_NAME		SCHR(130),		/* INDEX COLUMN NAME */
+  COLUMN_NAME			SCHR(130),		/* COLUMN NAME */
+  DATA_TYPE			SCHR(33),
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_COLUMN_IDX1 ON PCT_ENC_COLUMN(ENC_COL_ID);
+CREATE UNIQUE INDEX PCT_ENC_COLUMN_IDX2 ON PCT_ENC_COLUMN(ENC_TAB_ID,COLUMN_NAME);
+
+
+CREATE TABLE PCT_ENC_COL_CT(
+  ENC_COL_ID				SB8,		/* FK TO PCT_ENC_COLUMN */
+  ENC_TAB_ID				SB8,
+  CONSTRAINT_NAME			SB8,		/* CONSTRAINT NAME */
+  RENAMED_CONSTRAINT_NAME		SB8,		/* RENAMED CONSTRAINT NAME */
+  REF_PK_OWNER				SB8,		/* IF COLUMN IS FK, REFERENCING PK OWNER */
+  REF_PK_TABLE				SB8,		/* IF COLUMN IS FK, REFERENCING PK TABLE */
+  REF_PK_COLUMN				SB8,		/* IF COLUMN IS FK, REFERENCING PK COLUMN */
+  POSITION				UB4,		/* CONSTRAINT`s COLUMN POSITION */
+  GENERATED				UB1,		/* IT MEANS ORACLE SYSTEM GENERATE FLAG */
+  CONSTRAINT_TYPE			UB1,		/* 1:PK 2:FK 3:Check */
+  STATUS				UB1,		/* STATUS */
+  SEARCH_CONDITION			SB8,		/* SEARCH CONDITION */
+  RESERVED				SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_COL_CT_IDX1 ON PCT_ENC_COL_CT(ENC_COL_ID,CONSTRAINT_NAME,POSITION);
+
+
+CREATE TABLE PCT_ENC_COL_INDEX(
+  ENC_COL_ID			SB8,		/*  FK TO PCT_ENC_COLUMN */
+  ENC_TAB_ID			SB8,
+  INDEX_NAME			SB8,		/* INDEX NAME */
+  INDEX_OWNER			SB8,		/* INDEX OWNER NAME **/
+  RENAMED_INDEX_NAME1		SB8,		/* RENAMED NORMAL INDEX NAME */
+  RENAMED_INDEX_NAME2		SB8,		/* RENAMED FBI INDEX NAME */
+  RENAMED_ORG_NAME1		SB8,
+  TARGET_TABLESPACE_NAME	SB8,		/* TARGET TABLESPACE NAME */
+  INDEX_TABLESPACE		SB8,		/* INDEX TABLESPACE */
+  DEGREE			UB2,		/* THE NUMBER OF DEGREE */
+  COLUMN_POSITION		UB1,		/* COLUMN POSITION */
+  UNIQUENESS			UB1,		/* UNIQUENESS */
+  PARTITIONED			UB1,		/* PARTITIONED */
+  GENERATED			UB1,		/* GENERATED */
+  INDEX_TYPE			UB1,		/* INDEX TYPE, 1:DOMAIN-1, 2: DOMAIN-2 3: DOMAIN-3 4:FUNCTION, 5:NORMAL */
+  LOGGING			UB1,		/* LOGGING FLAG */
+  DESCEND_FLAG			UB1,		/* DESCEND FLAG 1:YES 2:NO */
+  STATUS			UB1,		/* STATUS */
+  COLUMN_EXPRESSION		SB8,			/* FUNCTION BASE INDEX`s EXPRESSION */
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_COL_INDEX_IDX1 ON PCT_ENC_COL_INDEX(ENC_COL_ID,ENC_TAB_ID,INDEX_NAME,COLUMN_POSITION);
+
+
+CREATE TABLE PCT_ENC_COL_COMMENT(
+  ENC_COL_ID		SB8,		/* ENCRYPT COLUMN ID */
+  ENC_TAB_ID		SB8,
+  COMMENTS		SB8,	/* COLUMN COMMENT */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_COL_COMMENT_IDX1 ON PCT_ENC_COL_COMMENT(ENC_COL_ID);
+
+
+CREATE TABLE PCT_WORKING_SET(
+  WORKING_SET_ID		SB8,	/* WORKING SET ID */
+  ENC_TAB_ID			SB8,
+  ENC_COL_ID			SB8,	/* ENCRYPT COLUMN ID */
+  REF_COL_ID			SB8,	/* REFERENCE COLUMN ID */
+  KEY_TYPE			UB1,    /* KEY_TYPE  1: PK   2: FK */
+  IS_ENCRYPT			UB1,
+  IS_AVAIL_COPY_TYPE		UB1,
+  RESERVED			SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE INDEX PCT_WORKING_SET_IDX1 ON PCT_WORKING_SET(WORKING_SET_ID);
+CREATE INDEX PCT_WORKING_SET_IDX2 ON PCT_WORKING_SET(ENC_COL_ID);
+
+
+CREATE TABLE PCT_ENC_INDEX(
+  ENC_IDX_ID		SB8,
+  LAST_UPDATE		SB8,
+  ENC_COL_ID		SB8,		/* FK TO PCT_ENC_COLUMN */
+  DATA_LENGTH		SB4,		/* indexed char length */
+  PARALLEL_DEGREE       UB2,		/* THE NUMBER OF PARALLEL PROCESSES FOR BUILDING */
+  INDEX_TYPE		UB1,		/* INDEX TYPE, 1:DOMAIN-1, 2:DOMAIN-2, 3:DOMAIN3, 4:FUNCTION, 5:B-TREE */
+  LOGGING_FLAG          UB1,		/* LOGGING FLAG */
+  NORMAL_IDX_FLAG       UB1,		/* 0: NOT CREATE , 1: CREATE */
+  INDEX_NAME		SCHR(130),	/* INDEX NAME */
+  TABLESPACE_NAME       SCHR(130),	/* TABLESPACE NAME FOR INDEX */
+  TMP_TABLESPACE_NAME   SCHR(130),	/* TEMPORARY TABLESPACE NAME FOR INDEX */
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE INDEX PCT_ENC_INDEX_IDX1 ON PCT_ENC_INDEX(ENC_IDX_ID);
+
+
+CREATE TABLE PCT_SCRIPT(
+  ENC_TAB_ID	SB8,		/* FK TO PCT_ENC_TABLE */
+  SEG_NO	UB4,		/* ENCRYPTION STEP NUMBER */
+  VERSION_NO	UB2,		/* VERSION NUMBER */
+  STEP_NO	SB2,		/* ENCRYPTION STEP NUMBER */
+  STMT_NO	SB2,		/* STATMENT NUMBER */
+  SEG_TEXT	SCHR(65),	/* SCRIPT TEXT SEGMENT */
+  RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_SCRIPT_IDX1 ON PCT_SCRIPT(ENC_TAB_ID, VERSION_NO, STEP_NO, STMT_NO, SEG_NO);
+
+
+/*
+DROP TABLE PCT_ROLE_PRIV;		/* DECRYPTING ROLE & PRIVILEGE /
+CREATE TABLE PCT_ROLE_PRIV
+(
+  ROLE_PRIV_ID		SB8,		/* PK /
+  LAST_UPDATE		SB8,		/* SYNC WATCH /
+  ROLE_ID		SB8,		/* ROLE ID /
+  PRIV_ID		SB8,		/* PRIVILEGE ID /
+  ENC_TARGET_ID		SB8,		/* ENCRYPTION TARGET ID /
+  DB_NAME		SCHR(33),	/* database name /
+  SCHEMA_NAME		SCHR(33),	/* schema name /
+  TABLE_NAME		SCHR(130),	/* table name /
+  COLUMN_NAME		SCHR(130),	/* column name /
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ROLE_PRIV_IDX1 ON PCT_ROLE_PRIV(ROLE_PRIV_ID);
+CREATE UNIQUE INDEX PCT_ROLE_PRIV_IDX2 ON PCT_ROLE_PRIV(ROLE_ID, PRIV_ID, ENC_TARGET_ID, DB_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
+*/
+
+
+CREATE TABLE PCT_ENC_PRIV
+(
+  PRIV_ID                               SB8,
+  LAST_UPDATE                           SB8,
+  MGID					SB8,
+  ENC_CONTROL_ID                        SB8,
+  WEEK_ID				SB8,
+  PRIVATE_FLAG                          SB1,
+  DELETE_FLAG                           SB1,
+  PRIV_NAME                             SCHR(129),
+  RESERVED                              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_PRIV_IDX1 ON PCT_ENC_PRIV(PRIV_ID);
+
+
+/* DECRYPTING privilege */
+CREATE TABLE PCT_DEC_PRIV
+(
+  PRIV_ID                               SB8,
+  LAST_UPDATE                           SB8,
+  MGID                                  SB8,
+  DEC_CONTROL_ID                        SB8,
+  WEEK_ID				SB8,
+  PRIVATE_FLAG                          SB1,
+  DELETE_FLAG                           SB1,
+  PRIV_NAME                             SCHR(129),
+  RESERVED                              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_DEC_PRIV_IDX1 ON PCT_DEC_PRIV(PRIV_ID);
+
+/* DECRYPTING ROW privilege */
+CREATE TABLE PCT_DEC_COUNT_PRIV
+(
+  PRIV_ID                               SB8,
+  LAST_UPDATE                           SB8,
+  MGID                                  SB8,
+  DEC_COUNT_CONTROL_ID                    SB8,
+  WEEK_ID				SB8,
+  PRIVATE_FLAG                          SB1,
+  DELETE_FLAG                           SB1,
+  PRIV_NAME                             SCHR(129),
+  RESERVED                              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_DEC_COUNT_PRIV_IDX1 ON PCT_DEC_COUNT_PRIV(PRIV_ID);
+
+/* ENCRYPTIONG privilege */
+CREATE TABLE PCT_ENC_CONTROL
+(
+  ENC_CONTROL_ID			SB8,		/* CONTROL ID */
+  LAST_UPDATE				SB8,		/* SYNC WATCH */
+  OBJECT_GID				SB8,
+  MGID					SB8,
+  ENCRYPT_FLAG				UB1,		/* 1:allow, 2:reject(error), 3:reject(error)-alert */
+  AUTH_FAIL_ENC_FLAG			UB1,		/* 1:allow, 2:reject(error) */
+  PRIVATE_FLAG				SB1,
+  DELETE_FLAG				SB1,
+  CONTROL_NAME				SCHR(129),	/* CONTROL NAME */
+  ENCRYPT_AUDIT_FLAG			SCHR(7),	/* ENCRYPT AUDIT FLAG, audit=>"yY",no audit =>" ", 0->insert, 1->update, 2->delete, 3->select, 4->others, 5->reserved */
+  RESERVED				SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENC_CONTROL_IDX1 ON PCT_ENC_CONTROL(ENC_CONTROL_ID);
+
+/* DECRYPTING privilege */
+CREATE TABLE PCT_DEC_CONTROL
+(
+  DEC_CONTROL_ID                        SB8,            /* CONTROL ID */
+  LAST_UPDATE                           SB8,            /* SYNC WATCH */
+  OBJECT_GID				SB8,
+  MGID                                  SB8,
+  DECRYPT_FLAG                          UB1,            /* 1:allow, 2:reject(masking), 3:reject(encrypt data), 4:reject(error),
+							   5:reject(masking)-alert, 6:reject(encrypt data)-alert, 7:reject(error)-alert */
+  AUTH_FAIL_DEC_FLAG                    UB1,            /* 1:allow, 2:reject(masking) */
+  PRIVATE_FLAG                          SB1,
+  DELETE_FLAG                           SB1,
+  CONTROL_NAME                          SCHR(129),       /* CONTROL NAME */
+  DECRYPT_AUDIT_FLAG                    SCHR(7),        /* DECRYPT AUDIT FLAG, audit=>"yY",no audit =>" ", 0->insert, 1->update, 2->delete, 3->select, 4->others, 5->reserved */
+  RESERVED                              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_DEC_CONTROL_IDX1 ON PCT_DEC_CONTROL(DEC_CONTROL_ID);
+
+/* DECRYPTING ROW COUNT privilege */
+CREATE TABLE PCT_DEC_COUNT_CONTROL
+(
+  DEC_COUNT_CONTROL_ID                  SB8,            /* CONTROL ID */
+  LAST_UPDATE                           SB8,            /* SYNC WATCH */
+  OBJECT_GID                            SB8,
+  MGID                                  SB8,
+  ALERT_DEC_COUNT                       UB4,            /* ALERTING DEC COUNT*/
+  MASKING_DEC_COUNT                     UB4,            /* MAKSING DEC COUNT*/
+  PRIVATE_FLAG                          SB1,
+  DELETE_FLAG                           SB1,
+  CONTROL_NAME                          SCHR(129),       /* CONTROL NAME */
+  RESERVED                              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_DEC_COUNT_CONTROL_IDX1 ON PCT_DEC_COUNT_CONTROL(DEC_COUNT_CONTROL_ID);
+
+
+
+
+/*
+DROP TABLE PCT_PRIV_WDAY;       /* DECRYPTING PRIVILEGE FOR WEEKDAY /
+CREATE TABLE PCT_PRIV_WDAY
+(
+  PRIV_WDAY_ID		SB8,		/* weekday privilege ID /
+  LAST_UPDATE		SB8,		/* SYNC WATCH /
+  PRIV_ID		SB8,		/* PRIVILEGE ID /
+  START_HOUR		UB1,		/* START HOUR, 0 - 23 /
+  END_HOUR		UB1,		/* END HOUR, 0 - 23 /
+  START_MIN		UB1,		/* START MIN, 0 - 59 /
+  END_MIN		UB1,		/* END MIN, 0 - 59 /
+  ENCRYPT_FLAG		UB1,		/* ENCRYPT PRIVILEGE /
+  DECRYPT_FLAG		UB1,		/* DECRYPT PRIVILEGE, 0 => error, 1=>encrypted data, 2=>masking, 3=>decrypted data /
+  STATUS		UB1,
+  WDAY_MAP		SCHR(8),	/* week day byte map, WEEK_DAY[0] -> sunday, WEEK_DAY[6] -> saturday, 'E' -> check, 'N' or ' ' -> not check /
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_PRIV_WDAY_IDX1 ON PCT_PRIV_WDAY(PRIV_WDAY_ID);
+*/
+
+
+CREATE TABLE PCT_OBJECT_GROUP
+(
+  OBJECT_GID		SB8,
+  LAST_UPDATE		SB8,
+  MGID                  SB8,
+  PRIVATE_FLAG          SB1,
+  DELETE_FLAG           SB1,
+  OBJECT_GRP_NAME	SCHR(129),
+  RESERVED		SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_OBJECT_GROUP_IDX1 ON PCT_OBJECT_GROUP(OBJECT_GID);
+
+
+CREATE TABLE PCT_GRP_OBJECT
+(
+  GRP_OBJECT_ID	SB8,
+  LAST_UPDATE	SB8,
+  OBJECT_GID	SB8,
+  ENC_COL_ID	SB8,       /* fk to PCT_ENC_COLUMN.ENC_COL_ID */
+  RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_GRP_OBJECT_IDX1 ON PCT_GRP_OBJECT(GRP_OBJECT_ID);
+CREATE UNIQUE INDEX PCT_GRP_OBJECT_IDX2 ON PCT_GRP_OBJECT(OBJECT_GID,ENC_COL_ID);
+
+
+
+
+/* KEY REQUEST HISTORY */
+CREATE TABLE PCT_PRIV_REQUEST_HIST(
+  USER_SID              SB8,         /* SESSION USER ID */
+  ENC_COL_ID            SB8,         /* FK TO PCT_ENC_COLUMN */
+  GROUP_ID		SB8,
+  UG_GID		SB8,
+  DA_METHOD_GID		SB8,
+  GROUP_ROLE_ID		SB8,
+  ROLE_ID		SB8,
+  ROLE_PRIV_ID		SB8,
+  ENC_PRIV_ID           SB8,         /* FK TO PCT_ENC_PRIV */
+  ENC_CONTROL_ID        SB8,         /* FK TO PCT_ENC_CONTROL */
+  DEC_PRIV_ID           SB8,         /* FK TO PCT_DEC_PRIV */
+  DEC_CONTROL_ID        SB8,         /* FK TO PCT_DEC_CONTROL */
+  DEC_COUNT_PRIV_ID     SB8,         /* FK TO PCT_DEC_COUNT_PRIV */
+  DEC_COUNT_CONTROL_ID     SB8,         /* FK TO PCT_DEC_COUNT_CONTROL */
+  REQUEST_DATE          UB4,         /* REQUEST DATE */
+  RESERVED              SCHR(33)
+)
+PERM '1100111111100'
+EXTENT(0,1000,50000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE INDEX PCT_PRIV_REQUEST_HIST_IDX1 ON PCT_PRIV_REQUEST_HIST(USER_SID);
+CREATE INDEX PCT_PRIV_REQUEST_HIST_IDX2 ON PCT_PRIV_REQUEST_HIST(ENC_COL_ID);
+
+
+
+/* KEY REQUEST HISTORY */
+CREATE TABLE PCT_KEY_REQUEST_HIST(
+  KEY_ID     	        SB8,         /* FK TO PCT_ENC_COLUMN */
+  REQUEST_DATE          UB4,         /* REQUEST DATE */
+  REQUEST_IP            SCHR(65),    /* REQUEST API IP */
+  RESERVED              SCHR(33)
+)
+PERM '1100111111100'
+EXTENT(0,1000,50000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE INDEX PCT_KEY_REQUEST_HIST_IDX1 ON PCT_KEY_REQUEST_HIST(REQUEST_IP);
+
+/* KEY REQUEST HISTORY */
+CREATE TABLE PCT_KEY_REJECT_HIST(
+  KEY_ID                SB8,         /* FK TO PCT_ENC_COLUMN */
+  REQUEST_DATE          UB4,         /* REQUEST DATE */
+  REQUEST_IP            SCHR(65),    /* REQUEST API IP */
+  RESERVED              SCHR(33)
+)
+PERM '1100111111100'
+EXTENT(0,1000,50000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE INDEX PCT_KEY_REJECT_HIST_IDX1 ON PCT_KEY_REJECT_HIST(REQUEST_IP);
+
+/* CRYPT HISTORY */
+CREATE TABLE PCT_CRYPT_HIST(
+  USER_SID              SB8,         /* SESSION USER ID */
+  ENC_COL_ID            SB8,         /* FK TO PCT_ENC_COLUMN */
+  ENC_COUNT             SB8,         /* encrypt count */
+  DEC_COUNT             SB8,         /* decrypt count */
+  LAPSE_TIME            SB8,         /* lapse time in micro second */
+  STMT_ID               SB8,         /* soha statement ID */
+  SQL_CPU_TIME          SB8,         /* cpu time for executing sql */
+  SQL_ELAPSED_TIME      SB8,          /* elapsed time for executing sql */
+  START_DATE            UB4,         /* start date */
+  SQL_TYPE              SB4,         /* sql type */
+  ENC_NO_PRIV_FLAG      UB1,         /* encrypt no privilege flag */
+  DEC_NO_PRIV_FLAG      UB1,         /* decrypt no privilege flag */
+  SQL_HASH              SCHR(65),    /* sql hash */
+  RESERVED              SCHR(33)
+)
+PERM '1100111111100'
+EXTENT(0,3000,250000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE INDEX PCT_CRYPT_HIST_IDX1 ON PCT_CRYPT_HIST(USER_SID);
+CREATE INDEX PCT_CRYPT_HIST_IDX2 ON PCT_CRYPT_HIST(ENC_COL_ID);
+
+
+/* FILE CRYPT HISTORY */
+CREATE TABLE PCT_FILE_CRYPT_HIST(
+  PSU_ID		SB8,        /* pt_sess_user.psu_id */
+  SYSTEM_NAME		SCHR(65),
+  SYSTEM_IP		SCHR(128),
+  FILE_NAME             SCHR(256),
+  ENC_TYPE              SCHR(32),   /* type: FULL, PATTERN, SAM(delimiter), SAM(position) */
+  MODE			UB1,	    /* 1:encrypt , 2:decrypt 3:validation*/
+  KEY_NAME              SCHR(130),
+  FILE_SIZE		SB8,
+  PROCESSED_BYTE	SB8,
+  ZONE_NAME		SCHR(130),
+  ENC_START_DATE        UB4,
+  ENC_END_DATE          UB4,
+  ERR_MSG		SCHR(256)
+)
+PERM '1100111111100'
+EXTENT(0,3000,250000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+
+
+/* FILE CRYPT HISTORY FOR USER*/
+CREATE TABLE PCT_USER_FILE_CRYPT_HIST(
+  PTU_ID		SB8,        /* pt_sess_user.psu_id */
+  CLIENT_IP		SCHR(128),
+  SYSTEM_NAME		SCHR(65),
+  SYSTEM_IP		SCHR(128),
+  FILE_NAME             SCHR(256),
+  ENC_TYPE              SCHR(32),   /* type: FULL, PATTERN, SAM(delimiter), SAM(position) */
+  MODE			UB1,	    /* 1:encrypt , 2:decrypt , 3:validation*/
+  KEY_NAME              SCHR(130),
+  FILE_SIZE		SB8,
+  PROCESSED_BYTE	SB8,
+  ZONE_NAME		SCHR(130),
+  ENC_START_DATE        UB4,
+  ENC_END_DATE          UB4,
+  ERR_MSG		SCHR(256)
+)
+PERM '1100111111100'
+EXTENT(0,3000,250000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+
+/* FILE DETECT HISTORY */
+CREATE TABLE PCT_FILE_DETECT_DATA(
+  JOB_ID		SB8,
+  DIR_ID		SB8,
+  FILE_ID		SB8,
+  FILE_NAME		SCHR(2048),
+  START_OFFSET		SB8,
+  END_OFFSET		SB8,
+  EXPR			SCHR(1024),
+  DATA			SCHR(1024)
+)
+PERM '1100111111100'
+EXTENT(0,3000,250000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+
+CREATE TABLE PCT_FILE_DETECT_HIST(
+  JOB_ID		SB8,
+  DIR_ID		SB8,
+  FILE_ID		SB8,
+  SYSTEM_NAME           SCHR(65),
+  SYSTEM_IP             SCHR(128),
+  FILE_NAME		SCHR(2048),
+  FILE_SIZE		SB8,
+  FILE_MTIME		UB4,
+  START_DATE            UB4,
+  END_DATE              UB4,
+  PTTN_NUM              SB8,
+  IS_SKIPPED            SB4,
+  PARAMETER 		SCHR(1024),
+  ERR_MSG		SCHR(256)
+)
+PERM '1100111111100'
+EXTENT(0,3000,250000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+
+
+CREATE TABLE PCT_SCHEDULE
+(
+  SCHEDULE_ID		sb8,		/* schedule id (#) */
+  ARRAY_SIZE		ub4,		/* array size, default = 1000 */
+  START_TIME		ub4,		/* start time */
+  CREATE_TIME		ub4,		/* create time */
+  PROCESS_ID		ub4,		/* process id */
+  END_TIME		ub4,		/* end time */
+  NUM_CHUNKS		ub2,		/* the number of chunks, default=200 */
+  PARALLEL_DEGREE	ub2,		/* the number of updating sessions, default=5 */
+  CURR_STATUS		sb2,		/* current status, 0->"Scheduling", 1-9999-> "Processing" 10000-> "Pending" 20000-> "Done" */
+  TARGET_STEP		sb2,		/* script target step number */
+  SCHEDULE_NAME		schr(33),	/* schedule name   */
+  EXECUTING_MODE	schr(11),	/* schedule executing mode, "time-base", "call-base" */
+  JOB_START_MODE	schr(11),	/* member job starting mode, "concurrent", "sequential" */
+  RESERVED              SCHR(33)
+)
+perm '0000111111100'
+extent(10,10,10);
+CREATE UNIQUE INDEX PCT_SCHEDULE_IDX1 ON PCT_SCHEDULE(SCHEDULE_ID);
+
+
+CREATE TABLE PCT_JOB
+(
+  JOB_ID		sb8,		/* job id (#) */
+  WORKING_SET_ID	sb8,		/* working set id (#) */
+  SCHEDULE_ID		sb8,		/* schedule id (#) */
+  ENC_TAB_ID		sb8,		/* encrypting table id */
+  TOTAL_ROWS		sb8,		/* the number of rows in target table */
+  ARRAY_SIZE		ub4,		/* array size */
+  PROCESS_ID		ub4,		/* process id */
+  START_TIME		ub4,		/* start time */
+  END_TIME		ub4,		/* end time */
+  EXE_ORDER		sb2,		/* execution order */
+  TARGET_STEP		sb2,		/* script target step number */
+  NUM_CHUNKS		ub2,		/* the number of chunks */
+  PARALLEL_DEGREE	ub2,		/* the number of updating sessions */
+  CURR_STATUS		sb2,		/* current status, 0->"Scheduling", 1-9999-> "Processing", 10000-> "Pending", 20000-> "Done" */
+  EXE_COUNT		sb2,		/* execution count */
+  CURR_ENC_STEP		sb2,		/* CURRENT ENCRYPTION STEP, 1 TO 5, SET BY PROCEDURE */
+  CURR_ENC_STMT		sb2,		/* CURRENT ENCRYPTION STATEMENT NUMBER, SET BY PROCEDURE */
+  WHERE_CLAUSE		schr(129),	/* where clause */
+  CURR_ERR_MSG		schr(129),	/* current script error message */
+  RESERVED              SCHR(33)
+)
+perm '0000111111100'
+extent(10,10,30);
+CREATE INDEX PCT_JOB_IDX1 ON PCT_JOB(SCHEDULE_ID);
+CREATE INDEX PCT_JOB_IDX2 ON PCT_JOB(WORKING_SET_ID);
+
+
+/* JOG EXECUTION LOG */
+CREATE TABLE PCT_JOB_EXE_LOG(
+  JOB_ID                SB8,         /* JOB ID */
+  LAPSE_TIME            SB8,         /* SCRIPT LAPSE TIME in micro seconds */
+  START_TIME            UB4,         /* START TIME */
+  ERR_CODE              SB4,         /* ERROR CODE */
+  EXE_COUNT             SB2,         /* JOB EXECUTION COUNTER */
+  VERSION_NO            UB2,         /* VERSION NUMBER */
+  STEP_NO               SB2,         /* STEP NO */
+  STMT_NO               SB2,         /* STATEMENT NUMBER */
+  ERR_MSG               SCHR(129),    /* ERROR MESSAGE */
+  RESERVED              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+
+
+CREATE TABLE PCT_VERIFY_JOB
+(
+  VERIFY_JOB_ID			sb8,		/* job id (#) */
+  SCHEDULE_ID			sb8,		/* schedule id (#) */
+  ENC_TAB_ID			sb8,		/* encrypting table id */
+  PROCESS_ID			ub4,		/* process id */
+  START_TIME			ub4,		/* start time */
+  END_TIME			ub4,		/* end time */
+  EXE_ORDER			sb2,		/* execution order */
+  CURR_STATUS			sb2,		/* current status, 0->"Scheduling", 1-9999-> "Processing", 10000-> "Pending", 20000-> "Done" */
+  VERIFY_ROWS_PERCENT		ub2,		/* verify rows percent, 10,20,30..100, 0 equal to 100 */
+  VERIFY_MODE			ub1,		/* verify mode, 1: only verify row count, 2: only verify data, 0 or 3: verify row and data */
+  ROW_VERIFY_CNT_RESULT		sb1,		/* row count verify result, -1: fail, 0: before verify, 1: success */
+  DATA_VERIFY_RESULT		sb1,            /* data verify result, -1: fail, 0: before verify, 1: success */
+  CURR_ERR_MSG			schr(129),	/* current script error message */
+  RESERVED              	SCHR(33)
+)
+perm '0000111111100'
+extent(10,10,30);
+CREATE INDEX PCT_VERIFY_JOB_IDX1 ON PCT_VERIFY_JOB(SCHEDULE_ID);
+
+CREATE TABLE PCT_VERIFY_JOB_ROW_CNT_RESULT(
+  VERIFY_JOB_ID			sb8,		/* job id (#) */
+  TARGET_TAB_ROW_CNT		ub4,		/* target table`s rows count */
+  SOURCE_TAB_ROW_CNT		ub4		/* source table`s rows count */
+)
+PERM '0100111111100'
+EXTENT(0,1000,50000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE UNIQUE INDEX PCT_VERIFY_JOB_ROW_CNT_RET_IDX1 ON PCT_VERIFY_JOB_ROW_CNT_RESULT(VERIFY_JOB_ID);
+
+CREATE TABLE PCT_VERIFY_JOB_DATA_RESULT(
+  VERIFY_JOB_ID                 sb8,            /* job id (#) */
+  TARGET_TAB_DATA               sb8,            /* target table data`s name id */
+  SOURCE_TAB_DATA               sb8             /* source table data`s name id */
+)
+PERM '0100111111100'
+EXTENT(0,1000,50000)
+DIRECTORY '%soha_home%/%soha_svc%/external/';
+CREATE INDEX PCT_VERIFY_JOB_DATA_RESULT_IDX1 ON PCT_VERIFY_JOB_DATA_RESULT(VERIFY_JOB_ID);
+
+create table PCT_WORKER
+(
+  JOB_ID			sb8,		/* job id (#) */
+  PROCESSED_ROWS		sb8,		/* the number of processed rows */
+  WORKING_TIME			sb8,		/* processing time in micro second */
+  PROCESS_ID			ub4,		/* process id */
+  THREAD_ID			ub4,		/* thread id */
+  START_TIME			ub4,		/* start time */
+  PROCESSED_CHUNKS		ub4,		/* the number of processed chunks */
+  CHUNK_WAITS			ub4,		/* the number of chunk wait */
+  END_TIME			ub4,		/* end time */
+  EXE_COUNT			SB2,		/* JOB EXECUTION COUNTER */
+  CURR_STATUS			sb2,		/* current status, 0->initializing, 1->"collecting", 2->"updating", 3->"waiting", 4->"inserting", 10000->error, 20000->done */
+  ERR_MSG			schr(129),	/* error message */
+  ASSIGNED_ROLE			schr(11),	/* assigned role, "collector", "updater" */
+  RESERVED              SCHR(33)
+)
+perm '0000111111100'
+extent(10,10,40);
+
+/*
+ * EXTERNAL PROCEDURE SERVER AND PROCEDURES FOR KEY MANAGING
+ */
+CREATE SERVER PCP_KEY_MGR PERM '0000111000000'
+  EXECUTABLE '%soha_home%/bin/pcp_keymgr';
+
+CREATE SERVER PCP_CIPHER_AGENT PERM '0000111000000'
+  EXECUTABLE '%soha_home%/bin/pcp_cipher_agent';
+
+CREATE PROCEDURE PCP_CREATE_KEY PERM '0000111110110'
+  IN(
+	PASSWD		SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_DROP_KEY PERM '0000111110110'
+  IN(
+	PASSWD		SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_OPEN_KEY PERM '0000111110110'
+  IN(
+	PASSWD		SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_CLOSE_KEY PERM '0000111110110'
+  IN(
+	PASSWD		SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_CHANGE_PW PERM '0000111110110'
+  IN(
+	OLD_PASSWD	SCHR(33),
+	NEW_PASSWD	SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_EXPORT_KEY PERM '0000111110110'
+  IN(
+	OLD_PASSWD	SCHR(33),
+	NEW_PASSWD	SCHR(33)
+  )
+  OUT(
+	RESULT		SCHR(7000)
+  );
+
+
+CREATE PROCEDURE PCP_IMPORT_KEY PERM '0000111110110'
+  IN(
+	OLD_PASSWD	SCHR(33),
+	NEW_PASSWD	SCHR(33),
+	KEYS		SCHR(7000)
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_GET_KEY PERM '0000111110110'
+  IN(
+        PASSWD      SCHR(33),
+        KEY_ID      SB8
+  )
+  OUT(
+        KEY         ACHR(65)
+  );
+
+
+CREATE PROCEDURE PCP_SET_KEY_OPEN_MODE PERM '0000111110110'
+  IN(
+        PASSWD          SCHR(33),
+        OPEN_MODE       SCHR(11)
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+
+
+/*
+ * EXTERNAL PROCEDURE SERVER AND PROCEDURES FOR MANAGING ENCRYPTION META
+ */
+CREATE SERVER PCP_META_MGR PERM '0000111000000'
+  EXECUTABLE '%soha_home%/bin/pcp_metamgr';
+
+CREATE PROCEDURE PCP_GET_TABLESPACE PERM '0000111110110'
+  IN(
+        DB_AGENT_ID               SB8
+  )
+  OUT(
+        TABLESPACE_NAME         SCHR(33),
+        RELATION                SB4 	/* 0-> no relationship, 1->default tablespace, 2->temporary tablespace */
+  );
+
+CREATE PROCEDURE PCP_GEN_SCRIPT PERM '0000111110110'
+  IN(
+	ENC_TAB_ID	SB8
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_GEN_SCRIPT_ADD_COL PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_GEN_SCRIPT_COL_ADMIN PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_GEN_SCRIPT_MIG PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_MIG_VALID_TEST PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8          /* 0: all target table , > 0: taget table id */
+  )
+  OUT(
+        RESULT         SCHR(256)
+  );
+
+CREATE PROCEDURE PCP_GET_SCRIPT PERM '0000111110110'
+  IN(
+	ENC_TAB_ID	SB8,
+	VERSION_NO	UB2,
+	STEP_NO		SB2,
+	STMT_NO		SB2
+  )
+  OUT(
+	SEG_TEXT	SCHR(65)
+  );
+
+
+CREATE PROCEDURE PCP_CHANGE_SCRIPT PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8,
+        VERSION_NO      UB2,
+        STEP_NO         SB2,
+        STMT_NO         SB2,
+        SCRIPT          SCHR(64000)
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_SCRIPT PERM '0000111110110'
+  IN(
+	ENC_TAB_ID	SB8,
+	VERSION_NO	UB2,
+	STEP_NO		SB2,
+	STMT_NO		SB2
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_CREATE_COUPON PERM '0000111110110'
+  IN(
+  	COUPON_ID	SB8	  /* COUPON ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_INSTALL_COUPON PERM '0000111110110'
+  IN(
+  	AGENT_ID	SB8,  	  /* AGENT ID */
+  	COUPON_ID	SB8	  /* COUPON ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_TRY_DB_CONN PERM '0000111110110'
+  IN(
+        DBMS_TYPE       SB4,            /* 1:oracle 2:mssql 3:mysql */
+        IP_ADDR         SCHR(256),
+        PORT            SB4,
+        DB_NAME         SCHR(33),
+        INSTANCE_NAME 	SCHR(33),
+        USER_NAME            SCHR(33),
+        PASS    SCHR(33)
+  )
+  OUT(
+	RESULT_CODE	SB4,	/* 0 : Success
+				  -1 : Fail
+				*/
+       	RESULT  SCHR(1024)
+  );
+
+CREATE PROCEDURE PCP_DROP_AGENT PERM '0000111110110'
+  IN(
+        DB_AGENT_ID        SB8,      /* PT_DB_AGENT->service_id */
+        SYS_UID         SCHR(33),
+        SYS_PASSWD      SCHR(33)
+  )
+  OUT(
+        RESULT_CODE	SB4,	/* 0 : Success
+				  -1 : user drop fail
+				*/
+	RESULT_MSG	SCHR(1024)
+  );
+
+CREATE PROCEDURE PCP_AGENT_TEST PERM '0000111110110'
+  IN(
+        DB_AGENT_ID        SB8	      /* PCT_DB_AGENT->service_id */
+  )
+  OUT(
+        RESULT_CODE	SB4,	/* 
+				   0 : All Fail
+				   1 : PL/SQL Success
+				   2 : JAVA Success
+				   3 : C-Lib Loading Success
+				   4 : C-LIb enc/dec Success
+				*/
+	RESULT_MSG	SCHR(1024)    /*
+				    
+				       */
+  );
+
+CREATE PROCEDURE PCP_AGENT_TABLE_TEST PERM '0000111110110'
+  IN(
+        DB_AGENT_ID        SB8      /* PT_DB_AGENT->service_id */
+  )
+  OUT(
+        PARALLEL_GEGREE   UB2,	   
+	DOMAIN_INDEX	  SB1,	   /* 0: success -1: fail */
+	DATA_TYPE	  SB1,	   /* 0: success -1: fail */		
+	ALGORITHM	  SB1,	   /* 0: success -1: fail */
+	RESULT_MSG	  SCHR(1024)
+  );
+
+CREATE PROCEDURE PCP_INST_AGENT_USER PERM '0000111110110'
+  IN(
+        DB_AGENT_ID        SB8,      /* AGENT ID */
+        SYS_UID         SCHR(33),
+        SYS_PASSWD      SCHR(33),
+        AGENT_UID       SCHR(33),
+        AGENT_PASSWD    SCHR(33),
+        SOHA_HOME       SCHR(512),
+        INST_MODE       UB1       /* 0: auto 1:manual */
+  )
+  OUT(
+        RESULT_CODE     SB4,    /* 0 : Success
+                                  -1 : connect test fail(as sys user)
+                                  -2 : duplicate agent user
+                                  -3 : create agent user fail
+                                */
+        RESULT_MSG      SCHR(1024)
+  );
+
+CREATE PROCEDURE PCP_INST_AGENT_PKG PERM '0000111110110'
+  IN(
+        DB_AGENT_ID        SB8         /* AGENT ID */
+  )
+  OUT(
+        RESULT_CODE     SB4,    /* 0 : Success
+                                  -1 : JVM fail.
+                                  -2 : java class file load faile
+                                  -3 : pl/sql function create fail
+                                  -4 : grant function fail
+                                  -5 : create synonym fail
+                                  -6 : domain index type create fail
+                                */
+        RESULT_MSG      SCHR(1024)
+  );
+
+
+/*
+ * EXTERNAL PROCEDURE SERVER AND PROCEDURES FOR MANAGING CRYPTO JOB
+ */
+CREATE SERVER PCP_JOB_MGR PERM '0000111000000'
+  EXECUTABLE '%soha_home%/bin/pcp_jobmgr';
+
+CREATE PROCEDURE PCP_ENCRYPT PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8 /* encrypt table ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_DECRYPT PERM '0000111110110'
+  IN(
+        ENC_TAB_ID      SB8 /* encrypt table ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_RUN_JOB PERM '0000111110110'
+  IN(
+        JOB_ID          SB8       /* JOB ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_MIG_JOB PERM '0000111110110'
+  IN(
+        JOB_ID          SB8       /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_VERIFY PERM '0000111110110'
+  IN(
+        JOB_ID          SB8       /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_MIG_VERIFY PERM '0000111110110'
+  IN(
+        JOB_ID          SB8       /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_SCHEDULE PERM '0000111110110'
+  IN(
+        SCHEDULE_ID     SB8     /* JOB ID */
+  )
+  OUT(
+	RESULT		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_MIG_SCHEDULE PERM '0000111110110'
+  IN(
+        SCHEDULE_ID     SB8     /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_VERIFY_SCHEDULE PERM '0000111110110'
+  IN(
+        SCHEDULE_ID     SB8     /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_RUN_MIG_VERIFY_SCHEDULE PERM '0000111110110'
+  IN(
+        SCHEDULE_ID     SB8     /* JOB ID */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_STOP_JOB PERM '0000111110110'
+  IN(
+        JOB_ID  SB8  /* Cipher JOB ID */
+  )
+  OUT(
+        RESULT  SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_JOB_PROGRESS PERM '0000111110110'
+  IN(
+        JOB_ID          SB8
+  )
+  OUT(
+	CURR_ENC_STEP	SB2,
+	CURR_ENC_STMT	SB2,
+	CURR_STATUS	SB2,
+	PROGRESS_STATUS	FLT8,
+	REMARK		SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_VERIF_PROGRESS PERM '0000111110110'
+  IN(
+        JOB_ID          SB8
+  )
+  OUT(
+	CURR_VERIF_STEP	SB2,   /* 1:verify, 2:re encrypt */
+	CURR_STATUS	SB2,
+	PROGRESS_STATUS	FLT8,
+	REMARK		SCHR(129)
+  );
+
+
+CREATE PROCEDURE PCP_GET_CREDENTIALS PERM '0000111110110'
+  IN(
+       INPUT_BGRAM     schr(1024)
+  )
+  OUT(
+       ERRCODE         SB4,
+       RESULT          SCHR(1024)
+  );
+
+CREATE PROCEDURE PCP_SESS_MONITOR PERM '0000111110110'
+  IN(
+        DBLINK_NAME     schr(33)        /* dblink name */
+  )
+  OUT(
+        username        schr(33),
+        sid             sb8,
+        serial_no       sb8,
+        paddr           schr(33),
+        osuser          schr(33),
+        sql_type        schr(10),
+        status          schr(20),
+        sess_event      schr(100),
+        machine         schr(50),
+        module          schr(50),
+        action          schr(30),
+        program         schr(50),
+        logon_time      schr(30),
+        sess_logical_read       sb8
+  );
+
+
+CREATE PROCEDURE PCP_SESS_SQL_TEXT PERM '0000111110110'
+  IN(
+        DBLINK_NAME     schr(33),        /* dblink name */
+        SID		sb8,        
+        SERIAL_NO	sb8        
+  )
+  OUT(
+        SQL_TEXT        schr(65),
+	PIECE		sb4
+  );
+
+ALTER SERVER PCP_KEY_MGR RESTART;
+ALTER SERVER PCP_META_MGR RESTART;
+ALTER SERVER PCP_JOB_MGR RESTART;
+
+
+
+/* -- create enc/dec key -- */     /* KEY_NO (0 TO 1792)  */
+DELETE PCT_ENCRYPT_KEY;
+INSERT INTO PCT_ENCRYPT_KEY(KEY_ID, KEY_NAME, KEY_NO, CIPHER_TYPE, KEY_SIZE, ENC_MODE, IV_TYPE, N2N_FLAG, B64_TXT_ENC_FLAG, ENC_START_POS, ENC_LENGTH, MASK_CHAR, COUPON_ID, RESERVED) VALUES(:1,:2,:3,:4,:5,:6,:7,:8,:9,:10,:11,:12,:13,:14);
+<
+1^'AES_128'^101^1^128^2^0^1^2^1^0^'****'^0^''
+2^'AES_128'^101^1^128^2^0^1^0^1^0^'****'^0^''
+3^'AES_256'^101^1^256^2^0^1^2^1^0^'****'^0^''
+4^'AES_256'^101^1^256^2^0^1^0^1^0^'****'^0^''
+5^'ARIA_128'^101^3^128^2^0^1^2^1^0^'****'^0^''
+6^'ARIA_128'^101^3^128^2^0^1^0^1^0^'****'^0^''
+7^'ARIA_256'^101^3^256^2^0^1^2^1^0^'****'^0^''
+8^'ARIA_256'^101^3^256^2^0^1^0^1^0^'****'^0^''
+9^'SEED_128'^101^2^128^2^0^1^2^1^0^'****'^0^''
+10^'SEED_128'^101^2^128^2^0^1^0^1^0^'****'^0^''
+11^'SEED_256'^101^2^256^2^0^1^2^1^0^'****'^0^''
+12^'SEED_256'^101^2^256^2^0^1^0^1^0^'****'^0^''
+13^'SHA_256'^101^4^256^2^0^1^2^1^0^'****'^0^''
+14^'SHA_512'^101^4^512^2^0^1^2^1^0^'****'^0^''
+15^'RSA_OAEP_2048bit_SHA-224'^101^7^2048^2^0^1^2^1^0^'****'^0^''
+>
+/* -- insert PCT_ENC_COLUMN -- */
+DELETE PCT_ENC_COLUMN;
+INSERT INTO PCT_ENC_COLUMN(ENC_COL_ID,ENC_TAB_ID,COLUMN_NAME,DATA_TYPE,MULTI_BYTE_FLAG,CHAR_SET,DATA_LENGTH,DATA_PRECISION,DATA_SCALE,NULLABLE_FLAG,COLUMN_ORDER,DEFAULT,KEY_ID,ENC_TARGET_ID,RENAMED_COL_NAME,DOMAIN_INDEX_NAME,INDEX_COL_NAME,STATUS,CURR_ENC_STEP) VALUES(:1,:2,:3,:4,:5,:6,:7,:8,:9,:10,:11,:12,:13,:14,:15,:16,:17,:18,:19);
+<
+1^0^'1'^''^''^''^'500'^''^''^''^''^''^1^''^''^''^''^''^''
+2^0^'2'^''^''^''^'500'^''^''^''^''^''^5^''^''^''^''^''^''
+3^0^'3'^''^''^''^'500'^''^''^''^''^''^9^''^''^''^''^''^''
+4^0^'4'^''^''^''^'500'^''^''^''^''^''^13^''^''^''^''^''^''
+>
+
+DELETE PCT_SCHEDULE;
+INSERT INTO PCT_SCHEDULE(schedule_id,schedule_name,executing_mode,target_step,array_size,num_chunks,parallel_degree,job_start_mode) VALUES(:1,:2,:3,:4,:5,:6,:7,:8);
+<
+1^'default_schedule'^'call-base'^0^1000^200^5^'sequential'
+>
+
+DELETE PCT_AGENT_ERROR;
+INSERT INTO PCT_AGENT_ERROR(ERR_CODE,INTERNAL_FLAG,CAUSE,ACTION) VALUES(:1,:2,:3,:4);
+<
+-30101^1^'UNSUPPORTED_KEY_SIZE'^'개발팀에게 문의'
+-30102^1^'UNSUPPORTED_ENC_MODE'^'개발팀에게 문의'
+-30103^1^'UNSUPPORTED_CIPHER_TYPE'^'개발팀에게 문의'
+-30104^1^'ENC_DATA_TOO_SHORT'^'개발팀에게 문의'
+-30105^1^'OUT_BUFFER_TOO_SHORT'^'개발팀에게 문의'
+-30106^1^'UNSUPPORTED_DIGEST_LEN'^'개발팀에게 문의'
+-30107^1^'INVALID_ENC_DATA_LEN'^'개발팀에게 문의'
+-30108^1^'B64_FORMAT_ERROR'^'개발팀에게 문의'
+-30109^1^'ARIA_KEY_MAKING_ERROR'^'개발팀에게 문의'
+-30110^1^'INVALID_ENC_START_POS'^'개발팀에게 문의'
+-30111^1^'INVALID_PARAM_VALUE'^'개발팀에게 문의'
+-30112^1^'EVP_FAILED'^'개발팀에게 문의'
+-30113^1^'SFC_FAILED'^'개발팀에게 문의'
+-30114^1^'INVALID_IV_TYPE'^'개발팀에게 문의'
+-30301^0^'NO_ENCRYPT_PRIV'^'암호화 권한 부여'
+-30302^1^'INVALID_SID'^'개발팀에게 문의'
+-30303^0^'INVALID_HOST'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30304^0^'SOCKET_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30305^0^'CONNECT_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30306^0^'WRITE_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30307^0^'READ_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30308^0^'BUF_OVERFLOW'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30309^1^'SESS_LOCK_FAIL'^'개발팀에게 문의'
+-30310^1^'SVR_SESS_LOCK_FAIL'^'개발팀에게 문의'
+-30311^1^'NO_SVR_SESSION'^'개발팀에게 문의'
+-30312^1^'NO_FREE_SVR_SESSION'^'개발팀에게 문의'
+-30313^1^'NO_EMPTY_SPACE'^'개발팀에게 문의'
+-30316^1^'PARSE_ERROR'^'개발팀에게 문의'
+-30317^1^'FILE_IO_ERROR'^'개발팀에게 문의'
+-30318^0^'APPROVE_REJECTED'^'결재 권한을 부여 하세요'
+-30388^1^'CHARSET_CONV_FAILURE'^'개발팀에게 문의'
+-30340^0^'INVALID_HOST'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30341^0^'SOCKET_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30342^0^'CONNECT_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30343^0^'WRITE_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30344^0^'READ_ERROR'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30345^0^'BUF_OVERFLOW'^'지정된 키서버의 IP/PORT로의 연결이 가능한 지 확인 하세요'
+-30351^0^'NAME_NOT_FOUND'^'컬럼의 이름을 확인하세요'
+-30352^0^'AMBIGUOUS_NAME'^'정확한 컬럼이름을 지정하세요(예.DB_NAME.SCHEMA_NAME.TABLE_NAME.COLUMN_NAME)'
+-30353^0^'COLUMN_NOT_FOUND'^'지정된 컬럼을 확인 하세요'
+-30354^0^'KEY_NOT_FOUND'^'컬럼에 지정된 키를 확인 하세요'
+-30501^1^'PARSE_ERROR'^'개발팀에게 문의'
+-30502^1^'INVALID_CREDENTIALS'^'개발팀에게 문의'
+-30601^0^'WEAK_PASSWORD'^'패스워드 강도 규칙에 맞는 패스워드를 지정 하세요'
+-30602^0^'WRONG_PASSWORD'^'정확한 패스워드를 지정 하세요'
+-30603^1^'NO_KEY_STASH'^'개발팀에게 문의'
+-30604^1^'KEY_OPENED'^'개발팀에게 문의'
+-30605^0^'KEY_NOT_OPENED'^'마스터키를 오픈 시켜 주세요'
+>
+
+
+/* 클라이언트 속성별 사용자 구분 */
+create table pct_client_group(
+        client_gid sb8 , /* CLIENT_GID */
+        last_update sb8, /* 싱크와치 */
+        mgid sb8, /* management group id */
+        auth_grp_id sb8, /* 인증 그룹 플래그 */
+        ip_grp_id sb8, /* IP_GRP_ID */
+        mac_grp_id sb8, /* MAC_GRP_ID */
+        auth_contrary_flag sb1, /* 인증 제외 플레그 */
+        client_ip_contrary_flag sb1, /* IP 제외 플레그 */
+        client_mac_contrary_flag sb1, /* MAC 제외 플레그*/
+        delete_flag sb1, /* delete flag */
+        client_ip SCHR(65), /* CLIENT_IP */
+        client_ip_end SCHR(65), /* CLIENT_IP_END */
+        client_mac SCHR(65), /* CLIENT_MAC */
+        client_grp_name schr(129), /* 클라이언 그룹 이름 */
+        auth_user schr(65), /* auth_user */
+        reserved schr(33) /* 예약 */
+)
+perm '0000111111100'
+extent(0,1,0);
+create unique index pct_client_group_idx1 on pct_client_group(client_gid);
+
+/* 조직별 사용자 구분 */
+create table pct_org_group(
+        orgg_id sb8, /* ORGG_ID */
+        last_update sb8, /* 싱크와치 */
+        mgid sb8, /* management group id */
+        org_uid_grp_id sb8, /* org_uid group id */
+        org_grp_id sb8, /* org group id */
+        security_level_low ub2, /* 보안등급 */
+        security_level_high ub2, /* 보안등급 */
+        contrary_flag sb1, /* 제외 플레그 */
+        private_flag sb1, /* private rule flag */
+        delete_flag sb1, /* delete flag */
+        orgg_name schr(33), /* 조직별 그룹 이름 */
+        org_uid schr(33), /* ORG_UID */
+        title schr(33), /* 직위 */
+        role schr(33), /* 역할 */
+        reserved schr(33) /* 예약 */
+)
+perm '0000111111100'
+extent(0,1,0);
+create unique index pct_org_group_idx1 on pct_org_group(orgg_id);
+create index pct_org_group_idx2 on pct_org_group(org_uid);
+
+/* pct_user_group */
+create table pct_user_group(
+        group_id sb8 , /* group_id */
+        last_update sb8, /* sync watch */
+        mgid sb8, /* management group id */
+        priority ub2,
+        private_flag sb1, /* private rule flag */
+        delete_flag sb1, /* delete flag */
+        name schr(129), /* name */
+        hir_1_name schr(129),
+        hir_2_name schr(129),
+        hir_3_name schr(129),
+        reserved schr(33)
+)
+perm '0000111111100'
+extent(0,1,0);
+create unique index pct_user_group_idx1 on pct_user_group(group_id);
+
+/* alert security level */
+CREATE TABLE PCT_ALERT_LEVEL(
+  LEVEL_ID                      SB8,                    
+  LAST_UPDATE                  SB8,                    /* SYNC WATCH */
+  LEVEL_COUNT	             UB4,
+  LEVEL_NAME		   SCHR(64),	/* Warning, Critical, Fatal ..... */		
+  RESERVED                      SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ALERT_LEVEL_IDX1 ON PCT_ALERT_LEVEL(LEVEL_ID);
+
+/* added by chchung 2014.12.22 for db sql fetcher */
+create table pct_db_sql_hash_stmt(
+  instance_id           sb8,
+  sql_hash              sb8,
+  tst_id                sb8
+)
+perm '0000111000100'
+extent(0,1,0);
+create unique index pct_db_sql_hash_stmt_idx1 on pct_db_sql_hash_stmt(instance_id,sql_hash);
+
+create procedure PCP_DB_SQL_FETCH perm '0000111110110'
+  in(
+  	table_name	schr(33)	/* table name */
+  )
+  out(
+	result		schr(129)
+  );
+
+create server pcp_dbsql_fetcher perm '0000111000000'
+  executable '%soha_home%/bin/pcp_dbsql_fetcher';
+
+/* cipher agnet key opener */
+create table pct_key_opener(
+  interval	UB4,
+  link_name1	SCHR(33),
+  link_name2	SCHR(33),
+  link_name3	SCHR(33)
+)
+perm '0000111111100'
+extent(0,1,0);
+insert into pct_key_opener values(30,'key_svr1','key_svr2','key_svr3');
+
+/* cipher external key table */
+/* EXTERNAL KEY TABLE */
+CREATE TABLE PCT_EXT_KEY
+(
+  KEY_ID        SB8,            /* key id */
+  LAST_UPDATE   SB8,            /* sync watch */
+  CREATE_TIME   UB4,            /* create time */
+  KEY_NO        UB2,            /* key number */
+  SEK           SCHR(1025),     /* saved external key */
+  SEKS          SCHR(100),      /* saved external key signature */
+  NAME          SCHR(33),       /* external key name */
+  DESCRIPTION   SCHR(129),      /* description */
+  RESERVED      SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_EXT_KEY_IDX1 ON PCT_EXT_KEY(KEY_ID);
+CREATE UNIQUE INDEX PCT_EXT_KEY_IDX2 ON PCT_EXT_KEY(KEY_NO);
+
+CREATE PROCEDURE PCP_CREATE_EXT_KEY PERM '0000111110110'
+  IN(
+        NAME          SCHR(33),
+        KEY           SCHR(513),
+	FORMAT        UB2 /* 16 => base16, 64 => base64, 128 => ascii */
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_DROP_EXT_KEY PERM '0000111110110'
+  IN(
+        KEY_ID          SB8
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_EXPORT_EXT_KEY PERM '0000111110110'
+  IN(
+        KEY_ID          SB8
+  )
+  OUT(
+        RESULT          SCHR(7000)
+  );
+
+CREATE PROCEDURE PCP_IMPORT_EXT_KEY PERM '0000111110110'
+  IN(
+        KEYS            SCHR(7000)
+  )
+  OUT(
+        RESULT          SCHR(129)
+  );
+
+
+/* cipher external initial vector table */
+/* EXTERNAL IV TABLE */
+CREATE TABLE PCT_EXT_IV
+(
+  IV_ID        SB8,            /* iv id */
+  LAST_UPDATE  SB8,            /* sync watch */
+  CREATE_TIME  UB4,            /* create time */
+  IV_NO        UB1,            /* iv number */
+  SEK          SCHR(1025),     /* saved external iv */
+  SEKS         SCHR(100),      /* saved external iv signature */
+  NAME         SCHR(33),       /* external iv name */
+  DESCRIPTION  SCHR(129),      /* description */
+  RESERVED     SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_EXT_IV_IDX1 ON PCT_EXT_IV(IV_ID);
+CREATE UNIQUE INDEX PCT_EXT_IV_IDX2 ON PCT_EXT_IV(IV_NO);
+
+CREATE PROCEDURE PCP_CREATE_EXT_IV PERM '0000111110110'
+  IN(
+        NAME         SCHR(33),
+        IV           SCHR(513),
+	FORMAT       UB2 /* 16 => base16, 64 => base64, 128 => ascii */
+  )
+  OUT(
+        RESULT       SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_DROP_EXT_IV PERM '0000111110110'
+  IN(
+        IV_ID        SB8
+  )
+  OUT(
+        RESULT       SCHR(129)
+  );
+
+CREATE PROCEDURE PCP_EXPORT_EXT_IV PERM '0000111110110'
+  IN(
+        IV_ID        SB8
+  )
+  OUT(
+        RESULT       SCHR(7000)
+  );
+
+CREATE PROCEDURE PCP_IMPORT_EXT_IV PERM '0000111110110'
+  IN(
+        IVS          SCHR(7000)
+  )
+  OUT(
+        RESULT       SCHR(129)
+  );
+
+
+CREATE TABLE
+  PCT_IT_TABLE (
+    IT_TAB_ID SB8,
+    /* artificial id */ DB_ID SB8,
+    /* db_id */ SCHEMA_NAME SB8,
+    /* nameid */ TABLE_NAME SB8,
+    /* nameid */ WHERE_CLAUSE SB8,
+    /* nameid */ JOIN_CLAUSE SB8,
+    /* nameid */ SCHEDULE_ID SB8,
+    /* fk to pct_schedule.schedule_id */ STATUS SB4,
+    /* 0: before validation check , 
+    1: validation success, 
+    -1: validation fail */
+    ANALY_PERCENT SB4,
+    /* compute statistics percent */ RESERVED SCHR (33)
+  ) PERM '0000111111100' EXTENT (0, 1, 0);
+
+CREATE UNIQUE INDEX PCT_IT_TABLE_IDX01 ON PCT_IT_TABLE (IT_TAB_ID);
+
+CREATE UNIQUE INDEX PCT_IT_TABLE_IDX02 ON PCT_IT_TABLE (DB_ID, SCHEMA_NAME, TABLE_NAME);
+
+
+CREATE TABLE
+  PCT_IT_COLUMN (
+    IT_COL_ID SB8,
+    /* artificial id */ IT_TAB_ID SB8,
+    /* fk to PCT_IT_TABLE.IT_TAB_ID */ DB_ID SB8,
+    /* db_id */ SCHEMA_NAME SB8,
+    /* nameid */ COLUMN_NAME SB8,
+    /* nameid */ MAP_COL_ID SB8,
+    /* mapping source table`s column 
+    fk to PCT_IS_COLUMN.ENC_COL_ID */
+    COL_EXPRESSION SB8,
+    /* namdid */ KEY_ID SB8,
+    COLUMN_ORDER SB4,
+    /* column order */ RESERVED SCHR (33)
+  ) PERM '0000111111100' EXTENT (0, 1, 0);
+
+CREATE UNIQUE INDEX PCT_IT_COLUMN_IDX01 ON PCT_IT_COLUMN (IT_COL_ID);
+
+CREATE UNIQUE INDEX PCT_IT_COLUMN_IDX02 ON PCT_IT_COLUMN (DB_ID, SCHEMA_NAME, IT_TAB_ID, COLUMN_NAME);
+
+CREATE TABLE
+  PCT_IS_TABLE (
+    IS_TAB_ID SB8,
+    /* artificial id */ IT_TAB_ID SB8,
+    /* fk to PCT_IT_TABLE.IT_TAB_ID */ DB_ID SB8,
+    SCHEMA_NAME SB8,
+    /* nameid */ TABLE_NAME SB8,
+    /* nameid */ ALIAS_NAME SB8,
+    /* nameid */ DBLINK_NAME SB8,
+    /* nameid (oracle dblink: target table -> source table) */ RESERVED SCHR (33)
+  ) PERM '0000111111100' EXTENT (0, 1, 0);
+
+CREATE UNIQUE INDEX PCT_IS_TABLE_IDX01 ON PCT_IS_TABLE (IS_TAB_ID);
+
+CREATE UNIQUE INDEX PCT_IS_TABLE_IDX02 ON PCT_IS_TABLE (DB_ID, SCHEMA_NAME, TABLE_NAME);
+
+CREATE TABLE
+  PCT_IS_COLUMN (
+    IS_COL_ID SB8,
+    /* artificial id */ IT_TAB_ID SB8,
+    /* fk to PCT_IT_TABLE.IT_TAB_ID */ IS_TAB_ID SB8,
+    /* fk to PCT_IS_TABLE.IS_TAB_ID */ DB_ID SB8,
+    SCHEMA_NAME SB8,
+    COLUMN_NAME SB8,
+    /* nameid */ COL_EXPRESSION SB8,
+    /* nameid */ RESERVED SCHR (33)
+  ) PERM '0000111111100' EXTENT (0, 1, 0);
+
+CREATE UNIQUE INDEX PCT_IS_COLUMN_IDX01 ON PCT_IS_COLUMN (IS_COL_ID);
+
+CREATE UNIQUE INDEX PCT_IS_COLUMN_IDX02 ON PCT_IS_COLUMN (DB_ID, SCHEMA_NAME, IS_TAB_ID, COLUMN_NAME);
+
+CREATE TABLE
+  PCT_IT_ERROR (
+    IT_TAB_ID SB8,
+    /* fk to PCT_IT_TABLE.IT_TAB_ID */ ERR_MSG SCHR (1024),
+    /* ERROR MESSAGE */ RESERVED SCHR (33)
+  ) PERM '0100111111100' EXTENT (0, 1000, 50000) DIRECTORY '%soha_home%/%soha_svc%/external/';
+
+CREATE INDEX PCT_IT_ERROR_IDX01 ON PCT_IT_ERROR (IT_TAB_ID);
+
+CREATE TABLE PCT_MT_TABLE
+(
+	ENC_TAB_ID	SB8,
+	IT_TAB_ID	SB8,	/* fk to PCT_IT_TABLE.IT_TAB_ID */
+	DB_ID		SB8,    
+	SCHEMA_NAME	SB8,    /* nameid */
+	TABLE_NAME	SB8,    /* nameid */
+	WHERE_CLAUSE	SB8,    /* nameid */ 
+	JOIN_CLAUSE	SB8,	/* nameid */    
+	SCHEDULE_ID	SB8,	/* fk to pct_schedule.schedule_id */
+	ANALY_PERCENT   SB4,    /* compute statistics percent */
+	RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_MT_TABLE_IDX01 ON PCT_MT_TABLE(IT_TAB_ID);
+CREATE UNIQUE INDEX PCT_MT_TABLE_IDX02 ON PCT_MT_TABLE(ENC_TAB_ID);
+CREATE UNIQUE INDEX PCT_MT_TABLE_IDX03 ON PCT_MT_TABLE(DB_ID,SCHEMA_NAME,TABLE_NAME);
+
+
+CREATE TABLE PCT_MT_COLUMN
+(
+	ENC_COL_ID	SB8,
+	IT_TAB_ID	SB8,	/* fk to PCT_IT_TABLE.IT_TAB_ID */
+	ENC_TAB_ID	SB8,
+	DB_ID		SB8,
+	SCHEMA_NAME	SB8,   /* nameid */
+	COLUMN_NAME	SB8,   /* nameid */
+	MAP_COL_ID	SB8,   /* mapping source table`s column 
+				  fk to PCT_MIG_SRC_COLUMN.ENC_COL_ID */
+	COL_EXPRESSION  SB8,   /* namdid */
+	KEY_ID		SB8,
+	COLUMN_ORDER    SB4,   /* column order */
+	RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_MT_COLUMN_IDX01 ON PCT_MT_COLUMN(ENC_COL_ID);
+CREATE UNIQUE INDEX PCT_MT_COLUMN_IDX02 ON PCT_MT_COLUMN(DB_ID,SCHEMA_NAME,ENC_TAB_ID,COLUMN_NAME);
+
+CREATE TABLE PCT_MS_TABLE
+(
+	ENC_TAB_ID	SB8,
+	IT_TAB_ID	SB8,	/* fk to PCT_IT_TABLE.IT_TAB_ID */
+	DB_ID		SB8,
+        SCHEMA_NAME	SB8,    /* nameid */
+	TABLE_NAME	SB8,    /* nameid */
+	ALIAS_NAME	SB8,    /* nameid */
+        DBLINK_NAME	SB8,	/* nameid (oracle dblink: target table -> source table) */
+	RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_MS_TABLE_IDX01 ON PCT_MS_TABLE(ENC_TAB_ID);
+CREATE UNIQUE INDEX PCT_MS_TABLE_IDX02 ON PCT_MS_TABLE(DB_ID, SCHEMA_NAME, TABLE_NAME);
+
+
+CREATE TABLE PCT_MS_COLUMN
+(
+	ENC_COL_ID	SB8,
+	IT_TAB_ID	SB8,	/* fk to PCT_IT_TABLE.IT_TAB_ID */
+	ENC_TAB_ID	SB8,
+	DB_ID		SB8,
+	SCHEMA_NAME	SB8,   /* nameid */
+	COLUMN_NAME	SB8,
+	COL_EXPRESSION	SB8,    /* nameid */
+	RESERVED	SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_MS_COLUMN_IDX01 ON PCT_MS_COLUMN(ENC_COL_ID);
+CREATE UNIQUE INDEX PCT_MS_COLUMN_IDX02 ON PCT_MS_COLUMN(DB_ID, SCHEMA_NAME, ENC_TAB_ID,COLUMN_NAME);
+
+CREATE TABLE PCT_IP_KEY_CTRL
+(
+  CTRL_ID	SB8,		/* UNIQUE KEY */
+  LAST_UPDATE   SB8,            /* SYNC WATCH */
+  KEY_ID        SB8,            /* KEY ID */
+  ALLOW_IP_ADDR	SCHR(65),	/* SERVER_IP */
+  RESERVED      SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_IP_KEY_CTRL_IDX1 ON PCT_IP_KEY_CTRL(CTRL_ID);
+CREATE UNIQUE INDEX PCT_IP_KEY_CTRL_IDX2 ON PCT_IP_KEY_CTRL(KEY_ID,ALLOW_IP_ADDR);
+
+CREATE TABLE PCT_ENCRYPT_KEY_TRAILER(
+  KEY_ID                SB8,
+  LAST_UPDATE           SB8,                    /* SYNC WATCH */
+  TRAILER_SIZE		UB1,
+  TRAILER_CHAR		SCHR(7),
+  RESERVED              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_ENCRYPT_KEY_TRAILER_IDX1 ON PCT_ENCRYPT_KEY_TRAILER(KEY_ID);
+
+DROP TABLE PCT_AGENT_HEALTH_CHECK;
+CREATE TABLE PCT_AGENT_HEALTH_CHECK(
+  PRODUCT_ID            SB8,
+  TEST_COLUMN           SCHR(257),
+  REVISION              SCHR(65),
+  RESULT                SCHR(33),
+  CHECK_DATE            UB4,
+  RESERVED              SCHR(33)
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_AGENT_HEALTH_CHECK_IDX1 ON PCT_AGENT_HEALTH_CHECK(PRODUCT_ID);
+
+
+CREATE PROCEDURE PCP_CREATE_RSA_KEY PERM '0000111110110'
+  IN(
+        PASSWD          SCHR(33)
+  )
+  OUT(
+        PRIVATE_KEY	SCHR(2048),
+	PUBLIC_KEY	SCHR(1024)
+  );
+
+
+CREATE TABLE PCT_RSA_KEY
+(
+  RSA_KEY_ID        SB8,            /* RSA KEY ID (artificial id) */
+  KEY_TYPE	    UB1,	    /* 1:private key, 2: public key */
+  ISSUE_TYPE	    UB1,	    /* 1:issued by petra cipher, 2:import */
+  ISSUE_DATE	    UB4,
+  KEY_STR	    SCHR(2049),     /* key string data */
+  KEY_NAME	    SCHR(128)	    /* key name */
+)
+PERM '0000111111100'
+EXTENT(0,1,0);
+CREATE UNIQUE INDEX PCT_RSA_KEY_IDX1 ON PCT_RSA_KEY(RSA_KEY_ID);
