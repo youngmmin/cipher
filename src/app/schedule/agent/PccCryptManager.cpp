@@ -139,115 +139,6 @@ dgt_sint32 PccCryptManager::buildParam(PccCryptTargetFile& tf, PccAgentCryptJob*
 	return 0;
 }
 
-dgt_sint32 PccCryptManager::streamCryption(PccAgentCryptJob* curr_job) throw(DgcExcept)
-{
-	WorkStage = 5;
-	dgt_sint32	threads = 0;
-	DgcExcept*	e = 0;
-	threads = curr_job->repository().fileQueue().get(&TargetFile); // get a crypt target file queued by the Collector
-	TargetFileFlag = threads;
-
-	if (threads > 0) {
-		TargetFile.cryptStat()->input_files--;
-		WorkStage = 6;
-		if ((buildStreamParam(TargetFile,curr_job)) < 0) { // build crypt parameter string,  rtn>0 => # of threads, rtn<0 => exception
-			ATHROWnR(DgcError(SPOS,"buildParam failed\n"),-1);
-		}
-
-		WorkStage = 7;
-		struct timeval	ct;
-		gettimeofday(&ct,0);
-		if (JobPool.traceLevel() > 0) {
-			DgcWorker::PLOG.tprintf(0,"streamCryption : \n"
-					"src[%s] dst[%s]\n"
-					"parameter[%s]\n",
-					TargetFile.srcFileName(),OutFileName,CryptParams);
-		}
-
-			//create Cryptor
-			if (Cryptor) { 
-				delete Cryptor;
-				Cryptor = 0; 
-			}
-			Cryptor =  new PccFileCryptor(0,0,JobPool.traceLevel(),ManagerID);
-			dgt_sint32 rtn = 0;
-			dgt_sint32 file_rtn=0;
-			struct stat file_info;
-			struct passwd *user;
-			if (AgentMode > 0) {
-				if ((file_rtn = stat(TargetFile.srcFileName(), &file_info)) != -1) {
-    					user = getpwuid(file_info.st_uid);
-					Cryptor->setOsUser(user->pw_name);
-    				}
-			}
-			 // crypting
-			if ((rtn=Cryptor->crypt(SessionID,CryptParams,TargetFile.srcFileName(),OutFileName,AgentMode,EncColName,HeaderFlag,BufferSize)) < 0) {
-				//
-				// rtn = last_error_code
-				// error_string from cryptor couldn't be contained in exception because of it's size = 1025
-				//
-				if (rtn < 0) {
-					TargetFile.cryptStat()->crypt_errors++;
-					if (JobPool.traceLevel() > 0) DgcWorker::PLOG.tprintf(0,"crypt failed [%s] : [%d:%s]\n",TargetFile.srcFileName(),rtn,Cryptor->errString());
-					if (EXCEPT) {
-						DgcExcept* e = EXCEPTnC;
-						if (e) {
-							DgcWorker::PLOG.tprintf(0,*e,"exception occured while crypt : \n");
-							delete e;
-						}
-					}
-				} //if (rtn < 0) end
-				WorkStage = 10;
-			} else { //if ((rtn=Cryptor->crypt(...)) < 0) else
-				TargetFile.cryptStat()->output_files++;
-				TargetFile.cryptStat()->output_bytes += Cryptor->outFileSize();
-				//gettimeofday(&ct,0);
-				//TargetFile.cryptStat()->end_time=ct.tv_sec;
-				EncFileCnt++;
-				if (JobPool.traceLevel() > 10) 
-					DgcWorker::PLOG.tprintf(0,"[%s] files success crypt \n",TargetFile.srcFileName());
-				else if ((JobPool.traceLevel() <= 10) && (EncFileCnt % 1000 == 0 || EncFileCnt == 1 || EncFileCnt % 1000 == 1)) 
-					DgcWorker::PLOG.tprintf(0,"[%lld]files success crypt \n",EncFileCnt);
-
-				// added by mwpark
-				// 18.10.02
-				// change file permission
-				if (AgentMode > 0) {
-					if (file_rtn !=1) {
-						chown(OutFileName, file_info.st_uid, file_info.st_gid);
-					}
-				}
-			} //if ((rtn=Cryptor->crypt(...)) < 0) else end
-
-			//added by shson 2019.07.04 for stream encryption statistic
-			curr_job->streamFileStatistic()->updateFileNode(
-					TargetFile.fileNode()->file_id,
-					TargetFile.dirID(),
-					TargetFile.zoneID(),
-					Cryptor->inFileSize(),
-					Cryptor->outFileSize(),
-					TargetFile.fileNode()->lm_time,
-					TargetFile.srcFileName(),
-					OutFileName,
-					Cryptor->errCode(),
-					Cryptor->errString()
-					);
-			if (JobPool.traceLevel() > 0) DgcWorker::PLOG.tprintf(0,"update statistic file: [%s]\n",TargetFile.srcFileName());
-
-			if (Cryptor) {
-				delete Cryptor;
-				Cryptor = 0;
-			}
-
-		WorkStage = 10;
-	} else { //empty file queue
-		WorkStage = 12;
-		napAtick();
-	}
-	WorkStage = 13;
-	return 0;
-}
-
 dgt_sint32 PccCryptManager::fileCryption(PccAgentCryptJob* curr_job) throw(DgcExcept)
 {
 	WorkStage = 5;
@@ -493,16 +384,7 @@ dgt_sint32 PccCryptManager::run() throw(DgcExcept)
 	TargetFileFlag = 0;
 	for(dgt_sint32 i=0; i<JobPool.numJobs(); i++) {
 		if ((curr_job=JobPool.jobByIdx(i))) {
-			if (curr_job->repository().getJobType() == PCC_AGENT_TYPE_STREAM_JOB) {
-				// stream cryption
-				if (streamCryption(curr_job) < 0) {
-					DgcExcept* e = EXCEPTnC;
-					if (e) {
-						DgcWorker::PLOG.tprintf(0,*e,"streamCryption failed : \n");
-						delete e;
-					}
-				}
-			} else if (curr_job->repository().schedule().isWorkingTime()) {
+			if (curr_job->repository().schedule().isWorkingTime()) {
 				if (fileCryption(curr_job) < 0)
 				{
 					DgcExcept *e = EXCEPTnC;

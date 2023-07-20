@@ -530,11 +530,6 @@ dgt_void PccCipherAgentManager::getCryptManagerStatus(pcct_manager_status* statu
 	}
 }
 
-
-#if 1 // added by chchung 2018.7.19 for PCFS auto mount
-#include "PccPcfsConfig.h"
-#endif
-
 void help_message()
 {
 	printf("Usage: pcp_crypt_manager [OPTIONS] <start|stop|status>\n");
@@ -723,24 +718,6 @@ int main(dgt_sint32 argc,dgt_schar** argv)
 		}
 		exit(1);
 	}
-
-#if 1 // added by chchung, 2018.7.19 for PCFS auto mount
-        PccPcfsConfig   pcfs_config;
-        if (pcfs_config.parse() > 0) {
-                for(dgt_uint16 i=0; i<pcfs_config.numFs(); i++) {
-                        if (strncasecmp(pcfs_config.fsAttrsByIdx(i)->auto_mount,"yes",3) == 0) {
-                                pcfs_config.mount(i,pcfs_config.MTT_MOUNT);
-                                DgcWorker::PLOG.tprintf(0,"sent a mount request for pcfs[%s]\n",pcfs_config.fsAttrsByIdx(i)->mount_dir);
-                        }
-                }
-        }
-        DgcExcept*  e = EXCEPTnC;
-        if (e) {
-                //e->print();
-                DgcWorker::PLOG.tprintf(0,*e,"pcfs auto-mount failed:\n");
-                delete e;
-        }
-#endif
 
 	/* start command begins */
 	// 1. be a background process and group leader

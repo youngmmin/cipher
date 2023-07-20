@@ -200,57 +200,6 @@ create procedure PFC_VALIDATION_FILE perm '0000111110110'
 	err_msg			schr(1025)
 );
 
-/* added by chchung 2018.7.17 for PCFS */
-drop procedure PFC_PCFS_GET_LIST;
-create procedure PFC_PCFS_GET_LIST perm '0000111110110'
- in(
-    agent_id        sb8
- )
- out(
-    pcfs_id         ub2,
-    name            schr(33),
-    root_dir        schr(257),
-    mount_dir       schr(257),
-    device          schr(33),
-    auto_mount      schr(11),
-    status          schr(11)
-);
-
-drop procedure PFC_PCFS_MOUNT;
-create procedure PFC_PCFS_MOUNT perm '0000111110110'
- in(
-    agent_id        sb8,
-    pcfs_id         ub2,
-    mount_type      ub2
- )
- out(
-    rtn_msg         schr(300)
-);
-
-drop procedure PFC_PCFS_GET_STAT;
-create procedure PFC_PCFS_GET_STAT perm '0000111110110'
- in(
-    agent_id        sb8,
-    pcfs_id         ub2
- )
- out(
-    pcfs_id         ub2,
-    encrypt_files   sb8,
-    decrypt_files   sb8,
-    pass_files      sb8,
-    encrypt_calls   sb8,
-    decrypt_calls   sb8,
-    pass_read_calls sb8,
-    pass_write_calls sb8,
-    encrypt_bytes   sb8,
-    decrypt_bytes   sb8,
-    pass_read_bytes sb8,
-    pass_write_bytes sb8,
-    all_calls       sb8,
-    start_time      sb8,
-    pid             sb8
-);
-
 drop procedure PFC_SYNC_TABLE;
 create procedure PFC_SYNC_TABLE perm '0000111110110'
 in(

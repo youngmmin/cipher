@@ -13,7 +13,6 @@
 #define PCC_AGENT_CRYPT_JOB_H
 
 #include "PccCryptTargetCollector.h"
-#include "PccStreamFileStatistic.h"
 
 class PccAgentCryptJob : public DgcObject {
   private:
@@ -24,7 +23,6 @@ class PccAgentCryptJob : public DgcObject {
 	dgt_time			EndTime;
 	PccJobRepository		Repository;
 	PccCryptTargetCollector*	Collector;
-	PccStreamFileStatistic*		StreamFileStatistic;
 	
 	dgt_slock	Lock;
 	dgt_uint8	ELF;  // for drop job
@@ -44,7 +42,6 @@ class PccAgentCryptJob : public DgcObject {
 	inline dgt_time endTime() { return EndTime; }
 	inline PccJobRepository& repository() { return Repository; }
 	inline PccCryptTargetCollector* collector() { return Collector; }
-	inline PccStreamFileStatistic* streamFileStatistic() { return StreamFileStatistic; }
 	dgt_sint32 lockExclusive() throw(DgcExcept);
 	dgt_sint32 unlockExclusive() throw(DgcExcept);
 	dgt_sint32 lockShare() throw(DgcExcept);

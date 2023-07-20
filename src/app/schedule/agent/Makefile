@@ -56,22 +56,14 @@ pcp_crypt_agent_objs = \
 	PccDropJobStmt.$(OBJEXT) \
 	PccGetAgentInfoStmt.$(OBJEXT) \
 	PccGetCryptStatStmt.$(OBJEXT) \
-	PccGetDetectInfoStmt.$(OBJEXT) \
 	PccGetDirCryptStatStmt.$(OBJEXT) \
 	PccGetDirEntryStmt.$(OBJEXT) \
-	PccGetStreamStatStmt.$(OBJEXT) \
 	PccGetTargetListStmt.$(OBJEXT) \
 	PccJobRepository.$(OBJEXT) \
-	PccPcfsGetListStmt.$(OBJEXT) \
-	PccPcfsGetStatStmt.$(OBJEXT) \
-	PccPcfsMountStmt.$(OBJEXT) \
 	PccRecollectCryptDirStmt.$(OBJEXT) \
 	PccRemoveFileStmt.$(OBJEXT) \
 	PccSetParamsStmt.$(OBJEXT) \
-	PccStreamFile.$(OBJEXT) \
-	PccStreamFileStatistic.$(OBJEXT) \
 	PccValidationFileStmt.$(OBJEXT) \
-	PccVerifyDetectInfoStmt.$(OBJEXT) \
 	PccCipherAgentService.$(OBJEXT)
 
 build_pcp_crypt_agent_objs: $(pcp_crypt_agent_objs)

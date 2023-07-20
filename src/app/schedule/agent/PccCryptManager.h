@@ -45,7 +45,6 @@ class PccCryptManager : public DgcWorker {
 	dgt_sint32 buildStreamParam(PccCryptTargetFile& tf, PccAgentCryptJob* curr_job);
 	dgt_sint32 buildParam(PccCryptTargetFile& tf, PccAgentCryptJob* curr_job, dgt_sint32 threads=0, dgt_sint32 migration_flag = 0); // return the number of cores when success
   protected:
-	dgt_sint32 streamCryption(PccAgentCryptJob* curr_job) throw(DgcExcept);
 	dgt_sint32 fileCryption(PccAgentCryptJob* curr_job) throw(DgcExcept);
 	virtual dgt_void in() throw(DgcExcept);
 	virtual dgt_sint32 run() throw(DgcExcept);

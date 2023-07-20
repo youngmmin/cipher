@@ -158,24 +158,7 @@ dgt_sint32 PccCipherAgentSvrSession::doRequest(DgcMsgDgiSqlRq* srm) throw(DgcExc
 		} else if (!strcasecmp(proc_name,"getRecollectCryptDir")) {
 			CurrStmt = new PccRecollectCryptDirStmt(JobPool);
 		} else if (!strcasecmp(proc_name,"validationFile")) {
-			CurrStmt = new PccValidationFileStmt(JobPool);
-#if 1 // added by chchung 2018.7.17 for PCFS
-		} else if (!strcasecmp(proc_name,"pcfsGetList")) {
-			CurrStmt = new PccPcfsGetListStmt(JobPool);
-		} else if (!strcasecmp(proc_name,"pcfsMount")) {
-			CurrStmt = new PccPcfsMountStmt(JobPool);
-		} else if (!strcasecmp(proc_name,"pcfsGetStat")) {
-			CurrStmt = new PccPcfsGetStatStmt(JobPool);
-#endif
-#if 1 // added by mjkim 2019.05.22 for pattern detect
-		} else if (!strcasecmp(proc_name,"getDetectInfo")) {
-			CurrStmt = new PccGetDetectInfoStmt(JobPool);
-		} else if (!strcasecmp(proc_name,"verifyDetectInfo")) {
-			CurrStmt = new PccVerifyDetectInfoStmt(JobPool);
-#endif
-			//added by shson 2019.07.05 for stream file statistic
-		} else if (!strcasecmp(proc_name,"getStreamStat")) {
-			CurrStmt = new PccGetStreamStatStmt(JobPool);
+			CurrStmt = new PccValidationFileStmt(JobPool);		
 		} else {
 			THROWnR(DgcDbNetExcept(DGC_EC_DN_INVALID_ST,new DgcError(SPOS,"unknown procedure[%s]",proc_name)),-1);
 		}

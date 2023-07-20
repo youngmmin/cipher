@@ -17,7 +17,7 @@
 
 
 PccAgentCryptJob::PccAgentCryptJob(dgt_sint64 job_id, dgt_sint32 trace_level, dgt_sint32 fail_file_queue_size, dgt_sint32 nullity_file_queue_size)
-	: JobID(job_id),StartTime(0),EndTime(0),Repository(trace_level),Collector(0),StreamFileStatistic(0)
+	: JobID(job_id),StartTime(0),EndTime(0),Repository(trace_level),Collector(0)
 {
 	NSL = 0;
 	ELF = 0;
@@ -34,10 +34,6 @@ PccAgentCryptJob::~PccAgentCryptJob()
 		while (Collector->isAlive()) napAtick();
 		delete Collector;
 		Collector = 0;
-	}
-	if (StreamFileStatistic) {
-		delete StreamFileStatistic;
-		StreamFileStatistic = 0;
 	}
 }
 
@@ -139,15 +135,6 @@ dgt_sint32 PccAgentCryptJob::start(dgt_uint8 job_type,dgt_uint8 job_status,dgt_s
 	DgcWorker::PLOG.tprintf(0,"CryptJob Library Version test\n");
 	//DgcWorker::PLOG.tprintf(0,"CryptJob Library Version [%d][%d][%d]\n",getBogoModule()->msGetMajorVersion(), getBogoModule()->msGetMinorVersion(), getBogoModule()->msGetPatchVersion());
 	Repository.setJobType(job_type);
-	if(job_type == PCC_AGENT_TYPE_STREAM_JOB) {
-		//stream job
-		if (StreamFileStatistic) {
-			delete StreamFileStatistic;
-			StreamFileStatistic = 0;
-		}
-		StreamFileStatistic = new PccStreamFileStatistic();
-	} //if(job_type == PCC_AGENT_TYPE_STREAM_JOB) end
-pr_debug("job_type[%d] job_status[%u]\n",job_type,job_status);
 
 	// initialize file queue
 	if (file_queue_size > 0) {
