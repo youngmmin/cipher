@@ -125,7 +125,7 @@ dgt_sint32 PccCipherAgentManager::getAgentList() throw(DgcExcept)
 		ATHROWnR(DgcError(SPOS,"connectMaster failed"),-1);
 	}
 	dgt_schar sql_text[129];
-	sprintf(sql_text,"select agent_id, agent_type from pfct_agent where enc_tgt_sys_id=%lld",EncTgtSysID);
+	sprintf(sql_text,"select agent_id from pfct_agent where enc_tgt_sys_id=%lld",EncTgtSysID);
 	if (SohaClient.execute(sql_text) < 0) {
 		SohaConnStatus = SOHA_CONN_STATUS_BROKEN;
 		ATHROWnR(DgcError(SPOS,"execute failed"),-1);
@@ -145,25 +145,23 @@ dgt_sint32 PccCipherAgentManager::getAgentList() throw(DgcExcept)
 	//pfct_agent table is modifed
 	typedef struct {
 		dgt_sint64	agent_id;
-		dgt_uint8	agent_type;
 	} pcamt_agent_info;
+	
 	pcamt_agent_info* agent_info; 
 	while (rtn_rows->next() && rtn_rows->data() && (agent_info = (pcamt_agent_info*)rtn_rows->data())) {
 		AgentList[NumAgents].agent_id = agent_info->agent_id;
-		AgentList[NumAgents++].agent_type = agent_info->agent_type;
 	}
 	return 0;
 }
 
-dgt_sint32 PccCipherAgentManager::sendAlertDeadProcess(dgt_sint64 pid, dgt_uint8 agent_type) throw(DgcExcept)
+dgt_sint32 PccCipherAgentManager::sendAlertDeadProcess(dgt_sint64 pid) throw(DgcExcept)
 {
 	if (connectMaster() < 0) {
 		SohaConnStatus = SOHA_CONN_STATUS_BROKEN;
 		ATHROWnR(DgcError(SPOS,"connectMaster failed"),-1);
 	}
 	dgt_schar sql_text[257];
-	if (agent_type == 0) sprintf(sql_text,"select * from pfc_alert_dead_process(%lld,%lld,'pcp_crypt_agent')",EncTgtSysID,pid);
-	else sprintf(sql_text,"select * from pfc_alert_dead_process(%lld,%lld,'pcp_client_agent')",EncTgtSysID,pid);
+	sprintf(sql_text,"select * from pfc_alert_dead_process(%lld,%lld,'pcp_crypt_agent')",EncTgtSysID,pid);
 	if (SohaClient.execute(sql_text) < 0) {
 		SohaConnStatus = SOHA_CONN_STATUS_BROKEN;
 		ATHROWnR(DgcError(SPOS,"execute failed"),-1);
@@ -172,11 +170,11 @@ dgt_sint32 PccCipherAgentManager::sendAlertDeadProcess(dgt_sint64 pid, dgt_uint8
 }
 
 
-dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, dgt_uint8 agent_type, const dgt_schar* cmd) throw(DgcExcept)
+dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, const dgt_schar* cmd) throw(DgcExcept)
 {
 	pid_t pid=0;
 	errno = 0;
-	const dgt_schar* proc_path = agent_type == 0 ? CryptAgentBinPath : ClientAgentBinPath;
+	const dgt_schar* proc_path = CryptAgentBinPath;
 	if ((pid=fork()) < 0) {
 		THROWnR(DgcOsExcept(errno,new DgcError(SPOS,"fork for program[soha_mgr_start] failed")),-1);
 	}
@@ -230,8 +228,7 @@ dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, dgt_uint8
 				(dgt_schar*)0};
 #else
 		dgt_schar* prog_name = 0;
-		if (agent_type == 0) prog_name = (dgt_schar*)"pcp_crypt_agent";
-		else prog_name = (dgt_schar*)"pcp_client_agent";
+		prog_name = (dgt_schar*)"pcp_crypt_agent";
 
 		// pcp_crypt_agent -c <conf_file_path> -i <agent_id> <start|stop>
 		dgt_schar* args[7]={
@@ -253,12 +250,11 @@ dgt_sint32 PccCipherAgentManager::execvCryptAgent(dgt_sint64 agent_id, dgt_uint8
 }
 
 
-dgt_sint64 PccCipherAgentManager::getCryptAgentPID(dgt_sint64 agent_id, dgt_uint8 agent_type) throw(DgcExcept)
+dgt_sint64 PccCipherAgentManager::getCryptAgentPID(dgt_sint64 agent_id) throw(DgcExcept)
 {
 	dgt_sint32 addr_len = dg_strlen(UdsListenDir) + 100;
 	dgt_schar agent_uds_addr[addr_len];
-	if (agent_type == 0) sprintf(agent_uds_addr,CRYPT_AGENT_CONN_STRING,UdsListenDir,agent_id);
-	else sprintf(agent_uds_addr,CLIENT_AGENT_CONN_STRING,UdsListenDir,agent_id);
+	sprintf(agent_uds_addr,CRYPT_AGENT_CONN_STRING,UdsListenDir,agent_id);
 
 	// connect server
 	DgcUnixClient client_stream;
@@ -321,7 +317,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept)
 		{
 			// start agents
 			for (dgt_uint8 i=0; i<NumAgents; i++) {
-				if (execvCryptAgent(AgentList[i].agent_id, AgentList[i].agent_type, "start") < 0) {
+				if (execvCryptAgent(AgentList[i].agent_id, "start") < 0) {
 					DgcExcept* e = EXCEPTnC;
 					if (e) {
 						DgcWorker::PLOG.tprintf(0,*e,"agent_manager[%lld] : restarting agent[%lld] failed\n",EncTgtSysID,AgentList[i].agent_id);
@@ -342,7 +338,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept)
 			dgt_uint8 retry_cnt = 0;
 			dgt_uint8 num_monitor_proc = 0;
 			while (list_idx < NumAgents) {
-				if ((agent_pid=getCryptAgentPID(AgentList[list_idx].agent_id, AgentList[list_idx].agent_type)) < 0) {
+				if ((agent_pid=getCryptAgentPID(AgentList[list_idx].agent_id)) < 0) {
 					if (retry_cnt++ < max_retry_cnt) {
 						delete EXCEPTnC;
 						sleep(1);
@@ -377,7 +373,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept)
 					if (kill((pid_t)AgentList[i].pid,0) != 0 && errno == ESRCH) { // find a dead process
 						DgcWorker::PLOG.tprintf(0,"agent_manager[%lld] : found dead agent[%lld:%lld]\n",EncTgtSysID,AgentList[i].agent_id,AgentList[i].pid);
 						// send alert
-						if (sendAlertDeadProcess(AgentList[i].pid, AgentList[i].agent_type) < 0) {
+						if (sendAlertDeadProcess(AgentList[i].pid) < 0) {
 							DgcExcept* e = EXCEPTnC;
 							if (e) {
 								DgcWorker::PLOG.tprintf(0,*e,"agent_manager[%lld] : send alert agent[%lld:%lld] failed\n",EncTgtSysID,AgentList[i].agent_id,AgentList[i].pid);
@@ -392,7 +388,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept)
 						unlink(agent_uds_addr);
 
 						// restarting process
-						if (execvCryptAgent(AgentList[i].agent_id, AgentList[i].agent_type, "start") < 0) {
+						if (execvCryptAgent(AgentList[i].agent_id, "start") < 0) {
 							DgcExcept* e = EXCEPTnC;
 							if (e) {
 								DgcWorker::PLOG.tprintf(0,*e,"agent_manager[%lld] : restarting agent[%lld] failed\n",EncTgtSysID,AgentList[i].agent_id);
@@ -405,7 +401,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept)
 						dgt_sint64 agent_pid = 0;
 						dgt_uint8 max_retry_cnt = 10;
 						dgt_uint8 retry_cnt = 0;
-						while ((agent_pid=getCryptAgentPID(AgentList[i].agent_id, AgentList[i].agent_type)) < 0) {
+						while ((agent_pid=getCryptAgentPID(AgentList[i].agent_id)) < 0) {
 							if (retry_cnt++ >= max_retry_cnt) {
 								DgcExcept* e = EXCEPTnC;
 								if (e) {
@@ -443,7 +439,7 @@ dgt_void PccCipherAgentManager::out() throw(DgcExcept)
 {
 	// stop agents
 	for (dgt_uint8 i=0; i<NumAgents; i++) {
-		if (execvCryptAgent(AgentList[i].agent_id, AgentList[i].agent_type, "stop") < 0) ATHROW(DgcError(SPOS,"startCryptAgent failed"));
+		if (execvCryptAgent(AgentList[i].agent_id, "stop") < 0) ATHROW(DgcError(SPOS,"startCryptAgent failed"));
 	}
 
 	// disconnect from master
@@ -973,14 +969,12 @@ int main(dgt_sint32 argc,dgt_schar** argv)
 						dgt_sint64 agent_id = 0;
 						dgt_sint64 agent_pid = 0;
 						dgt_uint8 monitoring_flag = 0;
-						dgt_uint8 agent_type = 0;
 						if (agent_list) {
 							agent_id = agent_list->agent_id;
 							agent_pid = agent_list->pid;
 							monitoring_flag = agent_list->monitoring_flag;
-							agent_type = agent_list->agent_type;
 						}
-						sprintf(agent_body,"- agent_id[%lld] pid[%lld] monitoring_flag[%u] agent_type[%u]", agent_id, agent_pid, monitoring_flag, agent_type);
+						sprintf(agent_body,"- agent_id[%lld] pid[%lld] monitoring_flag[%u]", agent_id, agent_pid, monitoring_flag);
 						agent_status_msg.setBody(agent_body);
 						if (msg_stream.sendMessage(&agent_status_msg) != 0) {
 							DgcExcept* e = EXCEPTnC;

@@ -24,7 +24,6 @@ typedef struct {
 	dgt_sint64	agent_id;
 	dgt_sint64	pid;
 	dgt_uint8	monitoring_flag;
-	dgt_uint8	agent_type;
 } pcamt_agent_list;
 
 typedef struct {
@@ -86,9 +85,9 @@ class PccCipherAgentManager : public DgcWorker {
 
 	dgt_sint32 connectMaster() throw(DgcExcept);
 	dgt_sint32 getAgentList() throw(DgcExcept);
-	dgt_sint32 sendAlertDeadProcess(dgt_sint64 pid, dgt_uint8 agent_type) throw(DgcExcept);
-	dgt_sint32 execvCryptAgent(dgt_sint64 agent_id, dgt_uint8 agent_type, const dgt_schar* cmd) throw(DgcExcept);
-	dgt_sint64 getCryptAgentPID(dgt_sint64 agent_id, dgt_uint8 agent_type) throw(DgcExcept);
+	dgt_sint32 sendAlertDeadProcess(dgt_sint64 pid) throw(DgcExcept);
+	dgt_sint32 execvCryptAgent(dgt_sint64 agent_id, const dgt_schar* cmd) throw(DgcExcept);
+	dgt_sint64 getCryptAgentPID(dgt_sint64 agent_id) throw(DgcExcept);
 
 	virtual dgt_void in() throw(DgcExcept);
 	virtual dgt_sint32 run() throw(DgcExcept);

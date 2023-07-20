@@ -114,7 +114,7 @@ create table pfct_agent(
 	agent_id		sb8,
 	last_update		sb8,
 	enc_tgt_sys_id	sb8,
-	agent_type		ub1,	/*crypt agent : 0 , client_agent : 1*/
+	agent_type		ub1,	/*crypt agent : 0 , client_agent : 1, deprecated*/
 	file_list_flag	ub1,	/*file list agent : 1, replace reserved 1 */
 	name			schr(129),
 	char_set		schr(65),
