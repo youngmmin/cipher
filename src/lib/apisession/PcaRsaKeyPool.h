@@ -15,17 +15,18 @@
 #include "PccHashTable.h"
 
 class PcaRsaKeyPool : public DgcObject {
-  private :
-	dgt_schar ErrMsg[1024];
-	PccHashTable RsaKeyList;
-  protected:
-  public:
-	PcaRsaKeyPool();
-	virtual ~PcaRsaKeyPool();
-	dgt_schar* getErr() { return ErrMsg; }
+   private:
+    dgt_schar ErrMsg[1024];
+    PccHashTable RsaKeyList;
 
-	dgt_schar* getRsaKey(dgt_schar* key_name);
-	dgt_schar* putRsaKey(dgt_schar* key_name, dgt_schar* key_string);
+   protected:
+   public:
+    PcaRsaKeyPool();
+    virtual ~PcaRsaKeyPool();
+    dgt_schar* getErr() { return ErrMsg; }
+
+    dgt_schar* getRsaKey(dgt_schar* key_name);
+    dgt_schar* putRsaKey(dgt_schar* key_name, dgt_schar* key_string);
 };
 
 #endif

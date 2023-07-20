@@ -62,20 +62,19 @@
 #include "PciHmac.h"
 
 #ifdef OPENSSL_FIPS
-# include <openssl/fips.h>
+#include <openssl/fips.h>
 #endif
 
 int PCI_HMAC_Init_ex(PCI_HMAC_CTX *ctx, const void *key, int len,
-                 const EVP_MD *md, ENGINE *impl)
-{
+                     const EVP_MD *md, ENGINE *impl) {
     int i, j, reset = 0;
     unsigned char pad[PCI_HMAC_MAX_MD_CBLOCK];
 
 #ifdef OPENSSL_FIPS
     if (FIPS_mode()) {
         /* If we have an ENGINE need to allow non FIPS */
-        if ((impl || ctx->i_ctx.engine)
-            && !(ctx->i_ctx.flags & EVP_CIPH_FLAG_NON_FIPS_ALLOW)) {
+        if ((impl || ctx->i_ctx.engine) &&
+            !(ctx->i_ctx.flags & EVP_CIPH_FLAG_NON_FIPS_ALLOW)) {
             EVPerr(EVP_F_HMAC_INIT_EX, EVP_R_DISABLED_FOR_FIPS);
             return 0;
         }
@@ -88,8 +87,7 @@ int PCI_HMAC_Init_ex(PCI_HMAC_CTX *ctx, const void *key, int len,
     }
 #endif
     /* If we are changing MD then we must have a key */
-    if (md != NULL && md != ctx->md && (key == NULL || len < 0))
-        return 0;
+    if (md != NULL && md != ctx->md && (key == NULL || len < 0)) return 0;
 
     if (md != NULL) {
         reset = 1;
@@ -105,16 +103,12 @@ int PCI_HMAC_Init_ex(PCI_HMAC_CTX *ctx, const void *key, int len,
         j = EVP_MD_block_size(md);
         OPENSSL_assert(j <= (int)sizeof(ctx->key));
         if (j < len) {
-            if (!EVP_DigestInit_ex(&ctx->md_ctx, md, impl))
-                goto err;
-            if (!EVP_DigestUpdate(&ctx->md_ctx, key, len))
-                goto err;
-            if (!EVP_DigestFinal_ex(&(ctx->md_ctx), ctx->key,
-                                    &ctx->key_length))
+            if (!EVP_DigestInit_ex(&ctx->md_ctx, md, impl)) goto err;
+            if (!EVP_DigestUpdate(&ctx->md_ctx, key, len)) goto err;
+            if (!EVP_DigestFinal_ex(&(ctx->md_ctx), ctx->key, &ctx->key_length))
                 goto err;
         } else {
-            if (len < 0 || len > (int)sizeof(ctx->key))
-                return 0;
+            if (len < 0 || len > (int)sizeof(ctx->key)) return 0;
             memcpy(ctx->key, key, len);
             ctx->key_length = len;
         }
@@ -126,95 +120,76 @@ int PCI_HMAC_Init_ex(PCI_HMAC_CTX *ctx, const void *key, int len,
     if (reset) {
         for (i = 0; i < PCI_HMAC_MAX_MD_CBLOCK; i++)
             pad[i] = 0x36 ^ ctx->key[i];
-        if (!EVP_DigestInit_ex(&ctx->i_ctx, md, impl))
-            goto err;
+        if (!EVP_DigestInit_ex(&ctx->i_ctx, md, impl)) goto err;
         if (!EVP_DigestUpdate(&ctx->i_ctx, pad, EVP_MD_block_size(md)))
             goto err;
 
         for (i = 0; i < PCI_HMAC_MAX_MD_CBLOCK; i++)
             pad[i] = 0x5c ^ ctx->key[i];
-        if (!EVP_DigestInit_ex(&ctx->o_ctx, md, impl))
-            goto err;
+        if (!EVP_DigestInit_ex(&ctx->o_ctx, md, impl)) goto err;
         if (!EVP_DigestUpdate(&ctx->o_ctx, pad, EVP_MD_block_size(md)))
             goto err;
     }
-    if (!EVP_MD_CTX_copy_ex(&ctx->md_ctx, &ctx->i_ctx))
-        goto err;
+    if (!EVP_MD_CTX_copy_ex(&ctx->md_ctx, &ctx->i_ctx)) goto err;
     return 1;
- err:
+err:
     return 0;
 }
 
-int PCI_HMAC_Init(PCI_HMAC_CTX *ctx, const void *key, int len, const EVP_MD *md)
-{
-    if (key && md)
-        PCI_HMAC_CTX_init(ctx);
+int PCI_HMAC_Init(PCI_HMAC_CTX *ctx, const void *key, int len,
+                  const EVP_MD *md) {
+    if (key && md) PCI_HMAC_CTX_init(ctx);
     return PCI_HMAC_Init_ex(ctx, key, len, md, NULL);
 }
 
-int PCI_HMAC_Update(PCI_HMAC_CTX *ctx, const unsigned char *data, size_t len)
-{
+int PCI_HMAC_Update(PCI_HMAC_CTX *ctx, const unsigned char *data, size_t len) {
 #ifdef OPENSSL_FIPS
     if (FIPS_mode() && !ctx->i_ctx.engine)
         return FIPS_hmac_update(ctx, data, len);
 #endif
-    if (!ctx->md)
-        return 0;
+    if (!ctx->md) return 0;
 
     return EVP_DigestUpdate(&ctx->md_ctx, data, len);
 }
 
-int PCI_HMAC_Final(PCI_HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
-{
+int PCI_HMAC_Final(PCI_HMAC_CTX *ctx, unsigned char *md, unsigned int *len) {
     unsigned int i;
     unsigned char buf[EVP_MAX_MD_SIZE];
 #ifdef OPENSSL_FIPS
-    if (FIPS_mode() && !ctx->i_ctx.engine)
-        return FIPS_hmac_final(ctx, md, len);
+    if (FIPS_mode() && !ctx->i_ctx.engine) return FIPS_hmac_final(ctx, md, len);
 #endif
 
-    if (!ctx->md)
-        goto err;
+    if (!ctx->md) goto err;
 
-    if (!EVP_DigestFinal_ex(&ctx->md_ctx, buf, &i))
-        goto err;
-    if (!EVP_MD_CTX_copy_ex(&ctx->md_ctx, &ctx->o_ctx))
-        goto err;
-    if (!EVP_DigestUpdate(&ctx->md_ctx, buf, i))
-        goto err;
-    if (!EVP_DigestFinal_ex(&ctx->md_ctx, md, len))
-        goto err;
+    if (!EVP_DigestFinal_ex(&ctx->md_ctx, buf, &i)) goto err;
+    if (!EVP_MD_CTX_copy_ex(&ctx->md_ctx, &ctx->o_ctx)) goto err;
+    if (!EVP_DigestUpdate(&ctx->md_ctx, buf, i)) goto err;
+    if (!EVP_DigestFinal_ex(&ctx->md_ctx, md, len)) goto err;
     return 1;
- err:
+err:
     return 0;
 }
 
-void PCI_HMAC_CTX_init(PCI_HMAC_CTX *ctx)
-{
+void PCI_HMAC_CTX_init(PCI_HMAC_CTX *ctx) {
     EVP_MD_CTX_init(&ctx->i_ctx);
     EVP_MD_CTX_init(&ctx->o_ctx);
     EVP_MD_CTX_init(&ctx->md_ctx);
     ctx->md = NULL;
 }
 
-int PCI_HMAC_CTX_copy(PCI_HMAC_CTX *dctx, PCI_HMAC_CTX *sctx)
-{
-    if (!EVP_MD_CTX_copy(&dctx->i_ctx, &sctx->i_ctx))
-        goto err;
-    if (!EVP_MD_CTX_copy(&dctx->o_ctx, &sctx->o_ctx))
-        goto err;
-    if (!EVP_MD_CTX_copy(&dctx->md_ctx, &sctx->md_ctx))
-        goto err;
+int PCI_HMAC_CTX_copy(PCI_HMAC_CTX *dctx, PCI_HMAC_CTX *sctx) {
+    if (!EVP_MD_CTX_copy(&dctx->i_ctx, &sctx->i_ctx)) goto err;
+    if (!EVP_MD_CTX_copy(&dctx->o_ctx, &sctx->o_ctx)) goto err;
+    if (!EVP_MD_CTX_copy(&dctx->md_ctx, &sctx->md_ctx)) goto err;
     memcpy(dctx->key, sctx->key, PCI_HMAC_MAX_MD_CBLOCK);
     dctx->key_length = sctx->key_length;
     dctx->md = sctx->md;
     return 1;
- err:
+err:
     return 0;
 }
 
-void PCI_HMAC_CTX_cleanup(PCI_HMAC_CTX *ctx)
-{
+void PCI_HMAC_CTX_cleanup(PCI_HMAC_CTX *ctx) {
 #ifdef OPENSSL_FIPS
     if (FIPS_mode() && !ctx->i_ctx.engine) {
         FIPS_hmac_ctx_cleanup(ctx);
@@ -228,32 +203,25 @@ void PCI_HMAC_CTX_cleanup(PCI_HMAC_CTX *ctx)
 }
 
 unsigned char *PCI_HMAC(const EVP_MD *evp_md, const void *key, int key_len,
-                    const unsigned char *d, size_t n, unsigned char *md,
-                    unsigned int *md_len)
-{
+                        const unsigned char *d, size_t n, unsigned char *md,
+                        unsigned int *md_len) {
     PCI_HMAC_CTX c;
     static unsigned char m[EVP_MAX_MD_SIZE];
 
-    if (md == NULL)
-        md = m;
+    if (md == NULL) md = m;
     PCI_HMAC_CTX_init(&c);
-    if (!PCI_HMAC_Init(&c, key, key_len, evp_md))
-        goto err;
-    if (!PCI_HMAC_Update(&c, d, n))
-        goto err;
-    if (!PCI_HMAC_Final(&c, md, md_len))
-        goto err;
+    if (!PCI_HMAC_Init(&c, key, key_len, evp_md)) goto err;
+    if (!PCI_HMAC_Update(&c, d, n)) goto err;
+    if (!PCI_HMAC_Final(&c, md, md_len)) goto err;
     PCI_HMAC_CTX_cleanup(&c);
     return md;
- err:
+err:
     PCI_HMAC_CTX_cleanup(&c);
     return NULL;
 }
 
-void PCI_HMAC_CTX_set_flags(PCI_HMAC_CTX *ctx, unsigned long flags)
-{
+void PCI_HMAC_CTX_set_flags(PCI_HMAC_CTX *ctx, unsigned long flags) {
     EVP_MD_CTX_set_flags(&ctx->i_ctx, flags);
     EVP_MD_CTX_set_flags(&ctx->o_ctx, flags);
     EVP_MD_CTX_set_flags(&ctx->md_ctx, flags);
 }
-

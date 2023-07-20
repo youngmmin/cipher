@@ -34,20 +34,20 @@
 #ifndef PCI_SHA2_H
 #define PCI_SHA2_H
 
-#define PCI_SHA224_DIGEST_SIZE ( 224 / 8)
-#define PCI_SHA256_DIGEST_SIZE ( 256 / 8)
-#define PCI_SHA384_DIGEST_SIZE ( 384 / 8)
-#define PCI_SHA512_DIGEST_SIZE ( 512 / 8)
+#define PCI_SHA224_DIGEST_SIZE (224 / 8)
+#define PCI_SHA256_DIGEST_SIZE (256 / 8)
+#define PCI_SHA384_DIGEST_SIZE (384 / 8)
+#define PCI_SHA512_DIGEST_SIZE (512 / 8)
 
-#define PCI_SHA256_BLOCK_SIZE  ( 512 / 8)
-#define PCI_SHA512_BLOCK_SIZE  (1024 / 8)
-#define PCI_SHA384_BLOCK_SIZE  PCI_SHA512_BLOCK_SIZE
-#define PCI_SHA224_BLOCK_SIZE  PCI_SHA256_BLOCK_SIZE
+#define PCI_SHA256_BLOCK_SIZE (512 / 8)
+#define PCI_SHA512_BLOCK_SIZE (1024 / 8)
+#define PCI_SHA384_BLOCK_SIZE PCI_SHA512_BLOCK_SIZE
+#define PCI_SHA224_BLOCK_SIZE PCI_SHA256_BLOCK_SIZE
 
 #ifndef PCI_SHA2_TYPES
 #define PCI_SHA2_TYPES
 typedef unsigned char uint8;
-typedef unsigned int  uint32;
+typedef unsigned int uint32;
 typedef unsigned long long uint64;
 #endif
 
@@ -74,31 +74,31 @@ typedef pci_sha256_ctx pci_sha224_ctx;
 
 void pci_sha224_init(pci_sha224_ctx *ctx);
 void pci_sha224_update(pci_sha224_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
+                       unsigned int len);
 void pci_sha224_final(pci_sha224_ctx *ctx, unsigned char *digest);
 void pci_sha224(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+                unsigned char *digest);
 
-void pci_sha256_init(pci_sha256_ctx * ctx);
+void pci_sha256_init(pci_sha256_ctx *ctx);
 void pci_sha256_update(pci_sha256_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
+                       unsigned int len);
 void pci_sha256_final(pci_sha256_ctx *ctx, unsigned char *digest);
 void pci_sha256(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+                unsigned char *digest);
 
 void pci_sha384_init(pci_sha384_ctx *ctx);
 void pci_sha384_update(pci_sha384_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
+                       unsigned int len);
 void pci_sha384_final(pci_sha384_ctx *ctx, unsigned char *digest);
 void pci_sha384(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+                unsigned char *digest);
 
 void pci_sha512_init(pci_sha512_ctx *ctx);
 void pci_sha512_update(pci_sha512_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
+                       unsigned int len);
 void pci_sha512_final(pci_sha512_ctx *ctx, unsigned char *digest);
 void pci_sha512(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+                unsigned char *digest);
 
 #ifdef __cplusplus
 }

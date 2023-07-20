@@ -16,18 +16,20 @@
 #include "PccTableTypes.h"
 
 class PccKredStmtGetKeySet : public PccKredStmt {
-  private:
-	pct_type_get_key_set_out	KeySet;
-	dgt_uint32			NumRtnRows;
-  protected:
-  public:
-	PccKredStmtGetKeySet(DgcPhyDatabase* pdb,DgcSession* session,DgcSqlTerm* stmt_term);
-	virtual ~PccKredStmtGetKeySet();
+   private:
+    pct_type_get_key_set_out KeySet;
+    dgt_uint32 NumRtnRows;
 
-	virtual dgt_sint32	execute(DgcMemRows* mrows=0,dgt_sint8 delete_flag=1) throw(DgcLdbExcept,DgcPdbExcept);
-	virtual dgt_uint8*      fetch() throw(DgcLdbExcept,DgcPdbExcept);
+   protected:
+   public:
+    PccKredStmtGetKeySet(DgcPhyDatabase* pdb, DgcSession* session,
+                         DgcSqlTerm* stmt_term);
+    virtual ~PccKredStmtGetKeySet();
 
+    virtual dgt_sint32 execute(DgcMemRows* mrows = 0,
+                               dgt_sint8 delete_flag = 1) throw(DgcLdbExcept,
+                                                                DgcPdbExcept);
+    virtual dgt_uint8* fetch() throw(DgcLdbExcept, DgcPdbExcept);
 };
-
 
 #endif

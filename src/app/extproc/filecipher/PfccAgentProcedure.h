@@ -17,16 +17,17 @@
 #include "PfccAgentProcSvr.h"
 
 class PfccAgentProcedure : public DgcExtProcedure {
-  private:
-  protected:
-	PfccAgentListener*	AgentListener;
-	PfccAgentSession*	AgentSession;
-  public:
-	PfccAgentProcedure(const dgt_schar* name, PfccAgentListener* agent_listener);
-	virtual ~PfccAgentProcedure();
+   private:
+   protected:
+    PfccAgentListener* AgentListener;
+    PfccAgentSession* AgentSession;
 
-	virtual dgt_sint32 initialize() throw(DgcExcept);
+   public:
+    PfccAgentProcedure(const dgt_schar* name,
+                       PfccAgentListener* agent_listener);
+    virtual ~PfccAgentProcedure();
+
+    virtual dgt_sint32 initialize() throw(DgcExcept);
 };
-
 
 #endif

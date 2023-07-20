@@ -11,13 +11,8 @@
 ********************************************************************/
 #include "PcbUpdateStmt.h"
 
+PcbUpdateStmt::PcbUpdateStmt(PcbCipherTable* cipher_table,
+                             dgt_uint32 array_size)
+    : PcbStmt(cipher_table, array_size) {}
 
-PcbUpdateStmt::PcbUpdateStmt(PcbCipherTable* cipher_table,dgt_uint32 array_size)
-	: PcbStmt(cipher_table,array_size)
-{
-}
-
-
-PcbUpdateStmt::~PcbUpdateStmt()
-{
-}
+PcbUpdateStmt::~PcbUpdateStmt() {}

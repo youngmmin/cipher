@@ -12,19 +12,19 @@
 #ifndef PCC_PROC_SESSION_MONITOR
 #define PCC_PROC_SESSION_MONITOR
 
-
-#include "DgcExtProcedure.h"
 #include "DgcDatabaseLink.h"
+#include "DgcExtProcedure.h"
 
 class PccProcSessionMonitor : public DgcExtProcedure {
-  private:
-	DgcDatabaseLink* DatabaseLink;
-  protected:
-  public:
-	PccProcSessionMonitor(const dgt_schar* name);
-	virtual ~PccProcSessionMonitor();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+    DgcDatabaseLink* DatabaseLink;
+
+   protected:
+   public:
+    PccProcSessionMonitor(const dgt_schar* name);
+    virtual ~PccProcSessionMonitor();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
 
 #endif /* PCC_PROC_SESSION_MONITOR */

@@ -14,17 +14,16 @@
 
 #include "PfccAgentProcedure.h"
 
-
 class PfccRecollectCryptDir : public PfccAgentProcedure {
-  private:
-  protected:
-  public:
-	PfccRecollectCryptDir(const dgt_schar* name, PfccAgentListener* agent_listener);
-	virtual ~PfccRecollectCryptDir();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 initialize() throw(DgcExcept);
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PfccRecollectCryptDir(const dgt_schar* name,
+                          PfccAgentListener* agent_listener);
+    virtual ~PfccRecollectCryptDir();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 initialize() throw(DgcExcept);
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

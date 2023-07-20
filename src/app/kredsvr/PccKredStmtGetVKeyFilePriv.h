@@ -15,15 +15,16 @@
 #include "PccKredStmtGetVKeyPriv.h"
 
 class PccKredStmtGetVKeyFilePriv : public PccKredStmtGetVKeyPriv {
-  private:
-  protected:
-  public:
-	PccKredStmtGetVKeyFilePriv(DgcPhyDatabase* pdb,DgcSession* session,DgcSqlTerm* stmt_term);
-	virtual ~PccKredStmtGetVKeyFilePriv();
+   private:
+   protected:
+   public:
+    PccKredStmtGetVKeyFilePriv(DgcPhyDatabase* pdb, DgcSession* session,
+                               DgcSqlTerm* stmt_term);
+    virtual ~PccKredStmtGetVKeyFilePriv();
 
-	virtual dgt_sint32 execute(DgcMemRows* mrows=0,dgt_sint8 delete_flag=1) throw(DgcLdbExcept,DgcPdbExcept);
-
+    virtual dgt_sint32 execute(DgcMemRows* mrows = 0,
+                               dgt_sint8 delete_flag = 1) throw(DgcLdbExcept,
+                                                                DgcPdbExcept);
 };
-
 
 #endif

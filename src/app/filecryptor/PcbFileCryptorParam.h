@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+
 #include "DgcObject.h"
 
 // typedef enum {
@@ -9,9 +10,8 @@
 //     FCB_MODE_CHECK = 3
 // } PcbFileCryptorMode;
 
-class PcbFileCryptorParam : public DgcObject
-{
-private:
+class PcbFileCryptorParam : public DgcObject {
+   private:
     char *user;
     char *key_name;
     char *in_file;
@@ -23,7 +23,7 @@ private:
     static const int FCB_MODE_DECRYPT = 2;
     static const int FCB_MODE_CHECK = 3;
 
-public:
+   public:
     PcbFileCryptorParam();
 
     void setUser(const char *user_);
@@ -34,5 +34,5 @@ public:
     void setDecryptMode();
     void setCheckMode();
 
-    int toString(char* param_list, int param_list_size);
+    int toString(char *param_list, int param_list_size);
 };

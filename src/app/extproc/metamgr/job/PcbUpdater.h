@@ -12,20 +12,20 @@
 #ifndef PCB_UPDATER_H
 #define PCB_UPDATER_H
 
-
-#include "PcbWorker.h"
 #include "PcbUpdateStmt.h"
-
+#include "PcbWorker.h"
 
 class PcbUpdater : public PcbWorker {
-  private:
-	PcbUpdateStmt*	UpdateStmt;
-  protected:
-	dgt_sint32 run() throw(DgcExcept);
-  public:
-        PcbUpdater(PcbUpdateStmt* update_stmt,PcbDataChunkPool* chunk_pool,pct_type_worker* worker_ptr);
-        virtual ~PcbUpdater();
-};
+   private:
+    PcbUpdateStmt* UpdateStmt;
 
+   protected:
+    dgt_sint32 run() throw(DgcExcept);
+
+   public:
+    PcbUpdater(PcbUpdateStmt* update_stmt, PcbDataChunkPool* chunk_pool,
+               pct_type_worker* worker_ptr);
+    virtual ~PcbUpdater();
+};
 
 #endif

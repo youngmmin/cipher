@@ -12,35 +12,35 @@
 #ifndef PFCC_GET_DETECT_STAT_H
 #define PFCC_GET_DETECT_STAT_H
 
-#include "DgcExtProcedure.h"
-#include "DgcSqlHandle.h"
-#include "DgcMemRows.h"
-#include "PccHashTable.h"
 #include "DgcCRC64.h"
+#include "DgcExtProcedure.h"
+#include "DgcMemRows.h"
+#include "DgcSqlHandle.h"
+#include "PccHashTable.h"
 
 typedef struct {
-	dgt_sint64	file_id;
-	dgt_sint64	pttn_num;
-	dgt_sint64	pttn_files;
-	dgt_schar	path[2048];
+    dgt_sint64 file_id;
+    dgt_sint64 pttn_num;
+    dgt_sint64 pttn_files;
+    dgt_schar path[2048];
 } pfcc_detect_stat;
 
 class PfccGetDetectStat : public DgcExtProcedure {
-  private:
-	static const dgt_sint32 DETECT_NODE_HASH_SIZE = 3000;
-	PccHashTable	DetectStat;
-  protected:
-  public:
-	PfccGetDetectStat(const dgt_schar* name);
-	virtual ~PfccGetDetectStat();
-	virtual DgcExtProcedure* clone();
+   private:
+    static const dgt_sint32 DETECT_NODE_HASH_SIZE = 3000;
+    PccHashTable DetectStat;
 
-	virtual dgt_sint32 initialize() throw(DgcExcept);
-	virtual dgt_sint32 execute() throw(DgcExcept);
-	virtual dgt_sint32 fetch() throw(DgcExcept);
+   protected:
+   public:
+    PfccGetDetectStat(const dgt_schar* name);
+    virtual ~PfccGetDetectStat();
+    virtual DgcExtProcedure* clone();
 
-	pfcc_detect_stat* getDetectStat(dgt_schar* path);
+    virtual dgt_sint32 initialize() throw(DgcExcept);
+    virtual dgt_sint32 execute() throw(DgcExcept);
+    virtual dgt_sint32 fetch() throw(DgcExcept);
+
+    pfcc_detect_stat* getDetectStat(dgt_schar* path);
 };
-
 
 #endif

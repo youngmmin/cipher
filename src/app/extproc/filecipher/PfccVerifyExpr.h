@@ -15,24 +15,23 @@
 #include "DgcExtProcedure.h"
 
 typedef struct {
-	dgt_schar expr[1024];
-	dgt_schar reg[4096];
+    dgt_schar expr[1024];
+    dgt_schar reg[4096];
 } pfcc_verify_expr_in;
 
 typedef struct {
-	dgt_sint32 rtn_code;
-	dgt_schar err_msg[1025];
+    dgt_sint32 rtn_code;
+    dgt_schar err_msg[1025];
 } pfcc_verify_expr_out;
 
 class PfccVerifyExpr : public DgcExtProcedure {
-  private:
-  protected:
-  public:
-	PfccVerifyExpr(const dgt_schar* name);
-	virtual ~PfccVerifyExpr();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PfccVerifyExpr(const dgt_schar* name);
+    virtual ~PfccVerifyExpr();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

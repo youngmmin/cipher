@@ -3,7 +3,7 @@
  *   Classes            :       PciSeed256Cipher
  *   Implementor        :       mwpark
  *   Create Date        :       2016. 6. 13
- *   Description        :      
+ *   Description        :
  *   Modification history
  *   date                    modification
 --------------------------------------------------------------------
@@ -15,17 +15,19 @@
 #include "PciBlockCipher.h"
 
 class PciSeed256Cipher : public PciBlockCipher {
-  private:
-	void SeedEncRoundKey(dgt_uint32 *pdwRoundKey,dgt_uint8 *pbUserKey);
+   private:
+    void SeedEncRoundKey(dgt_uint32* pdwRoundKey, dgt_uint8* pbUserKey);
 
-        virtual dgt_sint32      initializeContext();
-        virtual dgt_sint32      encryptBlock(dgt_uint8* iblock,dgt_uint8* oblock);
-        virtual dgt_sint32      decryptBlock(dgt_uint8* iblock,dgt_uint8* oblock);
-  protected:
-	dgt_uint32		Schedule[48];
-  public:
-  	PciSeed256Cipher();
-	virtual ~PciSeed256Cipher();
+    virtual dgt_sint32 initializeContext();
+    virtual dgt_sint32 encryptBlock(dgt_uint8* iblock, dgt_uint8* oblock);
+    virtual dgt_sint32 decryptBlock(dgt_uint8* iblock, dgt_uint8* oblock);
+
+   protected:
+    dgt_uint32 Schedule[48];
+
+   public:
+    PciSeed256Cipher();
+    virtual ~PciSeed256Cipher();
 };
 
 #endif

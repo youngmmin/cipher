@@ -58,22 +58,20 @@
 #ifndef PCI_HMAC_H
 #define PCI_HMAC_H
 
+#include <openssl/opensslconf.h>
 
-# include <openssl/opensslconf.h>
+#ifdef OPENSSL_NO_HMAC
+#error HMAC is disabled.
+#endif
 
-# ifdef OPENSSL_NO_HMAC
-#  error HMAC is disabled.
-# endif
+#include <openssl/evp.h>
 
-# include <openssl/evp.h>
+#define PCI_HMAC_MAX_MD_CBLOCK 128 /* largest known is SHA512 */
 
-# define PCI_HMAC_MAX_MD_CBLOCK      128/* largest known is SHA512 */
+#define PCI_HMAC_SHA1_DIGEST_SIZE (160 / 8)
+#define PCI_HMAC_SHA256_DIGEST_SIZE (256 / 8)
 
-#define PCI_HMAC_SHA1_DIGEST_SIZE ( 160 / 8)
-#define PCI_HMAC_SHA256_DIGEST_SIZE ( 256 / 8)
-
-
-#ifdef  __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -86,27 +84,27 @@ typedef struct pci_hmac_ctx_st {
     unsigned char key[PCI_HMAC_MAX_MD_CBLOCK];
 } PCI_HMAC_CTX;
 
-# define HMAC_size(e)    (EVP_MD_size((e)->md))
+#define HMAC_size(e) (EVP_MD_size((e)->md))
 
 void PCI_HMAC_CTX_init(PCI_HMAC_CTX *ctx);
 void PCI_HMAC_CTX_cleanup(PCI_HMAC_CTX *ctx);
 
 /* deprecated */
-# define PCI_HMAC_cleanup(ctx) PCI_HMAC_CTX_cleanup(ctx)
+#define PCI_HMAC_cleanup(ctx) PCI_HMAC_CTX_cleanup(ctx)
 
 /* deprecated */
-int PCI_HMAC_Init(PCI_HMAC_CTX *ctx, const void *key, int len, const EVP_MD *md);
+int PCI_HMAC_Init(PCI_HMAC_CTX *ctx, const void *key, int len,
+                  const EVP_MD *md);
 int PCI_HMAC_Init_ex(PCI_HMAC_CTX *ctx, const void *key, int len,
-                 const EVP_MD *md, ENGINE *impl);
+                     const EVP_MD *md, ENGINE *impl);
 int PCI_HMAC_Update(PCI_HMAC_CTX *ctx, const unsigned char *data, size_t len);
 int PCI_HMAC_Final(PCI_HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
 unsigned char *PCI_HMAC(const EVP_MD *evp_md, const void *key, int key_len,
-                    const unsigned char *d, size_t n, unsigned char *md,
-                    unsigned int *md_len);
+                        const unsigned char *d, size_t n, unsigned char *md,
+                        unsigned int *md_len);
 int PCI_HMAC_CTX_copy(PCI_HMAC_CTX *dctx, PCI_HMAC_CTX *sctx);
 
 void PCI_HMAC_CTX_set_flags(PCI_HMAC_CTX *ctx, unsigned long flags);
-
 
 #if 0 /* HMAC TEST */
 int PcAPI_hmac_sha256(const void *key, int key_len,
@@ -142,7 +140,7 @@ int PcAPI_hmac_sha1_b64_name(const unsigned char *key_name,
                            unsigned char *dst, unsigned int* dst_len);
 #endif /* HMAC TEST */
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
 #endif
 

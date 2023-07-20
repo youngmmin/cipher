@@ -12,20 +12,13 @@
 
 #include "PfccAgentProcedure.h"
 
-PfccAgentProcedure::PfccAgentProcedure(const dgt_schar* name, PfccAgentListener* agent_listener)
-	: DgcExtProcedure(name), AgentListener(agent_listener), AgentSession(0)
-{
+PfccAgentProcedure::PfccAgentProcedure(const dgt_schar* name,
+                                       PfccAgentListener* agent_listener)
+    : DgcExtProcedure(name), AgentListener(agent_listener), AgentSession(0) {}
 
+PfccAgentProcedure::~PfccAgentProcedure() {
+    if (AgentListener && AgentSession)
+        AgentListener->agentSessPool().returnSession(AgentSession);
 }
 
-
-PfccAgentProcedure::~PfccAgentProcedure()
-{
-	if (AgentListener && AgentSession) AgentListener->agentSessPool().returnSession(AgentSession);
-}
-
-
-dgt_sint32 PfccAgentProcedure::initialize() throw(DgcExcept)
-{
-	return 0;
-}
+dgt_sint32 PfccAgentProcedure::initialize() throw(DgcExcept) { return 0; }

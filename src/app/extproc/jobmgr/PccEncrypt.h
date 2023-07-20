@@ -12,19 +12,16 @@
 #ifndef PCC_ENCRYPT_H
 #define PCC_ENCRYPT_H
 
-
 #include "DgcExtProcedure.h"
 
-
 class PccEncrypt : public DgcExtProcedure {
-  private:
-  protected:
-  public:
-	PccEncrypt(const dgt_schar* name);
-	virtual ~PccEncrypt();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PccEncrypt(const dgt_schar* name);
+    virtual ~PccEncrypt();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

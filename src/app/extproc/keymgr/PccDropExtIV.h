@@ -15,22 +15,22 @@
 #include "DgcExtProcedure.h"
 
 class PccDropExtIV : public DgcExtProcedure {
-  private:
-  protected:
-/*
-        dgt_schar               ProcName[DGC_MAX_NAME_LEN+1];   // procedure name
-        DgcDatabase*            Database;                       // database
-        DgcSession*             Session;                        // session
-        DgcCallStmt*            CallStmt;                       // call statement
-        DgcMemRows*             BindRows;                       // bind rows
-        DgcMemRows*             ReturnRows;                     // return rows
-*/
-  public:
-	PccDropExtIV(const dgt_schar* name);
-	virtual ~PccDropExtIV();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+    /*
+            dgt_schar               ProcName[DGC_MAX_NAME_LEN+1];   // procedure
+       name DgcDatabase*            Database;                       // database
+            DgcSession*             Session;                        // session
+            DgcCallStmt*            CallStmt;                       // call
+       statement DgcMemRows*             BindRows;                       // bind
+       rows DgcMemRows*             ReturnRows;                     // return
+       rows
+    */
+   public:
+    PccDropExtIV(const dgt_schar* name);
+    virtual ~PccDropExtIV();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

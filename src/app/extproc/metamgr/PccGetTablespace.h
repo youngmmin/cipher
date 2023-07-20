@@ -12,19 +12,16 @@
 #ifndef PCC_GET_TABLESPACE_H
 #define PCC_GET_TABLESPACE_H
 
-
 #include "PccMetaProcedure.h"
 
-
 class PccGetTablespace : public PccMetaProcedure {
-  private:
-  protected:
-  public:
-	PccGetTablespace(const dgt_schar* name);
-	virtual ~PccGetTablespace();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PccGetTablespace(const dgt_schar* name);
+    virtual ~PccGetTablespace();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

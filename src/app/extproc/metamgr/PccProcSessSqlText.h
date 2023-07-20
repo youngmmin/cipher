@@ -12,19 +12,19 @@
 #ifndef PCC_PROC_SESS_SQL_TEXT
 #define PCC_PROC_SESS_SQL_TEXT
 
-
-#include "DgcExtProcedure.h"
 #include "DgcDatabaseLink.h"
+#include "DgcExtProcedure.h"
 
 class PccProcSessSqlText : public DgcExtProcedure {
-  private:
-	DgcDatabaseLink* DatabaseLink;
-  protected:
-  public:
-	PccProcSessSqlText(const dgt_schar* name);
-	virtual ~PccProcSessSqlText();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+    DgcDatabaseLink* DatabaseLink;
+
+   protected:
+   public:
+    PccProcSessSqlText(const dgt_schar* name);
+    virtual ~PccProcSessSqlText();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
 
 #endif /* PCC_PROC_SESS_SQL_TEXT */

@@ -10,341 +10,357 @@
 
 ********************************************************************/
 #include "PccTiberoScriptBuilder.h"
+
 #include "DgcLinkInfo.h"
 
-extern void check_logger(const char *fmt, ...);
+extern void check_logger(const char* fmt, ...);
 
-DgcCliConnection* PccTiberoScriptBuilder::connect(dgt_schar* uid,dgt_schar* pw) throw(DgcExcept)
-{
-        //
-        // getting the link_info
-        //
-        DgcLinkInfo             dblink(Database->pdb());
-        pt_database_link_info*       link_info=dblink.getDatabaseLinkInfo(SchemaLink);
-        if (!link_info) {
-                ATHROWnR(DgcError(SPOS,"getDatabaseLinkInfo failed"),0);
-        }
-        if (!uid || *uid == 0) uid=link_info->user_name;
-        if (!pw || *pw == 0) pw=link_info->passwd;
-        dgt_schar       conn_string[1024];
-        //
-        // Setting the charset(NLS_LANG)
-        //
-        memset(conn_string,0,1024);
-	sprintf(conn_string,"SERVER=%s;DB=%s;PORT=%d;UID=%s;PWD=%s;",
-			    link_info->host, link_info->db_name, link_info->port, link_info->user_name, link_info->passwd);
-        DgcTiberoConnection* conn=new DgcTiberoConnection();
-        if (conn->connect(conn_string, nul, uid, pw, nul) != 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete conn;
-                RTHROWnR(e,DgcError(SPOS,"connect failed."),0);
-        }
-	return conn;
+DgcCliConnection* PccTiberoScriptBuilder::connect(
+    dgt_schar* uid, dgt_schar* pw) throw(DgcExcept) {
+    //
+    // getting the link_info
+    //
+    DgcLinkInfo dblink(Database->pdb());
+    pt_database_link_info* link_info = dblink.getDatabaseLinkInfo(SchemaLink);
+    if (!link_info) {
+        ATHROWnR(DgcError(SPOS, "getDatabaseLinkInfo failed"), 0);
+    }
+    if (!uid || *uid == 0) uid = link_info->user_name;
+    if (!pw || *pw == 0) pw = link_info->passwd;
+    dgt_schar conn_string[1024];
+    //
+    // Setting the charset(NLS_LANG)
+    //
+    memset(conn_string, 0, 1024);
+    sprintf(conn_string, "SERVER=%s;DB=%s;PORT=%d;UID=%s;PWD=%s;",
+            link_info->host, link_info->db_name, link_info->port,
+            link_info->user_name, link_info->passwd);
+    DgcTiberoConnection* conn = new DgcTiberoConnection();
+    if (conn->connect(conn_string, nul, uid, pw, nul) != 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete conn;
+        RTHROWnR(e, DgcError(SPOS, "connect failed."), 0);
+    }
+    return conn;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::preparePrivInfo() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-        sprintf(sql_text,
-"select * from pct_enc_tab_priv "
-"where enc_tab_id=%lld ",TabInfo.enc_tab_id);
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        pct_type_enc_tab_priv*       priv_info_tmp;
-        PrivSqlRows.reset();
-        while ((priv_info_tmp=(pct_type_enc_tab_priv*)sql_stmt->fetch())) {
-                dgt_schar privilege[128];
-                dgt_schar privSql[1024];
-                memset(privilege,0,128);
-                memset(privSql,0,1024);
-                dgt_sint64 sql_id=0;
-                if (priv_info_tmp->privilege == 1) {
-                        sprintf(privilege,"select");
-                } else if (priv_info_tmp->privilege == 2) {
-                        sprintf(privilege,"insert");
-                } else if (priv_info_tmp->privilege == 3) {
-                        sprintf(privilege,"update");
-                } else if (priv_info_tmp->privilege == 4) {
-                        sprintf(privilege,"delete");
-                }
-                sprintf(privSql,"grant %s on %s.%s to %s", privilege, SchemaName, TabInfo.table_name 
-							   ,priv_info_tmp->grantee);
-                PrivSqlRows.add();
-                PrivSqlRows.next();
-                memcpy(PrivSqlRows.data(), privSql, 1024);
-		if (TabInfo.enc_type == 0) {
-			memset(privSql,0,1024);
-			sprintf(privSql,"grant %s on %s.%s to %s", privilege, SchemaName, TabInfo.renamed_tab_name, 
-								   priv_info_tmp->grantee);
-        	        PrivSqlRows.add();
-                	PrivSqlRows.next();
-	                memcpy(PrivSqlRows.data(), privSql, 1024);
-		}
-        }
-        DgcExcept*      e=EXCEPTnC;
+dgt_sint32 PccTiberoScriptBuilder::preparePrivInfo() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    sprintf(sql_text,
+            "select * from pct_enc_tab_priv "
+            "where enc_tab_id=%lld ",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        if (e) {
-                delete e;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pct_type_enc_tab_priv* priv_info_tmp;
+    PrivSqlRows.reset();
+    while ((priv_info_tmp = (pct_type_enc_tab_priv*)sql_stmt->fetch())) {
+        dgt_schar privilege[128];
+        dgt_schar privSql[1024];
+        memset(privilege, 0, 128);
+        memset(privSql, 0, 1024);
+        dgt_sint64 sql_id = 0;
+        if (priv_info_tmp->privilege == 1) {
+            sprintf(privilege, "select");
+        } else if (priv_info_tmp->privilege == 2) {
+            sprintf(privilege, "insert");
+        } else if (priv_info_tmp->privilege == 3) {
+            sprintf(privilege, "update");
+        } else if (priv_info_tmp->privilege == 4) {
+            sprintf(privilege, "delete");
         }
-        PrivSqlRows.rewind();
-        return 1;
+        sprintf(privSql, "grant %s on %s.%s to %s", privilege, SchemaName,
+                TabInfo.table_name, priv_info_tmp->grantee);
+        PrivSqlRows.add();
+        PrivSqlRows.next();
+        memcpy(PrivSqlRows.data(), privSql, 1024);
+        if (TabInfo.enc_type == 0) {
+            memset(privSql, 0, 1024);
+            sprintf(privSql, "grant %s on %s.%s to %s", privilege, SchemaName,
+                    TabInfo.renamed_tab_name, priv_info_tmp->grantee);
+            PrivSqlRows.add();
+            PrivSqlRows.next();
+            memcpy(PrivSqlRows.data(), privSql, 1024);
+        }
+    }
+    DgcExcept* e = EXCEPTnC;
+    delete sql_stmt;
+    if (e) {
+        delete e;
+    }
+    PrivSqlRows.rewind();
+    return 1;
 }
 
 typedef struct {
-	dgt_schar col_name[130];
-	dgt_sint64 comments;
+    dgt_schar col_name[130];
+    dgt_sint64 comments;
 } pc_type_col_comment;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareCommentInfo() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-        sprintf(sql_text,
-"select getname(comments) from pct_enc_tab_comment "
-"where enc_tab_id=%lld ",TabInfo.enc_tab_id);
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        dgt_schar*       comment_tmp;
-	CommentInfoRows.reset();
-        while ((comment_tmp=(dgt_schar*)sql_stmt->fetch())) {
-                dgt_schar comment_sql[5000];
-                memset(comment_sql,0,5000);
-		CommentInfoRows.add();
-		CommentInfoRows.next();
-                memset(comment_sql,0,5000);
-		sprintf(comment_sql,"COMMENT ON TABLE %s.%s IS '%s'", SchemaName, TabInfo.table_name, comment_tmp);
-               	memcpy(CommentInfoRows.data(), comment_sql, 5000);
-		if (TabInfo.enc_type == 0) {
-			CommentInfoRows.add();
-			CommentInfoRows.next();
-        	        memset(comment_sql,0,5000);
-			sprintf(comment_sql,"COMMENT ON TABLE %s.%s IS '%s'", SchemaName, TabInfo.renamed_tab_name, comment_tmp);
-		}
-        }
-        DgcExcept*      e=EXCEPTnC;
+dgt_sint32 PccTiberoScriptBuilder::prepareCommentInfo() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    sprintf(sql_text,
+            "select getname(comments) from pct_enc_tab_comment "
+            "where enc_tab_id=%lld ",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        if (e) {
-                delete e;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    dgt_schar* comment_tmp;
+    CommentInfoRows.reset();
+    while ((comment_tmp = (dgt_schar*)sql_stmt->fetch())) {
+        dgt_schar comment_sql[5000];
+        memset(comment_sql, 0, 5000);
+        CommentInfoRows.add();
+        CommentInfoRows.next();
+        memset(comment_sql, 0, 5000);
+        sprintf(comment_sql, "COMMENT ON TABLE %s.%s IS '%s'", SchemaName,
+                TabInfo.table_name, comment_tmp);
+        memcpy(CommentInfoRows.data(), comment_sql, 5000);
+        if (TabInfo.enc_type == 0) {
+            CommentInfoRows.add();
+            CommentInfoRows.next();
+            memset(comment_sql, 0, 5000);
+            sprintf(comment_sql, "COMMENT ON TABLE %s.%s IS '%s'", SchemaName,
+                    TabInfo.renamed_tab_name, comment_tmp);
         }
-	sprintf(sql_text,
-"select b.column_name, a.comments "
-"from pct_enc_col_comment a, "
-"     pct_enc_column b "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.enc_tab_id = %lld",TabInfo.enc_tab_id);
-	sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-	if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-	pc_type_col_comment* col_comment_tmp;
-	while ((col_comment_tmp=(pc_type_col_comment*)sql_stmt->fetch())) {
-                dgt_schar comment_sql[5000];
-                memset(comment_sql,0,5000);
-		sprintf(comment_sql,"COMMENT ON COLUMN %s.%s.%s IS '%s'", SchemaName, TabInfo.table_name,
-				    col_comment_tmp->col_name, PetraNamePool->getNameString(col_comment_tmp->comments));
-		CommentInfoRows.add();
-		CommentInfoRows.next();
-		memcpy(CommentInfoRows.data(), comment_sql, 5000);
-		if (TabInfo.enc_type == 0) {
-                	memset(comment_sql,0,5000);
-			sprintf(comment_sql,"COMMENT ON COLUMN %s.%s.%s IS '%s'", SchemaName, TabInfo.renamed_tab_name,
-					    col_comment_tmp->col_name, PetraNamePool->getNameString(col_comment_tmp->comments));
-			CommentInfoRows.add();
-			CommentInfoRows.next();
-			memcpy(CommentInfoRows.data(), comment_sql, 5000);
-			
-		}
-        }
-        e=EXCEPTnC;
+    }
+    DgcExcept* e = EXCEPTnC;
+    delete sql_stmt;
+    if (e) {
+        delete e;
+    }
+    sprintf(sql_text,
+            "select b.column_name, a.comments "
+            "from pct_enc_col_comment a, "
+            "     pct_enc_column b "
+            "where a.enc_col_id = b.enc_col_id "
+            "and   a.enc_tab_id = %lld",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        if (e) {
-                delete e;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_col_comment* col_comment_tmp;
+    while ((col_comment_tmp = (pc_type_col_comment*)sql_stmt->fetch())) {
+        dgt_schar comment_sql[5000];
+        memset(comment_sql, 0, 5000);
+        sprintf(comment_sql, "COMMENT ON COLUMN %s.%s.%s IS '%s'", SchemaName,
+                TabInfo.table_name, col_comment_tmp->col_name,
+                PetraNamePool->getNameString(col_comment_tmp->comments));
+        CommentInfoRows.add();
+        CommentInfoRows.next();
+        memcpy(CommentInfoRows.data(), comment_sql, 5000);
+        if (TabInfo.enc_type == 0) {
+            memset(comment_sql, 0, 5000);
+            sprintf(comment_sql, "COMMENT ON COLUMN %s.%s.%s IS '%s'",
+                    SchemaName, TabInfo.renamed_tab_name,
+                    col_comment_tmp->col_name,
+                    PetraNamePool->getNameString(col_comment_tmp->comments));
+            CommentInfoRows.add();
+            CommentInfoRows.next();
+            memcpy(CommentInfoRows.data(), comment_sql, 5000);
         }
-        CommentInfoRows.rewind();
-        return 1;
+    }
+    e = EXCEPTnC;
+    delete sql_stmt;
+    if (e) {
+        delete e;
+    }
+    CommentInfoRows.rewind();
+    return 1;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::prepareObjInfo() throw(DgcExcept)
-{
-	//
-        // getting the dependency object in real time
-        //
-	dgt_schar soha_text[2048];
-	memset(soha_text,0,2048);
-	sprintf(soha_text,
-"delete pct_enc_tab_dep_obj where enc_tab_id=%lld",TabInfo.enc_tab_id);
-	DgcSqlStmt*     sql_stmt=Database->getStmt(Session,soha_text,strlen(soha_text));
-	if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-		DgcExcept*      e=EXCEPTnC;
-		delete sql_stmt;
-		RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	}
-	delete sql_stmt;
-        ObjSqlRows.reset();
-        ObjTriggerSqlRows.reset();
-        dgt_schar       sql_text[2048];
-	if (!getConnection()) {
-        	ATHROWnR(DgcError(SPOS,"getConnection failed."),-1);
-	}
-	sprintf(sql_text,
-"select /*+ no_merge */ "
-  " distinct "
-  " owner, "
-  " name, "
-  " type, "
-  " level hlevel "
-"from dba_dependencies start with PARENT_OBJ_OWNER = upper('%s') "
-" and PARENT_OBJ_NAME = upper('%s') connect by PARENT_OBJ_OWNER = prior owner "
-" and PARENT_OBJ_NAME = prior name "
-" and PARENT_OBJ_TYPE = prior type "
-" order by hlevel", SchemaName, TabInfo.table_name);
+dgt_sint32 PccTiberoScriptBuilder::prepareObjInfo() throw(DgcExcept) {
+    //
+    // getting the dependency object in real time
+    //
+    dgt_schar soha_text[2048];
+    memset(soha_text, 0, 2048);
+    sprintf(soha_text, "delete pct_enc_tab_dep_obj where enc_tab_id=%lld",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, soha_text, strlen(soha_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    delete sql_stmt;
+    ObjSqlRows.reset();
+    ObjTriggerSqlRows.reset();
+    dgt_schar sql_text[2048];
+    if (!getConnection()) {
+        ATHROWnR(DgcError(SPOS, "getConnection failed."), -1);
+    }
+    sprintf(sql_text,
+            "select /*+ no_merge */ "
+            " distinct "
+            " owner, "
+            " name, "
+            " type, "
+            " level hlevel "
+            "from dba_dependencies start with PARENT_OBJ_OWNER = upper('%s') "
+            " and PARENT_OBJ_NAME = upper('%s') connect by PARENT_OBJ_OWNER = "
+            "prior owner "
+            " and PARENT_OBJ_NAME = prior name "
+            " and PARENT_OBJ_TYPE = prior type "
+            " order by hlevel",
+            SchemaName, TabInfo.table_name);
 
-	DgcCliStmt*     stmt=Connection->getStmt();
-	if (!stmt) {
-		ATHROWnR(DgcError(SPOS,"getStmt failed."),-1);
-	}
-	if (stmt->execute(sql_text,strlen(sql_text),10) < 0) {
-		DgcExcept*      e=EXCEPTnC;
-		delete stmt;
-		RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	}
-	DgcMemRows*     rows=stmt->returnRows();
-	rows->rewind();
-	while(rows->next()) {
-                dgt_schar objSql[1024];
-                memset(objSql,0,1024);
-		dgt_schar	owner[64];
-		dgt_schar	name[64];
-		dgt_schar	type[32];
-		dgt_sint32	hlevel=0;
-                memset(owner,0,64);
-                memset(name,0,64);
-                memset(type,0,32);
-		memcpy(owner,(dgt_schar*)rows->getColPtr(1),64);
-		memcpy(name,(dgt_schar*)rows->getColPtr(2),64);
-		memcpy(type,(dgt_schar*)rows->getColPtr(3),32);
-		hlevel=strtol((dgt_schar*)rows->getColPtr(4), 0, 10);
-		if (!strcasecmp(type,"SYNONYM")) {
-			continue;
-		}
-                if (!strcasecmp(type,"PACKAGE BODY")) {
-                        sprintf(objSql,"alter %s %s.%s compile body", type , owner, name);
-                } else {
-                        sprintf(objSql,"alter %s %s.%s compile", type , owner, name);
-		} 
-		if (TabInfo.init_enc_type > 0) {
-			if (!getConnection()) {
-				ATHROWnR(DgcError(SPOS,"getConnection failed."),-1);
-			}
-			if (!strcasecmp(type,"TRIGGER")) {
-				dgt_schar sql_text[1024];
-				memset(sql_text,0,1024);
-                	        sprintf(sql_text,
-"select b.src from dba_objects a, sys._dd_src b "
-"where a.object_id = b.obj_id "
-"  and a.owner = upper('%s') "
-"  and a.object_name = upper('%s') "
-"  and a.object_type = 'TRIGGER'", owner, name);
-                		DgcCliStmt*     stmt=Connection->getStmt();
-		                if (!stmt) {
-        		                ATHROWnR(DgcError(SPOS,"getStmt failed."),-1);
-                		}
-	                	if (stmt->execute(sql_text,strlen(sql_text),10) < 0) {
-        	                	DgcExcept*      e=EXCEPTnC;
-	                	        delete stmt;
-        		               	RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	                	}
-				DgcMemRows*     rows=stmt->returnRows();
-		                rows->rewind();
-				dgt_schar* ddl_stmt_ptr=0;
-	                	while(rows->next() && (ddl_stmt_ptr=(dgt_schar*)rows->data())) {
-					ObjTriggerSqlRows.add();
-					ObjTriggerSqlRows.next();
-					memcpy(ObjTriggerSqlRows.data(), ddl_stmt_ptr, strlen(ddl_stmt_ptr));
-				}
-				delete stmt;
-			}
-		}
-                ObjSqlRows.add();
-                ObjSqlRows.next();
-                memcpy(ObjSqlRows.data(), objSql, 1024);
-		dgt_uint32	object_type=0;
-                if (!strcasecmp(type,"FUNCTION")) {
-			object_type=1;
-                } else if (!strcasecmp(type,"PROCEDURE")) {
-			object_type=2;
-                } else if (!strcasecmp(type,"TRIGGER")) {
-			object_type=3;
-                } else if (!strcasecmp(type,"PACKAGE")) {
-			object_type=4;
-                } else if (!strcasecmp(type,"PACKAGE BODY")) {
-			object_type=5;
-                } else if (!strcasecmp(type,"VIEW")) {
-			object_type=6;
-                } else if (!strcasecmp(type,"SYNONYM")) {
-                        object_type=7;
-		}  
-		memset(soha_text,0,2048);
-		sprintf(soha_text,
-"insert into pct_enc_tab_dep_obj(enc_tab_id,schema_name,object_name,object_type) values(%lld,getnameid('%s'),getnameid('%s'),%d)"
-		,TabInfo.enc_tab_id, owner, name, object_type );
-		DgcSqlStmt*     sql_stmt=Database->getStmt(Session,soha_text,strlen(soha_text));
-		if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-			//DgcExcept*      e=EXCEPTnC;
-			//delete sql_stmt;
-			//RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-			delete EXCEPTnC;
-		}
-        	delete sql_stmt;
+    DgcCliStmt* stmt = Connection->getStmt();
+    if (!stmt) {
+        ATHROWnR(DgcError(SPOS, "getStmt failed."), -1);
+    }
+    if (stmt->execute(sql_text, strlen(sql_text), 10) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    DgcMemRows* rows = stmt->returnRows();
+    rows->rewind();
+    while (rows->next()) {
+        dgt_schar objSql[1024];
+        memset(objSql, 0, 1024);
+        dgt_schar owner[64];
+        dgt_schar name[64];
+        dgt_schar type[32];
+        dgt_sint32 hlevel = 0;
+        memset(owner, 0, 64);
+        memset(name, 0, 64);
+        memset(type, 0, 32);
+        memcpy(owner, (dgt_schar*)rows->getColPtr(1), 64);
+        memcpy(name, (dgt_schar*)rows->getColPtr(2), 64);
+        memcpy(type, (dgt_schar*)rows->getColPtr(3), 32);
+        hlevel = strtol((dgt_schar*)rows->getColPtr(4), 0, 10);
+        if (!strcasecmp(type, "SYNONYM")) {
+            continue;
         }
-	delete stmt;
-        DgcExcept*      e=EXCEPTnC;
-        if (e) {
-                delete e;
+        if (!strcasecmp(type, "PACKAGE BODY")) {
+            sprintf(objSql, "alter %s %s.%s compile body", type, owner, name);
+        } else {
+            sprintf(objSql, "alter %s %s.%s compile", type, owner, name);
         }
-        ObjSqlRows.rewind();
-        ObjTriggerSqlRows.rewind();
-        return 1;
+        if (TabInfo.init_enc_type > 0) {
+            if (!getConnection()) {
+                ATHROWnR(DgcError(SPOS, "getConnection failed."), -1);
+            }
+            if (!strcasecmp(type, "TRIGGER")) {
+                dgt_schar sql_text[1024];
+                memset(sql_text, 0, 1024);
+                sprintf(sql_text,
+                        "select b.src from dba_objects a, sys._dd_src b "
+                        "where a.object_id = b.obj_id "
+                        "  and a.owner = upper('%s') "
+                        "  and a.object_name = upper('%s') "
+                        "  and a.object_type = 'TRIGGER'",
+                        owner, name);
+                DgcCliStmt* stmt = Connection->getStmt();
+                if (!stmt) {
+                    ATHROWnR(DgcError(SPOS, "getStmt failed."), -1);
+                }
+                if (stmt->execute(sql_text, strlen(sql_text), 10) < 0) {
+                    DgcExcept* e = EXCEPTnC;
+                    delete stmt;
+                    RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+                }
+                DgcMemRows* rows = stmt->returnRows();
+                rows->rewind();
+                dgt_schar* ddl_stmt_ptr = 0;
+                while (rows->next() &&
+                       (ddl_stmt_ptr = (dgt_schar*)rows->data())) {
+                    ObjTriggerSqlRows.add();
+                    ObjTriggerSqlRows.next();
+                    memcpy(ObjTriggerSqlRows.data(), ddl_stmt_ptr,
+                           strlen(ddl_stmt_ptr));
+                }
+                delete stmt;
+            }
+        }
+        ObjSqlRows.add();
+        ObjSqlRows.next();
+        memcpy(ObjSqlRows.data(), objSql, 1024);
+        dgt_uint32 object_type = 0;
+        if (!strcasecmp(type, "FUNCTION")) {
+            object_type = 1;
+        } else if (!strcasecmp(type, "PROCEDURE")) {
+            object_type = 2;
+        } else if (!strcasecmp(type, "TRIGGER")) {
+            object_type = 3;
+        } else if (!strcasecmp(type, "PACKAGE")) {
+            object_type = 4;
+        } else if (!strcasecmp(type, "PACKAGE BODY")) {
+            object_type = 5;
+        } else if (!strcasecmp(type, "VIEW")) {
+            object_type = 6;
+        } else if (!strcasecmp(type, "SYNONYM")) {
+            object_type = 7;
+        }
+        memset(soha_text, 0, 2048);
+        sprintf(soha_text,
+                "insert into "
+                "pct_enc_tab_dep_obj(enc_tab_id,schema_name,object_name,object_"
+                "type) values(%lld,getnameid('%s'),getnameid('%s'),%d)",
+                TabInfo.enc_tab_id, owner, name, object_type);
+        DgcSqlStmt* sql_stmt =
+            Database->getStmt(Session, soha_text, strlen(soha_text));
+        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+            // DgcExcept*      e=EXCEPTnC;
+            // delete sql_stmt;
+            // RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+            delete EXCEPTnC;
+        }
+        delete sql_stmt;
+    }
+    delete stmt;
+    DgcExcept* e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    ObjSqlRows.rewind();
+    ObjTriggerSqlRows.rewind();
+    return 1;
 }
 
 typedef struct {
-        dgt_sint64 enc_col_id;
-	dgt_schar  column_name[130];
-	dgt_schar  data_type[33];
-	dgt_uint8  index_type;
-	dgt_schar  domain_index_name[130];
-	dgt_schar  fbi_index_name[130];
-	dgt_schar  normal_index_name[130];
-	dgt_schar  tablespace_name[130];
-	dgt_uint8  normal_idx_flag;
-	dgt_schar  index_col_name[130];
+    dgt_sint64 enc_col_id;
+    dgt_schar column_name[130];
+    dgt_schar data_type[33];
+    dgt_uint8 index_type;
+    dgt_schar domain_index_name[130];
+    dgt_schar fbi_index_name[130];
+    dgt_schar normal_index_name[130];
+    dgt_schar tablespace_name[130];
+    dgt_uint8 normal_idx_flag;
+    dgt_schar index_col_name[130];
 } pc_type_index_row;
 
 typedef struct {
-	dgt_schar  sql_text[512];
-	dgt_schar  normal_sql_text[512];
-	dgt_schar  sql_text2[512];
-	dgt_schar  normal_sql_text2[512];
-	dgt_schar  idx_col_idx1[512];
-	dgt_schar  idx_col_idx2[512];
+    dgt_schar sql_text[512];
+    dgt_schar normal_sql_text[512];
+    dgt_schar sql_text2[512];
+    dgt_schar normal_sql_text2[512];
+    dgt_schar idx_col_idx1[512];
+    dgt_schar idx_col_idx2[512];
 } pc_type_petra_index;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareIdxInfo() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-        memset(sql_text,0,2048);
-	//
-	// Petra Index sql create
-	// 
+dgt_sint32 PccTiberoScriptBuilder::prepareIdxInfo() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    //
+    // Petra Index sql create
+    //
 #if 0
 	dgt_schar idx_sql[512];
 	dgt_schar normal_sql[512];
@@ -610,2040 +626,2464 @@ dgt_sint32 PccTiberoScriptBuilder::prepareIdxInfo() throw(DgcExcept)
 	delete sql_stmt;
 	PetraIdxInfoRows.rewind();
 #endif
-	//
-	// Unique Idx Column settting(non enc column) for double view except rowid 
-	//
-	DgcExcept* e=0;
-	IdxColRows.reset();
-        memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select c.idx_name1 "
-"from "
-"( select a.index_name idx_name1,b.index_name idx_name2 "
-"from    pct_enc_col_index a, "
-        "(select distinct index_name "
-         "from   pct_enc_col_index "
-         "where  status = 1 "
-         "and    enc_tab_id= %lld) (+) b "
-"where  a.index_name = b.index_name "
-"and    a.enc_tab_id = %lld "
-"and    a.uniqueness = 1 ) c "
-"where   c.idx_name2 = 0",TabInfo.enc_tab_id,TabInfo.enc_tab_id);
-        DgcSqlStmt* sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        dgt_sint64*       idxname=0;
-        if ((idxname=(dgt_sint64*)sql_stmt->fetch())) {
-        	memset(sql_text,0,2048);
-		sprintf(sql_text,
-"select c.column_name "
-"from "
-"( "
-"select b.column_name,a.column_position "
-"from pct_enc_col_index a, pct_enc_column b "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.index_name = %lld "
-"and   a.enc_tab_id = %lld "
-"order by a.column_position "
-") c",*idxname,TabInfo.enc_tab_id);
-		DgcSqlStmt* idx_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-		if (idx_stmt == 0 || idx_stmt->execute() < 0) {
-         	       DgcExcept*      e=EXCEPTnC;
-                	delete idx_stmt;
-	                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        	} 
-		dgt_schar* idxcol=0;
-		while ((idxcol=(dgt_schar*)idx_stmt->fetch())) {
-			IdxColRows.add();
-			IdxColRows.next();
-			memcpy(IdxColRows.data(),idxcol,strlen(idxcol));
-		}
-		e=EXCEPTnC;
-		if (e) {
-			delete e;
-		}
-		delete idx_stmt;
-	}
-	e=EXCEPTnC;
-        if (e) {
-                delete e;
-        }
+    //
+    // Unique Idx Column settting(non enc column) for double view except rowid
+    //
+    DgcExcept* e = 0;
+    IdxColRows.reset();
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select c.idx_name1 "
+            "from "
+            "( select a.index_name idx_name1,b.index_name idx_name2 "
+            "from    pct_enc_col_index a, "
+            "(select distinct index_name "
+            "from   pct_enc_col_index "
+            "where  status = 1 "
+            "and    enc_tab_id= %lld) (+) b "
+            "where  a.index_name = b.index_name "
+            "and    a.enc_tab_id = %lld "
+            "and    a.uniqueness = 1 ) c "
+            "where   c.idx_name2 = 0",
+            TabInfo.enc_tab_id, TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-	IdxColRows.rewind();
-        //
-        // Unique Idx Column settting2 (for transaction trigger)
-        //
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    dgt_sint64* idxname = 0;
+    if ((idxname = (dgt_sint64*)sql_stmt->fetch())) {
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select c.column_name "
+                "from "
+                "( "
+                "select b.column_name,a.column_position "
+                "from pct_enc_col_index a, pct_enc_column b "
+                "where a.enc_col_id = b.enc_col_id "
+                "and   a.index_name = %lld "
+                "and   a.enc_tab_id = %lld "
+                "order by a.column_position "
+                ") c",
+                *idxname, TabInfo.enc_tab_id);
+        DgcSqlStmt* idx_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (idx_stmt == 0 || idx_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete idx_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        dgt_schar* idxcol = 0;
+        while ((idxcol = (dgt_schar*)idx_stmt->fetch())) {
+            IdxColRows.add();
+            IdxColRows.next();
+            memcpy(IdxColRows.data(), idxcol, strlen(idxcol));
+        }
+        e = EXCEPTnC;
+        if (e) {
+            delete e;
+        }
+        delete idx_stmt;
+    }
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    delete sql_stmt;
+    IdxColRows.rewind();
+    //
+    // Unique Idx Column settting2 (for transaction trigger)
+    //
 #if 1
-        TranIdxColRows.reset();
-        memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select distinct index_name "
-"from   pct_enc_col_index "
-"where  enc_tab_id = %lld "
-"and    uniqueness = 1 ",TabInfo.enc_tab_id);
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        idxname=0;
-        if ((idxname=(dgt_sint64*)sql_stmt->fetch())) {
-                memset(sql_text,0,2048);
-                sprintf(sql_text,
-"select c.column_name "
-"from "
-"( "
-"select b.column_name column_name, a.column_position "
-"from pct_enc_col_index a, pct_enc_column b "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.index_name = %lld "
-"and   a.enc_tab_id = %lld "
-"order by a.column_position "
-") c", *idxname, TabInfo.enc_tab_id);
-                DgcSqlStmt* idx_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (idx_stmt == 0 || idx_stmt->execute() < 0) {
-                       DgcExcept*      e=EXCEPTnC;
-                        delete idx_stmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                }
-                dgt_schar* idxcol=0;
-                while ((idxcol=(dgt_schar*)idx_stmt->fetch())) {
-                        TranIdxColRows.add();
-                        TranIdxColRows.next();
-                        memcpy(TranIdxColRows.data(),idxcol,strlen(idxcol));
-                }
-                e=EXCEPTnC;
-                if (e) {
-                        delete e;
-                }
-                delete idx_stmt;
-        }
-        e=EXCEPTnC;
-        if (e) {
-                delete e;
-        }
+    TranIdxColRows.reset();
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select distinct index_name "
+            "from   pct_enc_col_index "
+            "where  enc_tab_id = %lld "
+            "and    uniqueness = 1 ",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-	TranIdxColRows.rewind();
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    idxname = 0;
+    if ((idxname = (dgt_sint64*)sql_stmt->fetch())) {
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select c.column_name "
+                "from "
+                "( "
+                "select b.column_name column_name, a.column_position "
+                "from pct_enc_col_index a, pct_enc_column b "
+                "where a.enc_col_id = b.enc_col_id "
+                "and   a.index_name = %lld "
+                "and   a.enc_tab_id = %lld "
+                "order by a.column_position "
+                ") c",
+                *idxname, TabInfo.enc_tab_id);
+        DgcSqlStmt* idx_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (idx_stmt == 0 || idx_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete idx_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        dgt_schar* idxcol = 0;
+        while ((idxcol = (dgt_schar*)idx_stmt->fetch())) {
+            TranIdxColRows.add();
+            TranIdxColRows.next();
+            memcpy(TranIdxColRows.data(), idxcol, strlen(idxcol));
+        }
+        e = EXCEPTnC;
+        if (e) {
+            delete e;
+        }
+        delete idx_stmt;
+    }
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    delete sql_stmt;
+    TranIdxColRows.rewind();
 #endif
-        return 1;
+    return 1;
 }
 
 typedef struct {
-	dgt_sint64 index_name;
-	dgt_sint64 renamed_org_name;
-	dgt_sint64 index_owner;
-	dgt_uint8  uniqueness;
-	dgt_sint64 target_tablespace;
-	dgt_uint16 degree;
+    dgt_sint64 index_name;
+    dgt_sint64 renamed_org_name;
+    dgt_sint64 index_owner;
+    dgt_uint8 uniqueness;
+    dgt_sint64 target_tablespace;
+    dgt_uint16 degree;
 } pc_type_idx2;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareIdx2Info() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-	IdxSqlRows2.reset();
-	IdxSqlRows3.reset();
-	IdxSqlRows4.reset();
-	IdxSqlRows5.reset();
-	IdxSqlRows6.reset();
-	
-        //
-        // getting the index_name in table
-        //
-        memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select distinct index_name,renamed_org_name1,index_owner,uniqueness,target_tablespace_name,degree "
-"from  pct_enc_col_index "
-"where enc_tab_id = %lld "
-"order by uniqueness desc",TabInfo.enc_tab_id);
-        DgcSqlStmt*     idx_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (idx_stmt == 0 || idx_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete idx_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        pc_type_idx2*       idx_tmp=0;
-        while ((idx_tmp=(pc_type_idx2*)idx_stmt->fetch())) {
-	        //
-        	// getting the index creation sql text
-	        //
-		memset(sql_text,0,2048);
-       	        dgt_schar       idx_sql[30000];
-               	dgt_schar       idx_sql2[2048];
-                dgt_schar       idx_sql3[30000];
-       	        memset(idx_sql,0,30000);
-               	memset(idx_sql2,0,2048);
-                memset(idx_sql3,0,30000);
+dgt_sint32 PccTiberoScriptBuilder::prepareIdx2Info() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    IdxSqlRows2.reset();
+    IdxSqlRows3.reset();
+    IdxSqlRows4.reset();
+    IdxSqlRows5.reset();
+    IdxSqlRows6.reset();
 
-                if (idx_tmp->uniqueness == 1) {
-                        sprintf(idx_sql,"CREATE UNIQUE INDEX %s.%s ON %s.%s( ",
-                                        PetraNamePool->getNameString(idx_tmp->index_owner),
-                                        PetraNamePool->getNameString(idx_tmp->renamed_org_name),
-                                        SchemaName, TabInfo.renamed_tab_name);
-                        sprintf(idx_sql3,"CREATE UNIQUE INDEX %s.%s ON %s.%s_%lld( ",
-                                        PetraNamePool->getNameString(idx_tmp->index_owner),
-                                        PetraNamePool->getNameString(idx_tmp->renamed_org_name),
-                                        SchemaName, "petra", TabInfo.enc_tab_id);
-                } else {
-                        sprintf(idx_sql,"CREATE INDEX %s.%s ON %s.%s( ",
-                                        PetraNamePool->getNameString(idx_tmp->index_owner),
-                                        PetraNamePool->getNameString(idx_tmp->renamed_org_name),
-                                        SchemaName, TabInfo.renamed_tab_name);
-                        sprintf(idx_sql3,"CREATE INDEX %s.%s ON %s.%s_%lld( ",
-                                        PetraNamePool->getNameString(idx_tmp->index_owner),
-                                        PetraNamePool->getNameString(idx_tmp->renamed_org_name),
-                                        SchemaName, "petra", TabInfo.enc_tab_id);
-                }
-		// getting the index`s column lists
-		 sprintf(sql_text,
-"select "
-	" a.enc_col_id, "
-	" b.column_name, " 
-	" a.status, "
-	" a.column_position, "
-	" a.column_expression "
-"from pct_enc_col_index a, pct_enc_column b "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.enc_tab_id = %lld "
-"and   a.index_name = %lld "
-"order by column_position",TabInfo.enc_tab_id, idx_tmp->index_name);
-	        DgcSqlStmt*     col_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        	if (col_stmt == 0 || col_stmt->execute() < 0) {
-	                DgcExcept*      e=EXCEPTnC;
-        	        delete col_stmt;
-        	        delete idx_stmt;
-                	RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	        }
-		typedef struct {
-			dgt_sint64	enc_col_id;
-			dgt_schar	column_name[130];
-			dgt_uint8	status;
-			dgt_uint8	col_position;
-			dgt_sint64	col_expression;
-		} col_type;
-        	col_type*       col_tmp=0;
-		while ((col_tmp=(col_type*)col_stmt->fetch())) {
-			strcat(idx_sql,col_tmp->column_name);
-			strcat(idx_sql,",");
-			strcat(idx_sql3,col_tmp->column_name);
-			strcat(idx_sql3,",");
-		}
-		delete col_stmt;
-		idx_sql[strlen(idx_sql)-1]=')';				
-		idx_sql3[strlen(idx_sql3)-1]=')';				
-
-		strcat(idx_sql," TABLESPACE ");
-		strcat(idx_sql,PetraNamePool->getNameString(idx_tmp->target_tablespace));
-		strcat(idx_sql3," TABLESPACE ");
-		strcat(idx_sql3,PetraNamePool->getNameString(idx_tmp->target_tablespace));
-		IdxSqlRows2.add();
-		IdxSqlRows2.next();
-		memcpy(IdxSqlRows2.data(),idx_sql,strlen(idx_sql));
-		IdxSqlRows6.add();
-		IdxSqlRows6.next();
-		memcpy(IdxSqlRows6.data(),idx_sql3,strlen(idx_sql3));
-                sprintf(idx_sql2,"ALTER INDEX %s.%s LOGGING",PetraNamePool->getNameString(idx_tmp->index_owner),
-       	                                                         PetraNamePool->getNameString(idx_tmp->renamed_org_name));
-                IdxSqlRows3.add();
-       	        IdxSqlRows3.next();
-               	memcpy(IdxSqlRows3.data(),idx_sql2,strlen(idx_sql2));
-
-       	        dgt_schar idx_sql4[512];
-               	memset(idx_sql4,0,512);
-                sprintf(idx_sql4,"ALTER INDEX %s.%s rename to %s",PetraNamePool->getNameString(idx_tmp->index_owner),
-       	                                                          PetraNamePool->getNameString(idx_tmp->renamed_org_name),
-               	                                                  PetraNamePool->getNameString(idx_tmp->index_name));
-                IdxSqlRows4.add();
-       	        IdxSqlRows4.next();
-               	memcpy(IdxSqlRows4.data(),idx_sql4,strlen(idx_sql4));
-
-                dgt_schar idx_sql5[512];
-       	        memset(idx_sql5,0,512);
-               	sprintf(idx_sql5,"ALTER INDEX %s.%s rename to %s_org",PetraNamePool->getNameString(idx_tmp->index_owner),
-                                                                  PetraNamePool->getNameString(idx_tmp->index_name),
-       	                                                          PetraNamePool->getNameString(idx_tmp->index_name));
-               	IdxSqlRows5.add();
-                IdxSqlRows5.next();
-       	        memcpy(IdxSqlRows5.data(),idx_sql5,strlen(idx_sql5));
-	}
+    //
+    // getting the index_name in table
+    //
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select distinct "
+            "index_name,renamed_org_name1,index_owner,uniqueness,target_"
+            "tablespace_name,degree "
+            "from  pct_enc_col_index "
+            "where enc_tab_id = %lld "
+            "order by uniqueness desc",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* idx_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (idx_stmt == 0 || idx_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete idx_stmt;
-	DgcExcept* e=EXCEPTnC;
-	if (e) {
-		delete e;
-	}
-	IdxSqlRows2.rewind();
-	IdxSqlRows3.rewind();
-	IdxSqlRows4.rewind();
-	IdxSqlRows5.rewind();
-	IdxSqlRows6.rewind();
-	return 1;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_idx2* idx_tmp = 0;
+    while ((idx_tmp = (pc_type_idx2*)idx_stmt->fetch())) {
+        //
+        // getting the index creation sql text
+        //
+        memset(sql_text, 0, 2048);
+        dgt_schar idx_sql[30000];
+        dgt_schar idx_sql2[2048];
+        dgt_schar idx_sql3[30000];
+        memset(idx_sql, 0, 30000);
+        memset(idx_sql2, 0, 2048);
+        memset(idx_sql3, 0, 30000);
+
+        if (idx_tmp->uniqueness == 1) {
+            sprintf(idx_sql, "CREATE UNIQUE INDEX %s.%s ON %s.%s( ",
+                    PetraNamePool->getNameString(idx_tmp->index_owner),
+                    PetraNamePool->getNameString(idx_tmp->renamed_org_name),
+                    SchemaName, TabInfo.renamed_tab_name);
+            sprintf(idx_sql3, "CREATE UNIQUE INDEX %s.%s ON %s.%s_%lld( ",
+                    PetraNamePool->getNameString(idx_tmp->index_owner),
+                    PetraNamePool->getNameString(idx_tmp->renamed_org_name),
+                    SchemaName, "petra", TabInfo.enc_tab_id);
+        } else {
+            sprintf(idx_sql, "CREATE INDEX %s.%s ON %s.%s( ",
+                    PetraNamePool->getNameString(idx_tmp->index_owner),
+                    PetraNamePool->getNameString(idx_tmp->renamed_org_name),
+                    SchemaName, TabInfo.renamed_tab_name);
+            sprintf(idx_sql3, "CREATE INDEX %s.%s ON %s.%s_%lld( ",
+                    PetraNamePool->getNameString(idx_tmp->index_owner),
+                    PetraNamePool->getNameString(idx_tmp->renamed_org_name),
+                    SchemaName, "petra", TabInfo.enc_tab_id);
+        }
+        // getting the index`s column lists
+        sprintf(sql_text,
+                "select "
+                " a.enc_col_id, "
+                " b.column_name, "
+                " a.status, "
+                " a.column_position, "
+                " a.column_expression "
+                "from pct_enc_col_index a, pct_enc_column b "
+                "where a.enc_col_id = b.enc_col_id "
+                "and   a.enc_tab_id = %lld "
+                "and   a.index_name = %lld "
+                "order by column_position",
+                TabInfo.enc_tab_id, idx_tmp->index_name);
+        DgcSqlStmt* col_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (col_stmt == 0 || col_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete col_stmt;
+            delete idx_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        typedef struct {
+            dgt_sint64 enc_col_id;
+            dgt_schar column_name[130];
+            dgt_uint8 status;
+            dgt_uint8 col_position;
+            dgt_sint64 col_expression;
+        } col_type;
+        col_type* col_tmp = 0;
+        while ((col_tmp = (col_type*)col_stmt->fetch())) {
+            strcat(idx_sql, col_tmp->column_name);
+            strcat(idx_sql, ",");
+            strcat(idx_sql3, col_tmp->column_name);
+            strcat(idx_sql3, ",");
+        }
+        delete col_stmt;
+        idx_sql[strlen(idx_sql) - 1] = ')';
+        idx_sql3[strlen(idx_sql3) - 1] = ')';
+
+        strcat(idx_sql, " TABLESPACE ");
+        strcat(idx_sql,
+               PetraNamePool->getNameString(idx_tmp->target_tablespace));
+        strcat(idx_sql3, " TABLESPACE ");
+        strcat(idx_sql3,
+               PetraNamePool->getNameString(idx_tmp->target_tablespace));
+        IdxSqlRows2.add();
+        IdxSqlRows2.next();
+        memcpy(IdxSqlRows2.data(), idx_sql, strlen(idx_sql));
+        IdxSqlRows6.add();
+        IdxSqlRows6.next();
+        memcpy(IdxSqlRows6.data(), idx_sql3, strlen(idx_sql3));
+        sprintf(idx_sql2, "ALTER INDEX %s.%s LOGGING",
+                PetraNamePool->getNameString(idx_tmp->index_owner),
+                PetraNamePool->getNameString(idx_tmp->renamed_org_name));
+        IdxSqlRows3.add();
+        IdxSqlRows3.next();
+        memcpy(IdxSqlRows3.data(), idx_sql2, strlen(idx_sql2));
+
+        dgt_schar idx_sql4[512];
+        memset(idx_sql4, 0, 512);
+        sprintf(idx_sql4, "ALTER INDEX %s.%s rename to %s",
+                PetraNamePool->getNameString(idx_tmp->index_owner),
+                PetraNamePool->getNameString(idx_tmp->renamed_org_name),
+                PetraNamePool->getNameString(idx_tmp->index_name));
+        IdxSqlRows4.add();
+        IdxSqlRows4.next();
+        memcpy(IdxSqlRows4.data(), idx_sql4, strlen(idx_sql4));
+
+        dgt_schar idx_sql5[512];
+        memset(idx_sql5, 0, 512);
+        sprintf(idx_sql5, "ALTER INDEX %s.%s rename to %s_org",
+                PetraNamePool->getNameString(idx_tmp->index_owner),
+                PetraNamePool->getNameString(idx_tmp->index_name),
+                PetraNamePool->getNameString(idx_tmp->index_name));
+        IdxSqlRows5.add();
+        IdxSqlRows5.next();
+        memcpy(IdxSqlRows5.data(), idx_sql5, strlen(idx_sql5));
+    }
+    delete idx_stmt;
+    DgcExcept* e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    IdxSqlRows2.rewind();
+    IdxSqlRows3.rewind();
+    IdxSqlRows4.rewind();
+    IdxSqlRows5.rewind();
+    IdxSqlRows6.rewind();
+    return 1;
 }
 
-
 typedef struct {
-	dgt_sint64 schema_name;
-	dgt_sint64 table_name;
-	dgt_sint64 renamed_tab_name;
-	dgt_sint64 column_name;
-	dgt_sint64 renamed_col_name;
-	dgt_sint64 constraint_name;
-	dgt_sint64 renamed_constraint_name;
-	dgt_uint8  status;
-	dgt_uint32 position;
-	dgt_uint8  constraint_type;
-	dgt_sint64 ref_pk_owner;
-	dgt_sint64 ref_pk_table;
-	dgt_sint64 ref_pk_column;
-	dgt_sint64 org_renamed_tab_name;
-	dgt_uint8  enc_type;
-	dgt_uint8  keep_org_tab_flag;
+    dgt_sint64 schema_name;
+    dgt_sint64 table_name;
+    dgt_sint64 renamed_tab_name;
+    dgt_sint64 column_name;
+    dgt_sint64 renamed_col_name;
+    dgt_sint64 constraint_name;
+    dgt_sint64 renamed_constraint_name;
+    dgt_uint8 status;
+    dgt_uint32 position;
+    dgt_uint8 constraint_type;
+    dgt_sint64 ref_pk_owner;
+    dgt_sint64 ref_pk_table;
+    dgt_sint64 ref_pk_column;
+    dgt_sint64 org_renamed_tab_name;
+    dgt_uint8 enc_type;
+    dgt_uint8 keep_org_tab_flag;
 } pc_type_pk_info;
 
 typedef struct {
-        dgt_sint64 ref_pk_owner;
-        dgt_sint64 ref_pk_table;
-        dgt_sint64 ref_pk_column;
-        dgt_sint64 ref_pk_renamed_table;
-        dgt_sint64 ref_pk_renamed_column;
-	dgt_uint8  status;
+    dgt_sint64 ref_pk_owner;
+    dgt_sint64 ref_pk_table;
+    dgt_sint64 ref_pk_column;
+    dgt_sint64 ref_pk_renamed_table;
+    dgt_sint64 ref_pk_renamed_column;
+    dgt_uint8 status;
 } pc_type_pk_row;
 
 typedef struct {
-        dgt_schar  table_name[130];
-        dgt_schar  renamed_tab_name[130];
-        dgt_schar  column_name[130];
-        dgt_schar  renamed_col_name[130];
+    dgt_schar table_name[130];
+    dgt_schar renamed_tab_name[130];
+    dgt_schar column_name[130];
+    dgt_schar renamed_col_name[130];
 } pc_type_check_row;
 
 typedef struct {
-        dgt_schar  org1[512];
-        dgt_schar  org2[512];
-        dgt_schar  enc1[512];
-        dgt_schar  enc2[512];
+    dgt_schar org1[512];
+    dgt_schar org2[512];
+    dgt_schar enc1[512];
+    dgt_schar enc2[512];
 } pc_type_check_sql;
 
 typedef struct {
-        dgt_schar       org1[512];
-        dgt_schar       org2[512];
-        dgt_schar       enc1[512];
-        dgt_schar       enc2[512];
-        dgt_schar       org3[512];
-        dgt_schar       org4[512];
+    dgt_schar org1[512];
+    dgt_schar org2[512];
+    dgt_schar enc1[512];
+    dgt_schar enc2[512];
+    dgt_schar org3[512];
+    dgt_schar org4[512];
 } pc_type_pk_fk_sql;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareCtInfo() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-	CheckSqlRows.reset();
-	//
-	// Not Null Encryption Column`s check constraint sql create
-	//
-	sprintf(sql_text,
-"select c.table_name,c.renamed_tab_name,b.column_name,b.renamed_col_name "
-"from pct_enc_col_ct a, pct_enc_column b, pct_enc_table c "
-"where a.enc_col_id = b.enc_col_id "
-"and   b.enc_tab_id = c.enc_tab_id "
-"and   a.enc_tab_id=%lld "
-"and   getname(a.search_condition) like '%%IS NOT NULL%%' "
-"and   a.status = 1",TabInfo.enc_tab_id);
-	DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+dgt_sint32 PccTiberoScriptBuilder::prepareCtInfo() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    CheckSqlRows.reset();
+    //
+    // Not Null Encryption Column`s check constraint sql create
+    //
+    sprintf(sql_text,
+            "select "
+            "c.table_name,c.renamed_tab_name,b.column_name,b.renamed_col_name "
+            "from pct_enc_col_ct a, pct_enc_column b, pct_enc_table c "
+            "where a.enc_col_id = b.enc_col_id "
+            "and   b.enc_tab_id = c.enc_tab_id "
+            "and   a.enc_tab_id=%lld "
+            "and   getname(a.search_condition) like '%%IS NOT NULL%%' "
+            "and   a.status = 1",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_check_row* check_row_tmp;
+    pc_type_check_sql check_sql;
+    memset(&check_sql, 0, sizeof(pc_type_check_sql));
+    while ((check_row_tmp = (pc_type_check_row*)sql_stmt->fetch())) {
+        CheckSqlRows.add();
+        CheckSqlRows.next();
+        if (TabInfo.enc_type == 0) {
+            if (TabInfo.init_enc_type >= 1) {
+                sprintf(check_sql.org1,
+                        "alter table %s.petra_%lld modify %s not null enable "
+                        "novalidate",
+                        SchemaName, TabInfo.enc_tab_id,
+                        check_row_tmp->column_name);
+                sprintf(
+                    check_sql.enc1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.renamed_tab_name,
+                    check_row_tmp->column_name);
+            } else {
+                sprintf(
+                    check_sql.org1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.renamed_tab_name,
+                    check_row_tmp->column_name);
+                sprintf(check_sql.org2,
+                        "alter table %s.%s modify %s null enable novalidate",
+                        SchemaName, TabInfo.renamed_tab_name,
+                        check_row_tmp->column_name);
+                sprintf(
+                    check_sql.enc1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.renamed_tab_name,
+                    check_row_tmp->column_name);
+                sprintf(check_sql.enc2,
+                        "alter table %s.%s modify %s null enable novalidate",
+                        SchemaName, TabInfo.renamed_tab_name,
+                        check_row_tmp->column_name);
+            }
+        } else {
+            if (TabInfo.init_enc_type >= 1) {
+                sprintf(check_sql.org1,
+                        "alter table %s.petra_%lld modify %s not null enable "
+                        "novalidate",
+                        SchemaName, TabInfo.enc_tab_id,
+                        check_row_tmp->column_name);
+                sprintf(
+                    check_sql.enc1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.renamed_tab_name,
+                    check_row_tmp->column_name);
+            } else {
+                sprintf(
+                    check_sql.org1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.table_name, check_row_tmp->column_name);
+                sprintf(check_sql.org2,
+                        "alter table %s.%s modify %s null enable novalidate",
+                        SchemaName, TabInfo.table_name,
+                        check_row_tmp->column_name);
+                sprintf(
+                    check_sql.enc1,
+                    "alter table %s.%s modify %s not null enable novalidate",
+                    SchemaName, TabInfo.table_name,
+                    check_row_tmp->renamed_col_name);
+                sprintf(check_sql.enc2,
+                        "alter table %s.%s modify %s null enable novalidate",
+                        SchemaName, TabInfo.table_name,
+                        check_row_tmp->renamed_col_name);
+            }
         }
-        pc_type_check_row*     check_row_tmp;
-	pc_type_check_sql      check_sql;
-	memset(&check_sql,0,sizeof(pc_type_check_sql));
-        while ((check_row_tmp=(pc_type_check_row*)sql_stmt->fetch())) {
-		CheckSqlRows.add();
-		CheckSqlRows.next();
-		if (TabInfo.enc_type == 0) {
-			if (TabInfo.init_enc_type >= 1) {
-				sprintf(check_sql.org1,"alter table %s.petra_%lld modify %s not null enable novalidate",SchemaName,TabInfo.enc_tab_id,
-                                                                                                        check_row_tmp->column_name);
-                                sprintf(check_sql.enc1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-                                                                                                        check_row_tmp->column_name);
-			} else {
-				sprintf(check_sql.org1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-													check_row_tmp->column_name);
-				sprintf(check_sql.org2,"alter table %s.%s modify %s null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-                        	                                                                        check_row_tmp->column_name);
-				sprintf(check_sql.enc1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-													check_row_tmp->column_name);
-				sprintf(check_sql.enc2,"alter table %s.%s modify %s null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-                        	                                                                        check_row_tmp->column_name);
-			}
-		} else {
-			if (TabInfo.init_enc_type >= 1) {
-				sprintf(check_sql.org1,"alter table %s.petra_%lld modify %s not null enable novalidate",SchemaName,TabInfo.enc_tab_id,
-                                                                                                        check_row_tmp->column_name);
-                                sprintf(check_sql.enc1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.renamed_tab_name,
-                                                                                                        check_row_tmp->column_name);
+        memcpy(CheckSqlRows.data(), &check_sql, sizeof(pc_type_check_sql));
+    }
+    delete sql_stmt;
+    DgcExcept* e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    CheckSqlRows.rewind();
+
+    //
+    // for using trigger (enc_column`s check constraint)
+    //
+    CheckTrgRows.reset();
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select a.search_condition, b.default "
+            "from pct_enc_col_ct a, pct_enc_column b, pct_enc_table c "
+            "where a.enc_col_id = b.enc_col_id "
+            "and   b.enc_tab_id = c.enc_tab_id "
+            "and   a.enc_tab_id = %lld "
+            "and   a.status =1 "
+            "and   getname(a.search_condition) != '' "
+            "and   a.constraint_type =3",
+            TabInfo.enc_tab_id);
+
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    typedef struct {
+        dgt_sint64 search_condition;
+        dgt_sint64 default_val;
+    } type_check;
+    typedef struct {
+        dgt_schar search_condition[4000];
+        dgt_schar default_val[4000];
+    } check_st;
+
+    type_check* tmp_search = 0;
+    check_st st_search;
+    while ((tmp_search = (type_check*)sql_stmt->fetch())) {
+        dgt_sint32 i = 0;
+        memset(&st_search, 0, sizeof(check_st));
+        sprintf(st_search.search_condition, "%s",
+                PetraNamePool->getNameString(tmp_search->search_condition));
+        sprintf(st_search.default_val, "%s",
+                PetraNamePool->getNameString(tmp_search->default_val));
+        while (st_search.search_condition[i]) {
+            if (st_search.search_condition[i] == '"')
+                strcpy(st_search.search_condition + i,
+                       st_search.search_condition + i + 1);
+            i++;
+        }
+        CheckTrgRows.add();
+        CheckTrgRows.next();
+        memcpy(CheckTrgRows.data(), &st_search, sizeof(check_st));
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    CheckTrgRows.rewind();
+    //
+    // if IsPkFk =1 then pk,fk sql create
+    //
+    sprintf(sql_text,
+            "select working_set_id "
+            "from pct_working_set where enc_tab_id=%lld",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    dgt_sint64* working_set_id_tmp;
+    dgt_sint64 working_set_id = 0;
+    while ((working_set_id_tmp = (dgt_sint64*)sql_stmt->fetch())) {
+        memcpy(&working_set_id, working_set_id_tmp, sizeof(dgt_sint64));
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    pc_type_pk_fk_sql pkfkSql;
+    memset(&pkfkSql, 0, sizeof(pc_type_pk_fk_sql));
+    FkSqlRows.reset();
+    PkSqlRows.reset();
+
+    if (IsPkFk == 1) {
+        //
+        // pk sql create
+        //
+        sprintf(sql_text,
+                "select distinct working_set_id,enc_tab_id "
+                "from pct_working_set where working_set_id=%lld",
+                working_set_id);
+        sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete sql_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        typedef struct pc_type_working_set {
+            dgt_sint64 working_set_id;
+            dgt_sint64 enc_tab_id;
+        } pc_type_working_set;
+        pc_type_working_set* row_ptr;
+        while ((row_ptr = (pc_type_working_set*)sql_stmt->fetch())) {
+            memset(&pkfkSql, 0, sizeof(pc_type_pk_fk_sql));
+            sprintf(sql_text,
+                    "select c.schema_name, c.table_name, c.renamed_tab_name, "
+                    "b.column_name, b.renamed_col_name, a.constraint_name, "
+                    "a.renamed_constraint_name, "
+                    "a.status, a.position, a.constraint_type, a.ref_pk_owner, "
+                    "a.ref_pk_table, a.ref_pk_column, c.org_renamed_tab_name, "
+                    "d.enc_type, d.keep_org_tab_flag  "
+                    "from ceea_enc_col_ct a, ceea_enc_column b, ceea_enc_table "
+                    "c, pct_enc_table d "
+                    "where a.enc_col_id = b.enc_col_id "
+                    "and   a.enc_tab_id = c.enc_tab_id "
+                    "and   a.enc_tab_id = d.enc_tab_id "
+                    "and   a.enc_tab_id=%lld "
+                    "and   a.constraint_type=1 "
+                    "order by a.position",
+                    row_ptr->enc_tab_id);
+
+            DgcSqlStmt* pk_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (pk_stmt == 0 || pk_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
+                delete pk_stmt;
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            pc_type_pk_info* pk_row = 0;
+            dgt_sint32 seq = 0;
+            dgt_sint32 is_fetch = 0;
+
+            dgt_sint32 ispkfk_tab = 0;
+            if (row_ptr->enc_tab_id == TabInfo.enc_tab_id) ispkfk_tab = 1;
+            while ((pk_row = (pc_type_pk_info*)pk_stmt->fetch())) {
+                // pc_type_pk_row refpk;
+                seq++;
+                is_fetch = 1;
+                if (seq == 1) {
+                    if (pk_row->enc_type == 0) {
+                        sprintf(
+                            pkfkSql.enc1,
+                            "alter table %s.%s add constraint %s primary key(",
+                            PetraNamePool->getNameString(pk_row->schema_name),
+                            PetraNamePool->getNameString(
+                                pk_row->renamed_tab_name),
+                            PetraNamePool->getNameString(
+                                pk_row->constraint_name));
+                    } else {
+                        sprintf(
+                            pkfkSql.enc1,
+                            "alter table %s.%s add constraint %s primary key(",
+                            PetraNamePool->getNameString(pk_row->schema_name),
+                            PetraNamePool->getNameString(pk_row->table_name),
+                            PetraNamePool->getNameString(
+                                pk_row->constraint_name));
+                    }
+                    sprintf(
+                        pkfkSql.org3,
+                        "alter table %s.%s add constraint %s primary key(",
+                        PetraNamePool->getNameString(pk_row->schema_name),
+                        PetraNamePool->getNameString(pk_row->table_name),
+                        PetraNamePool->getNameString(pk_row->constraint_name));
+                    if (pk_row->keep_org_tab_flag) {
+                        sprintf(
+                            pkfkSql.enc2,
+                            "alter table %s.%s rename constraint %s to %s",
+                            PetraNamePool->getNameString(pk_row->schema_name),
+                            PetraNamePool->getNameString(
+                                pk_row->org_renamed_tab_name),
+                            PetraNamePool->getNameString(
+                                pk_row->constraint_name),
+                            PetraNamePool->getNameString(
+                                pk_row->renamed_constraint_name));
+                    }
+                }
+                strcat(pkfkSql.org3,
+                       PetraNamePool->getNameString(pk_row->column_name));
+                strcat(pkfkSql.org3, ",");
+                if (pk_row->status == 1) {
+                    strcat(pkfkSql.enc1,
+                           PetraNamePool->getNameString(pk_row->column_name));
+                } else {
+                    strcat(pkfkSql.enc1,
+                           PetraNamePool->getNameString(pk_row->column_name));
+                }
+                strcat(pkfkSql.enc1, ",");
+            }
+            if (is_fetch) {
+                pkfkSql.enc1[strlen(pkfkSql.enc1) - 1] = 0;
+                pkfkSql.org3[strlen(pkfkSql.org3) - 1] = 0;
+                strcat(pkfkSql.enc1, ") enable novalidate");
+                strcat(pkfkSql.org3, ") enable novalidate");
+                PkSqlRows.add();
+                PkSqlRows.next();
+                memcpy(PkSqlRows.data(), &pkfkSql, sizeof(pc_type_pk_fk_sql));
+            }
+            memset(&pkfkSql, 0, sizeof(pc_type_pk_fk_sql));
+            sprintf(sql_text,
+                    "select distinct constraint_name "
+                    "from ceea_enc_col_ct "
+                    "where enc_tab_id = %lld "
+                    "and   constraint_type=2 "
+                    //"and   status =1",row_ptr->enc_tab_id);
+                    ,
+                    row_ptr->enc_tab_id);
+            DgcSqlStmt* fk_sql_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (fk_sql_stmt == 0 || fk_sql_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
+                delete fk_sql_stmt;
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            dgt_sint64* constraint_name_tmp = 0;
+            dgt_sint64 constraint_name = 0;
+            while ((constraint_name_tmp = (dgt_sint64*)fk_sql_stmt->fetch())) {
+                memcpy(&constraint_name, constraint_name_tmp,
+                       sizeof(dgt_sint64));
+                sprintf(
+                    sql_text,
+                    "select c.schema_name, c.table_name, c.renamed_tab_name, "
+                    "b.column_name, b.renamed_col_name, a.constraint_name, "
+                    "a.renamed_constraint_name, a.status, a.position, "
+                    "a.constraint_type, "
+                    "a.ref_pk_owner, a.ref_pk_table, a.ref_pk_column, "
+                    "c.org_renamed_tab_name, d.enc_type, d.keep_org_tab_flag "
+                    "from ceea_enc_col_ct a, ceea_enc_column b, ceea_enc_table "
+                    "c, pct_enc_table d "
+                    "where a.enc_col_id = b.enc_col_id "
+                    "and   a.enc_tab_id = c.enc_tab_id "
+                    "and   a.enc_tab_id = d.enc_tab_id "
+                    "and   a.enc_tab_id=%lld "
+                    "and   a.constraint_name=%lld "
+                    "order by a.position",
+                    row_ptr->enc_tab_id, constraint_name);
+
+                DgcSqlStmt* fk_stmt =
+                    Database->getStmt(Session, sql_text, strlen(sql_text));
+                if (fk_stmt == 0 || fk_stmt->execute() < 0) {
+                    DgcExcept* e = EXCEPTnC;
+                    delete fk_stmt;
+                    RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+                }
+                dgt_sint32 seq = 0;
+                pc_type_pk_info* fk_row = 0;
+                DgcMemRows pkrows(6);
+                pkrows.addAttr(DGC_SCHR, 130, "OWNER");
+                pkrows.addAttr(DGC_SCHR, 130, "TABLE");
+                pkrows.addAttr(DGC_SCHR, 130, "COLUMNE");
+                pkrows.addAttr(DGC_SCHR, 130, "rename_table");
+                pkrows.addAttr(DGC_SCHR, 130, "rename_column");
+                pkrows.addAttr(DGC_UB1, 0, "status");
+                pkrows.reset();
+                typedef struct {
+                    dgt_schar owner[130];
+                    dgt_schar table[130];
+                    dgt_schar column[130];
+                    dgt_schar renamed_table[130];
+                    dgt_schar renamed_column[130];
+                    dgt_uint8 status;
+                } pk_tmp;
+                pk_tmp pktmp;
+                memset(&pktmp, 0, sizeof(pk_tmp));
+                while ((fk_row = (pc_type_pk_info*)fk_stmt->fetch())) {
+                    seq++;
+                    if (seq == 1) {
+                        if (fk_row->enc_type == 0) {
+                            sprintf(pkfkSql.enc1,
+                                    "alter table %s.%s add constraint %s "
+                                    "foreign key(",
+                                    PetraNamePool->getNameString(
+                                        fk_row->schema_name),
+                                    PetraNamePool->getNameString(
+                                        fk_row->renamed_tab_name),
+                                    PetraNamePool->getNameString(
+                                        fk_row->constraint_name));
                         } else {
-				sprintf(check_sql.org1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.table_name,
-													check_row_tmp->column_name);
-				sprintf(check_sql.org2,"alter table %s.%s modify %s null enable novalidate",SchemaName,TabInfo.table_name,
-                        	                                                                        check_row_tmp->column_name);
-				sprintf(check_sql.enc1,"alter table %s.%s modify %s not null enable novalidate",SchemaName,TabInfo.table_name,
-													check_row_tmp->renamed_col_name);
-				sprintf(check_sql.enc2,"alter table %s.%s modify %s null enable novalidate",SchemaName,TabInfo.table_name,
-                                                                                                check_row_tmp->renamed_col_name);
-			}
-		}
-		memcpy(CheckSqlRows.data(),&check_sql,sizeof(pc_type_check_sql));
-        }
-        delete sql_stmt;
-        DgcExcept*      e=EXCEPTnC;
-        if (e) {
-		delete e;
-	}
-	CheckSqlRows.rewind();
-
-	//
-	// for using trigger (enc_column`s check constraint)
-	//
-	CheckTrgRows.reset();
-	memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select a.search_condition, b.default "
-"from pct_enc_col_ct a, pct_enc_column b, pct_enc_table c "
-"where a.enc_col_id = b.enc_col_id "
-"and   b.enc_tab_id = c.enc_tab_id "
-"and   a.enc_tab_id = %lld "
-"and   a.status =1 "
-"and   getname(a.search_condition) != '' "
-"and   a.constraint_type =3",TabInfo.enc_tab_id);
-
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        typedef struct {
-                dgt_sint64       search_condition;
-                dgt_sint64       default_val;
-        } type_check;
-	typedef struct {
-                dgt_schar       search_condition[4000];
-                dgt_schar       default_val[4000];
-        } check_st;
-	
-        type_check*    tmp_search=0;
-        check_st       st_search;
-        while ((tmp_search=(type_check*)sql_stmt->fetch())) {
-		dgt_sint32 i = 0;
-		memset(&st_search,0,sizeof(check_st));
-		sprintf(st_search.search_condition,"%s",PetraNamePool->getNameString(tmp_search->search_condition));
-		sprintf(st_search.default_val,"%s",PetraNamePool->getNameString(tmp_search->default_val));
-		while (st_search.search_condition[i]) {
-			if( st_search.search_condition[i] == '"' )
-			strcpy( st_search.search_condition+i, st_search.search_condition+i+1 );
-			i++;
-		}
-                CheckTrgRows.add();
-                CheckTrgRows.next();
-                memcpy(CheckTrgRows.data(),&st_search,sizeof(check_st));
-        }
-        delete sql_stmt;
-        e=EXCEPTnC;
-        if (e) {
+                            sprintf(pkfkSql.enc1,
+                                    "alter table %s.%s add constraint %s "
+                                    "foreign key(",
+                                    PetraNamePool->getNameString(
+                                        fk_row->schema_name),
+                                    PetraNamePool->getNameString(
+                                        fk_row->table_name),
+                                    PetraNamePool->getNameString(
+                                        fk_row->constraint_name));
+                        }
+                        sprintf(
+                            pkfkSql.org3,
+                            "alter table %s.%s add constraint %s foreign key(",
+                            PetraNamePool->getNameString(fk_row->schema_name),
+                            PetraNamePool->getNameString(fk_row->table_name),
+                            PetraNamePool->getNameString(
+                                fk_row->constraint_name));
+                        if (fk_row->keep_org_tab_flag) {
+                            sprintf(
+                                pkfkSql.enc2,
+                                "alter table %s.%s rename constraint %s to %s",
+                                PetraNamePool->getNameString(
+                                    fk_row->schema_name),
+                                PetraNamePool->getNameString(
+                                    fk_row->org_renamed_tab_name),
+                                PetraNamePool->getNameString(
+                                    fk_row->constraint_name),
+                                PetraNamePool->getNameString(
+                                    fk_row->renamed_constraint_name));
+                        }
+                    }
+                    strcat(pkfkSql.org3,
+                           PetraNamePool->getNameString(fk_row->column_name));
+                    strcat(pkfkSql.org3, ",");
+                    if (fk_row->status == 1) {
+                        strcat(pkfkSql.enc1, PetraNamePool->getNameString(
+                                                 fk_row->column_name));
+                    } else {
+                        strcat(pkfkSql.enc1, PetraNamePool->getNameString(
+                                                 fk_row->column_name));
+                    }
+                    strcat(pkfkSql.enc1, ",");
+                    pkrows.add();
+                    pkrows.next();
+                    sprintf(pktmp.owner,
+                            PetraNamePool->getNameString(fk_row->ref_pk_owner));
+                    sprintf(pktmp.table, "%s",
+                            PetraNamePool->getNameString(fk_row->ref_pk_table));
+                    sprintf(
+                        pktmp.column, "%s",
+                        PetraNamePool->getNameString(fk_row->ref_pk_column));
+                    if (TabInfo.enc_type == 0) {
+                        sprintf(
+                            pktmp.renamed_table, "%s$$",
+                            PetraNamePool->getNameString(fk_row->ref_pk_table));
+                    } else {
+                        sprintf(
+                            pktmp.renamed_table, "%s",
+                            PetraNamePool->getNameString(fk_row->ref_pk_table));
+                    }
+                    sprintf(
+                        pktmp.renamed_column, "%s$$",
+                        PetraNamePool->getNameString(fk_row->ref_pk_column));
+                    dgt_schar stext[2048];
+                    sprintf(stext,
+                            "select count() from ceea_enc_column "
+                            "where db_id=%lld "
+                            "and schema_name=%lld "
+                            "and table_name=%lld "
+                            "and status = 1 ",
+                            Dbid, fk_row->ref_pk_owner, fk_row->ref_pk_table);
+                    DgcSqlStmt* s_stmt =
+                        Database->getStmt(Session, stext, strlen(stext));
+                    if (s_stmt == 0 || s_stmt->execute() < 0) {
+                        DgcExcept* e = EXCEPTnC;
+                        delete s_stmt;
+                        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+                    }
+                    dgt_sint64* cnt_tmp;
+                    if ((cnt_tmp = (dgt_sint64*)s_stmt->fetch())) {
+                        if (*cnt_tmp > 0) pktmp.status = 1;
+                    }
+                    DgcExcept* e = EXCEPTnC;
+                    delete s_stmt;
+                    memcpy(pkrows.data(), &pktmp, sizeof(pktmp));
+                }
+                delete fk_stmt;
+                pkrows.rewind();
+                pkfkSql.enc1[strlen(pkfkSql.enc1) - 1] = 0;
+                pkfkSql.org3[strlen(pkfkSql.org3) - 1] = 0;
+                strcat(pkfkSql.enc1, ") references ");
+                strcat(pkfkSql.org3, ") references ");
+                pk_tmp* pk_ptr = 0;
+                seq = 0;
+                while (pkrows.next()) {
+                    seq++;
+                    pk_ptr = (pk_tmp*)pkrows.data();
+                    if (seq == 1) {
+                        dgt_schar tmpbuf[128];
+                        memset(tmpbuf, 0, 128);
+                        sprintf(tmpbuf, "%s.%s(%s,", pk_ptr->owner,
+                                pk_ptr->table, pk_ptr->column);
+                        strcat(pkfkSql.org3, tmpbuf);
+                        memset(tmpbuf, 0, 128);
+                        if (pk_ptr->status == 1) {
+                            sprintf(tmpbuf, "%s.%s(%s,", pk_ptr->owner,
+                                    pk_ptr->renamed_table, pk_ptr->column);
+                        } else {
+                            sprintf(tmpbuf, "%s.%s(%s,", pk_ptr->owner,
+                                    pk_ptr->renamed_table, pk_ptr->column);
+                        }
+                        strcat(pkfkSql.enc1, tmpbuf);
+                    } else {
+                        strcat(pkfkSql.org3, pk_ptr->column);
+                        strcat(pkfkSql.org3, ",");
+                        if (pk_ptr->status == 1) {
+                            strcat(pkfkSql.enc1, pk_ptr->column);
+                            strcat(pkfkSql.enc1, ",");
+                        } else {
+                            strcat(pkfkSql.enc1, pk_ptr->column);
+                            strcat(pkfkSql.enc1, ",");
+                        }
+                    }
+                }
+                pkfkSql.org3[strlen(pkfkSql.org3) - 1] = 0;
+                pkfkSql.enc1[strlen(pkfkSql.enc1) - 1] = 0;
+                strcat(pkfkSql.org3, ") enable novalidate");
+                strcat(pkfkSql.enc1, ") enable novalidate");
+                FkSqlRows.add();
+                FkSqlRows.next();
+                memcpy(FkSqlRows.data(), &pkfkSql, sizeof(pc_type_pk_fk_sql));
+            }
+            delete fk_sql_stmt;
+            e = EXCEPTnC;
+            if (e) {
                 delete e;
-        }
-        CheckTrgRows.rewind();
-        //
-        // if IsPkFk =1 then pk,fk sql create
-        //
-        sprintf(sql_text,
-"select working_set_id "
-"from pct_working_set where enc_tab_id=%lld",TabInfo.enc_tab_id);
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        dgt_sint64*     working_set_id_tmp;
-        dgt_sint64      working_set_id=0;
-        while ((working_set_id_tmp=(dgt_sint64*)sql_stmt->fetch())) {
-                memcpy(&working_set_id,working_set_id_tmp,sizeof(dgt_sint64));
+            }
         }
         delete sql_stmt;
-        e=EXCEPTnC;
+        DgcExcept* e = EXCEPTnC;
         if (e) {
-                delete e;
+            delete e;
         }
-        pc_type_pk_fk_sql pkfkSql;
-        memset(&pkfkSql,0,sizeof(pc_type_pk_fk_sql));
-        FkSqlRows.reset();
-        PkSqlRows.reset();
+    }
 
-        if (IsPkFk == 1) {
-                //
-                // pk sql create
-                //
-                sprintf(sql_text,
-"select distinct working_set_id,enc_tab_id "
-"from pct_working_set where working_set_id=%lld",working_set_id);
-                sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete sql_stmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                }
-                typedef struct pc_type_working_set {
-                        dgt_sint64      working_set_id;
-                        dgt_sint64      enc_tab_id;
-                } pc_type_working_set;
-                pc_type_working_set*       row_ptr;
-                while ((row_ptr=(pc_type_working_set*)sql_stmt->fetch())) {
-                        memset(&pkfkSql,0,sizeof(pc_type_pk_fk_sql));
-                        sprintf(sql_text,
-"select c.schema_name, c.table_name, c.renamed_tab_name, b.column_name, b.renamed_col_name, a.constraint_name, a.renamed_constraint_name, "
-"a.status, a.position, a.constraint_type, a.ref_pk_owner, a.ref_pk_table, a.ref_pk_column, c.org_renamed_tab_name, d.enc_type, d.keep_org_tab_flag  "
-"from ceea_enc_col_ct a, ceea_enc_column b, ceea_enc_table c, pct_enc_table d "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.enc_tab_id = c.enc_tab_id "
-"and   a.enc_tab_id = d.enc_tab_id "
-"and   a.enc_tab_id=%lld "
-"and   a.constraint_type=1 "
-"order by a.position",row_ptr->enc_tab_id);
-
-                        DgcSqlStmt* pk_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                        if (pk_stmt == 0 || pk_stmt->execute() < 0) {
-                                DgcExcept*      e=EXCEPTnC;
-                                delete pk_stmt;
-                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                        }
-                        pc_type_pk_info* pk_row=0;
-                        dgt_sint32 seq=0;
-                        dgt_sint32 is_fetch=0;
-
-			dgt_sint32 ispkfk_tab =0;
-			if (row_ptr->enc_tab_id == TabInfo.enc_tab_id) ispkfk_tab =1;
-                        while ((pk_row=(pc_type_pk_info*)pk_stmt->fetch())) {
-                                //pc_type_pk_row refpk;
-                                seq++;
-                                is_fetch=1;
-                                if (seq == 1) {
-					if (pk_row->enc_type == 0) {
-	                                        sprintf(pkfkSql.enc1,"alter table %s.%s add constraint %s primary key("
-        	                                                ,PetraNamePool->getNameString(pk_row->schema_name)
-                	                                        ,PetraNamePool->getNameString(pk_row->renamed_tab_name)
-                        	                                ,PetraNamePool->getNameString(pk_row->constraint_name));
-					} else {
-	                                        sprintf(pkfkSql.enc1,"alter table %s.%s add constraint %s primary key("
-        	                                                ,PetraNamePool->getNameString(pk_row->schema_name)
-                	                                        ,PetraNamePool->getNameString(pk_row->table_name)
-                        	                                ,PetraNamePool->getNameString(pk_row->constraint_name));
-					}
-                                        sprintf(pkfkSql.org3,"alter table %s.%s add constraint %s primary key("
-                                                        ,PetraNamePool->getNameString(pk_row->schema_name)
-                                                        ,PetraNamePool->getNameString(pk_row->table_name)
-                                                        ,PetraNamePool->getNameString(pk_row->constraint_name));
-                                        if (pk_row->keep_org_tab_flag) {
-                                        	sprintf(pkfkSql.enc2,"alter table %s.%s rename constraint %s to %s"
-                                                			,PetraNamePool->getNameString(pk_row->schema_name)
-                                                                        ,PetraNamePool->getNameString(pk_row->org_renamed_tab_name)
-                                                                        ,PetraNamePool->getNameString(pk_row->constraint_name)
-                                                                        ,PetraNamePool->getNameString(pk_row->renamed_constraint_name));
-                                        }
-                                }
-                                strcat(pkfkSql.org3,PetraNamePool->getNameString(pk_row->column_name));
-                                strcat(pkfkSql.org3,",");
-                                if (pk_row->status == 1) {
-                                        strcat(pkfkSql.enc1,PetraNamePool->getNameString(pk_row->column_name));
-                                } else {
-                                        strcat(pkfkSql.enc1,PetraNamePool->getNameString(pk_row->column_name));
-                                }
-                                strcat(pkfkSql.enc1,",");
-                        }
-                        if (is_fetch) {
-                                pkfkSql.enc1[strlen(pkfkSql.enc1)-1]=0;
-                                pkfkSql.org3[strlen(pkfkSql.org3)-1]=0;
-                                strcat(pkfkSql.enc1,") enable novalidate");
-                                strcat(pkfkSql.org3,") enable novalidate");
-                                PkSqlRows.add();
-                                PkSqlRows.next();
-                                memcpy(PkSqlRows.data(),&pkfkSql,sizeof(pc_type_pk_fk_sql));
-                        }
-                        memset(&pkfkSql,0,sizeof(pc_type_pk_fk_sql));
-                        sprintf(sql_text,
-"select distinct constraint_name "
-"from ceea_enc_col_ct "
-"where enc_tab_id = %lld "
-"and   constraint_type=2 "
-//"and   status =1",row_ptr->enc_tab_id);
-,row_ptr->enc_tab_id);
-                        DgcSqlStmt* fk_sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                        if (fk_sql_stmt == 0 || fk_sql_stmt->execute() < 0) {
-                                DgcExcept*      e=EXCEPTnC;
-                                delete fk_sql_stmt;
-                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                        }
-                        dgt_sint64* constraint_name_tmp=0;
-                        dgt_sint64  constraint_name=0;
-                        while ((constraint_name_tmp=(dgt_sint64*)fk_sql_stmt->fetch())) {
-                                memcpy(&constraint_name,constraint_name_tmp,sizeof(dgt_sint64));
-                                sprintf(sql_text,
-"select c.schema_name, c.table_name, c.renamed_tab_name, b.column_name, b.renamed_col_name, a.constraint_name, "
-"a.renamed_constraint_name, a.status, a.position, a.constraint_type, "
-"a.ref_pk_owner, a.ref_pk_table, a.ref_pk_column, c.org_renamed_tab_name, d.enc_type, d.keep_org_tab_flag "
-"from ceea_enc_col_ct a, ceea_enc_column b, ceea_enc_table c, pct_enc_table d "
-"where a.enc_col_id = b.enc_col_id "
-"and   a.enc_tab_id = c.enc_tab_id "
-"and   a.enc_tab_id = d.enc_tab_id "
-"and   a.enc_tab_id=%lld "
-"and   a.constraint_name=%lld "
-"order by a.position",row_ptr->enc_tab_id, constraint_name);
-
-                                DgcSqlStmt* fk_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                                if (fk_stmt == 0 || fk_stmt->execute() < 0) {
-                                        DgcExcept*      e=EXCEPTnC;
-                                        delete fk_stmt;
-                                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                                }
-                                dgt_sint32 seq=0;
-                                pc_type_pk_info* fk_row=0;
-                                DgcMemRows      pkrows(6);
-                                pkrows.addAttr(DGC_SCHR,130,"OWNER");
-                                pkrows.addAttr(DGC_SCHR,130,"TABLE");
-                                pkrows.addAttr(DGC_SCHR,130,"COLUMNE");
-                                pkrows.addAttr(DGC_SCHR,130,"rename_table");
-                                pkrows.addAttr(DGC_SCHR,130,"rename_column");
-                                pkrows.addAttr(DGC_UB1,0,"status");
-                                pkrows.reset();
-                                typedef struct {
-                                        dgt_schar       owner[130];
-                                        dgt_schar       table[130];
-                                        dgt_schar       column[130];
-                                        dgt_schar       renamed_table[130];
-                                        dgt_schar       renamed_column[130];
-                                        dgt_uint8       status;
-                                } pk_tmp;
-                                pk_tmp pktmp;
-                                memset(&pktmp,0,sizeof(pk_tmp));
-                                while ((fk_row=(pc_type_pk_info*)fk_stmt->fetch())) {
-                                        seq++;
-                                        if (seq == 1) {
-						if (fk_row->enc_type == 0) {
-	                                                sprintf(pkfkSql.enc1,"alter table %s.%s add constraint %s foreign key("
-        	                                                        ,PetraNamePool->getNameString(fk_row->schema_name)
-                	                                                ,PetraNamePool->getNameString(fk_row->renamed_tab_name)
-                        	                                        ,PetraNamePool->getNameString(fk_row->constraint_name));
-						} else {
-	                                                sprintf(pkfkSql.enc1,"alter table %s.%s add constraint %s foreign key("
-        	                                                        ,PetraNamePool->getNameString(fk_row->schema_name)
-                	                                                ,PetraNamePool->getNameString(fk_row->table_name)
-                        	                                        ,PetraNamePool->getNameString(fk_row->constraint_name));
-						}
-                                		sprintf(pkfkSql.org3,"alter table %s.%s add constraint %s foreign key("
-       	                                                        ,PetraNamePool->getNameString(fk_row->schema_name)
-               	                                                ,PetraNamePool->getNameString(fk_row->table_name)
-                       	                                        ,PetraNamePool->getNameString(fk_row->constraint_name));
-	                                        if (fk_row->keep_org_tab_flag) {
-        	                                	sprintf(pkfkSql.enc2,"alter table %s.%s rename constraint %s to %s"
-                	                                			,PetraNamePool->getNameString(fk_row->schema_name)
-                        	                                                ,PetraNamePool->getNameString(fk_row->org_renamed_tab_name)
-                                	                                        ,PetraNamePool->getNameString(fk_row->constraint_name)
-                                        	                                ,PetraNamePool->getNameString(fk_row->renamed_constraint_name));
-        	                                }
-                                        }
-                                        strcat(pkfkSql.org3,PetraNamePool->getNameString(fk_row->column_name));
-                                        strcat(pkfkSql.org3,",");
-                                        if (fk_row->status == 1) {
-                                                strcat(pkfkSql.enc1,PetraNamePool->getNameString(fk_row->column_name));
-                                        } else {
-                                                strcat(pkfkSql.enc1,PetraNamePool->getNameString(fk_row->column_name));
-                                        }
-                                        strcat(pkfkSql.enc1,",");
-                                        pkrows.add();
-                                        pkrows.next();
-                                        sprintf(pktmp.owner,PetraNamePool->getNameString(fk_row->ref_pk_owner));
-                                        sprintf(pktmp.table,"%s",PetraNamePool->getNameString(fk_row->ref_pk_table));
-                                        sprintf(pktmp.column,"%s",PetraNamePool->getNameString(fk_row->ref_pk_column));
-					if (TabInfo.enc_type == 0) {
-	                                        sprintf(pktmp.renamed_table,"%s$$",PetraNamePool->getNameString(fk_row->ref_pk_table));
-					} else {
-	                                        sprintf(pktmp.renamed_table,"%s",PetraNamePool->getNameString(fk_row->ref_pk_table));
-					}
-       	                                sprintf(pktmp.renamed_column,"%s$$",PetraNamePool->getNameString(fk_row->ref_pk_column));
-					dgt_schar       stext[2048];
-                                        sprintf(stext,
-"select count() from ceea_enc_column "
-"where db_id=%lld "
-"and schema_name=%lld "
-"and table_name=%lld "
-"and status = 1 ",Dbid,fk_row->ref_pk_owner,fk_row->ref_pk_table);
-                                        DgcSqlStmt*     s_stmt=Database->getStmt(Session,stext,strlen(stext));
-                                        if (s_stmt == 0 || s_stmt->execute() < 0) {
-                                                DgcExcept*      e=EXCEPTnC;
-                                                delete s_stmt;
-                                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                                        }
-                                        dgt_sint64*       cnt_tmp;
-                                        if ((cnt_tmp=(dgt_sint64*)s_stmt->fetch())) {
-                                                if (*cnt_tmp > 0) pktmp.status=1;
-                                        }
-                                        DgcExcept*      e=EXCEPTnC;
-                                        delete s_stmt;
-                                        memcpy(pkrows.data(),&pktmp,sizeof(pktmp));
-                                }
-                                delete fk_stmt;
-                                pkrows.rewind();
-                                pkfkSql.enc1[strlen(pkfkSql.enc1)-1]=0;
-                                pkfkSql.org3[strlen(pkfkSql.org3)-1]=0;
-                                strcat(pkfkSql.enc1,") references ");
-                                strcat(pkfkSql.org3,") references ");
-                                pk_tmp* pk_ptr=0;
-                                seq=0;
-                                while (pkrows.next()) {
-                                        seq++;
-                                        pk_ptr=(pk_tmp*)pkrows.data();
-                                        if (seq == 1) {
-                                                dgt_schar tmpbuf[128];
-                                                memset(tmpbuf,0,128);
-                                                sprintf(tmpbuf,"%s.%s(%s,",pk_ptr->owner,
-                                                                           pk_ptr->table,
-                                                                           pk_ptr->column);
-                                                strcat(pkfkSql.org3,tmpbuf);
-                                                memset(tmpbuf,0,128);
-                                                if (pk_ptr->status == 1) {
-                                                        sprintf(tmpbuf,"%s.%s(%s,",pk_ptr->owner,
-                                                                                   pk_ptr->renamed_table,
-                                                                                   pk_ptr->column);
-                                                } else {
-                                                        sprintf(tmpbuf,"%s.%s(%s,",pk_ptr->owner,
-                                                                                   pk_ptr->renamed_table,
-                                                                                   pk_ptr->column);
-                                                }
-                                                strcat(pkfkSql.enc1,tmpbuf);
-                                        } else {
-                                                strcat(pkfkSql.org3,pk_ptr->column);
-                                                strcat(pkfkSql.org3,",");
-                                                if (pk_ptr->status == 1) {
-                                                        strcat(pkfkSql.enc1,pk_ptr->column);
-                                                        strcat(pkfkSql.enc1,",");
-                                                } else {
-                                                        strcat(pkfkSql.enc1,pk_ptr->column);
-                                                        strcat(pkfkSql.enc1,",");
-                                                }
-                                        }
-                                }
-                                pkfkSql.org3[strlen(pkfkSql.org3)-1]=0;
-                                pkfkSql.enc1[strlen(pkfkSql.enc1)-1]=0;
-                                strcat(pkfkSql.org3,") enable novalidate");
-                                strcat(pkfkSql.enc1,") enable novalidate");
-                                FkSqlRows.add();
-                                FkSqlRows.next();
-                                memcpy(FkSqlRows.data(),&pkfkSql,sizeof(pc_type_pk_fk_sql));
-                        }
-                        delete fk_sql_stmt;
-                        e=EXCEPTnC;
-                        if (e) {
-                                delete e;
-                        }
-                }
-                delete sql_stmt;
-                DgcExcept*      e=EXCEPTnC;
-                if (e) {
-                        delete e;
-                }
-        }
-
-	PkSqlRows.rewind();
-	FkSqlRows.rewind();
-        return 1;
+    PkSqlRows.rewind();
+    FkSqlRows.rewind();
+    return 1;
 }
 
 typedef struct {
-        dgt_schar col_name[130];
-        dgt_uint8  status;
-        dgt_uint32 position;
-        dgt_uint8  constraint_type;
-        dgt_sint64 constraint_name;
-        dgt_sint64 renamed_constraint_name;
+    dgt_schar col_name[130];
+    dgt_uint8 status;
+    dgt_uint32 position;
+    dgt_uint8 constraint_type;
+    dgt_sint64 constraint_name;
+    dgt_sint64 renamed_constraint_name;
 } pc_type_pksql2;
 
 typedef struct {
-        dgt_schar col_name[130];
-        dgt_sint64 ref_pk_owner;
-        dgt_sint64 ref_pk_table;
-        dgt_sint64 ref_pk_column;
-        dgt_uint8  status;
-        dgt_uint32 position;
-        dgt_sint64 constraint_name;
-        dgt_sint64 renamed_constraint_name;
+    dgt_schar col_name[130];
+    dgt_sint64 ref_pk_owner;
+    dgt_sint64 ref_pk_table;
+    dgt_sint64 ref_pk_column;
+    dgt_uint8 status;
+    dgt_uint32 position;
+    dgt_sint64 constraint_name;
+    dgt_sint64 renamed_constraint_name;
 } pc_type_fksql2;
 
-
 typedef struct {
-	dgt_schar col_name[130];
-        dgt_schar renamed_col_name[130];
-        dgt_schar search_condition[4000];
-	dgt_uint8 status;
+    dgt_schar col_name[130];
+    dgt_schar renamed_col_name[130];
+    dgt_schar search_condition[4000];
+    dgt_uint8 status;
 } pc_type_checksql2;
 
 typedef struct {
-        dgt_sint64 constraint_name;
-        dgt_sint64 schema_name;
-        dgt_sint64 table_name;
-        dgt_sint64 column_name;
-        dgt_sint64 ref_owner;
-        dgt_sint64 ref_table;
-        dgt_sint64 ref_column;
-        dgt_sint32 position;
+    dgt_sint64 constraint_name;
+    dgt_sint64 schema_name;
+    dgt_sint64 table_name;
+    dgt_sint64 column_name;
+    dgt_sint64 ref_owner;
+    dgt_sint64 ref_table;
+    dgt_sint64 ref_column;
+    dgt_sint32 position;
 } pc_type_def_fksql2;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareCt2Info() throw(DgcExcept)
-{
-        //
-        // new table encryption mode (setting pksql,fksql,checksql)
-        //
-        DefFkDropSqlRows.reset(); // enc table`s dependeny foreign key(drop)
-        DefFkDropSqlRows2.reset(); // non enc table`s dependeny foreign key(drop)
-        DefFkCreSqlRows2.reset(); // non enc column`s dependeny foreign key in step2
-        DefFkCreSqlRows3.reset(); // non enc column`s dependeny foreign key in reverse_step2
+dgt_sint32 PccTiberoScriptBuilder::prepareCt2Info() throw(DgcExcept) {
+    //
+    // new table encryption mode (setting pksql,fksql,checksql)
+    //
+    DefFkDropSqlRows.reset();   // enc table`s dependeny foreign key(drop)
+    DefFkDropSqlRows2.reset();  // non enc table`s dependeny foreign key(drop)
+    DefFkCreSqlRows2
+        .reset();  // non enc column`s dependeny foreign key in step2
+    DefFkCreSqlRows3
+        .reset();  // non enc column`s dependeny foreign key in reverse_step2
 
-        CheckSqlRows2.reset();
-        CheckSqlRows3.reset();
-        // FkSql (non enc pk column <- non enc fk column)
-        //
-        dgt_schar sql_text[2048];
-        memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select distinct constraint_name "
-"from ceea_col_ct a, ceea_table b "
-"where a.enc_tab_id = b.enc_tab_id "
-"and   b.db_id = %lld "
-"and   ref_pk_owner = getnameid('%s') "
-"and   ref_pk_table = getnameid('%s') "
-"and   constraint_type = 2",Dbid, SchemaName, TabInfo.table_name);
-        DgcSqlStmt* sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        dgt_sint64* const_name=0;
-        DgcExcept* e=0;
-        while ((const_name=(dgt_sint64*)sql_stmt->fetch())) {
-                //
-                // if dependecy fk is encryption table then table_name
-                //
-                memset(sql_text,0,2048);
-                sprintf(sql_text,
-"select constraint_name from ceea_enc_col_ct where constraint_name = %lld",*const_name);
-                DgcSqlStmt* searchStmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (searchStmt == 0 || searchStmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete sql_stmt;
-                        delete searchStmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                }
-                dgt_sint64* tmp_result;
-                typedef struct {
-                        dgt_schar       enc_sql[512];
-                        dgt_schar       org_sql[512];
-                } def_fk_enc_table;
-                def_fk_enc_table def_enc_sql;
-                dgt_sint32 enc_tab_flag =0;
-                if ((tmp_result=(dgt_sint64*)searchStmt->fetch())) {
-                        enc_tab_flag =1;
-                }
-                memset(sql_text,0,2048);
-                sprintf(sql_text,
-"select constraint_name, a.schema_name, a.table_name, b.column_name, c.ref_pk_owner, c.ref_pk_table, c.ref_pk_column, c.position "
-"from   ceea_table a, "
-       "ceea_column b, "
-       "ceea_col_ct c "
-"where a.enc_tab_id = b.enc_tab_id "
-"and   b.enc_col_id = c.enc_col_id "
-"and   c.constraint_name = %lld "
-"order by c.position",*const_name);
-                DgcSqlStmt* fkStmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (fkStmt == 0 || fkStmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete sql_stmt;
-                        delete fkStmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                }
-                pc_type_def_fksql2* def_fksql=0;
-                dgt_schar dropSql[512];
-                dgt_schar createSql[512];
-                dgt_schar createSql2[512];
-                dgt_schar refSql[512];
-                dgt_schar refSql2[512];
-                dgt_schar pk_col[512];
-                dgt_schar fk_col[512];
-                memset(pk_col,0,512);
-                memset(fk_col,0,512);
-                memset(dropSql,0,512);
-                dgt_sint32 fetch=0;
-                while ((def_fksql=(pc_type_def_fksql2*)fkStmt->fetch())) {
-                        fetch=1;
-                        if (enc_tab_flag == 0) {
-                                memset(createSql,0,512);
-                                memset(createSql2,0,512);
-                                memset(dropSql,0,512);
-                                memset(refSql,0,512);
-                                memset(refSql2,0,512);
-                                sprintf(dropSql,"alter table %s.%s drop constraint %s",
-                                                PetraNamePool->getNameString(def_fksql->schema_name),
-                                                PetraNamePool->getNameString(def_fksql->table_name),
-                                                PetraNamePool->getNameString(def_fksql->constraint_name));
-                                sprintf(createSql,"alter table %s.%s add constraint %s foreign key(",
-                                                PetraNamePool->getNameString(def_fksql->schema_name),
-                                                PetraNamePool->getNameString(def_fksql->table_name),
-                                                PetraNamePool->getNameString(def_fksql->constraint_name));
-                                sprintf(createSql2,"alter table %s.%s add constraint %s foreign key(",
-                                                PetraNamePool->getNameString(def_fksql->schema_name),
-                                                PetraNamePool->getNameString(def_fksql->table_name),
-                                                PetraNamePool->getNameString(def_fksql->constraint_name));
-                                sprintf(refSql," references %s.%s(",
-                                                SchemaName, TabInfo.renamed_tab_name);
-                                sprintf(refSql2," references %s.%s_%lld(",
-                                                SchemaName, "petra", TabInfo.enc_tab_id);
-                                strcat(fk_col,PetraNamePool->getNameString(def_fksql->column_name));
-                                strcat(fk_col,",");
-                                strcat(pk_col,PetraNamePool->getNameString(def_fksql->ref_column));
-                                strcat(pk_col,",");
-                        } else {
-                                memset(&def_enc_sql,0,sizeof(def_fk_enc_table));
-                                sprintf(def_enc_sql.enc_sql,"alter table %s.%s drop constraint %s",PetraNamePool->getNameString(def_fksql->schema_name),
-                                                                                                   PetraNamePool->getNameString(def_fksql->table_name),
-                                                                                                   PetraNamePool->getNameString(def_fksql->constraint_name));
-                                if (TabInfo.enc_type == 0) {
-                                        sprintf(def_enc_sql.org_sql,"alter table %s.%s$$ drop constraint %s",
-                                                                        PetraNamePool->getNameString(def_fksql->schema_name),
-                                                                        PetraNamePool->getNameString(def_fksql->table_name),
-                                                                        PetraNamePool->getNameString(def_fksql->constraint_name));
-                                } else {
-                                        sprintf(def_enc_sql.org_sql,"alter table %s.%s drop constraint %s",
-                                                                        PetraNamePool->getNameString(def_fksql->schema_name),
-                                                                        PetraNamePool->getNameString(def_fksql->table_name),
-                                                                        PetraNamePool->getNameString(def_fksql->constraint_name));
-                                }
-                        }
-
-                }
-                if (fetch == 1) {
-                        if (enc_tab_flag == 0) {
-                                DefFkDropSqlRows2.add();
-                                DefFkDropSqlRows2.next();
-                                memcpy(DefFkDropSqlRows2.data(),dropSql,strlen(dropSql));
-                                DefFkCreSqlRows2.add();
-                                DefFkCreSqlRows2.next();
-                                fk_col[strlen(fk_col)-1]=')';
-                                pk_col[strlen(pk_col)-1]=')';
-                                strcat(createSql,fk_col);
-                                strcat(createSql,refSql);
-                                strcat(createSql,pk_col);
-                                memcpy(DefFkCreSqlRows2.data(),createSql,strlen(createSql));
-                                DefFkCreSqlRows3.add();
-                                DefFkCreSqlRows3.next();
-                                strcat(createSql2,fk_col);
-                                strcat(createSql2,refSql2);
-                                strcat(createSql2,pk_col);
-                                memcpy(DefFkCreSqlRows3.data(),createSql2,strlen(createSql2));
-                        } else {
-                                DefFkDropSqlRows.add();
-                                DefFkDropSqlRows.next();
-                                memcpy(DefFkDropSqlRows.data(),&def_enc_sql,sizeof(def_fk_enc_table));
-                        }
-                }
-                delete fkStmt;
-                e=EXCEPTnC;
-                if (e) {
-                        delete e;
-                }
-        }
+    CheckSqlRows2.reset();
+    CheckSqlRows3.reset();
+    // FkSql (non enc pk column <- non enc fk column)
+    //
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select distinct constraint_name "
+            "from ceea_col_ct a, ceea_table b "
+            "where a.enc_tab_id = b.enc_tab_id "
+            "and   b.db_id = %lld "
+            "and   ref_pk_owner = getnameid('%s') "
+            "and   ref_pk_table = getnameid('%s') "
+            "and   constraint_type = 2",
+            Dbid, SchemaName, TabInfo.table_name);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        e=EXCEPTnC;
-        if (e) {
-                delete e;
-        }
-	//
-	// checksql create (if non encryption column then create checksql)
-	// 
-	memset(sql_text,0,2048);
-	sprintf(sql_text,
-"select b.column_name, b.renamed_col_name, getname(a.search_condition), b.status "
-"from   pct_enc_col_ct a, pct_enc_column b "
-"where  a.enc_col_id = b.enc_col_id "
-"and    a.enc_tab_id = %lld "
-"and    b.status = 0 "
-"and    a.constraint_type=3 ",TabInfo.enc_tab_id);
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-        	DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-	pc_type_checksql2* checksql_tmp;
-	while ((checksql_tmp=(pc_type_checksql2*)sql_stmt->fetch())) {
-		dgt_schar checksql[512];
-                memset(checksql,0,512);
-                sprintf(checksql,"check (%s)",checksql_tmp->search_condition);
-                CheckSqlRows2.add();
-                CheckSqlRows2.next();
-                memcpy(CheckSqlRows2.data(),checksql,strlen(checksql));
-	}
-	delete sql_stmt;
-	e=EXCEPTnC;
-	if (e) {
-		delete e;
-	}
-	memset(sql_text,0,2048);
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    dgt_sint64* const_name = 0;
+    DgcExcept* e = 0;
+    while ((const_name = (dgt_sint64*)sql_stmt->fetch())) {
+        //
+        // if dependecy fk is encryption table then table_name
+        //
+        memset(sql_text, 0, 2048);
         sprintf(sql_text,
-"select b.column_name, b.renamed_col_name, getname(a.search_condition), b.status "
-"from   pct_enc_col_ct a, pct_enc_column b "
-"where  a.enc_col_id = b.enc_col_id "
-"and    a.enc_tab_id = %lld "
-"and    a.constraint_type=3 ",TabInfo.enc_tab_id);
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+                "select constraint_name from ceea_enc_col_ct where "
+                "constraint_name = %lld",
+                *const_name);
+        DgcSqlStmt* searchStmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (searchStmt == 0 || searchStmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete sql_stmt;
+            delete searchStmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
         }
-        while ((checksql_tmp=(pc_type_checksql2*)sql_stmt->fetch())) {
-		dgt_schar checksql[512];
-                memset(checksql,0,512);
-                sprintf(checksql,"check (%s)",checksql_tmp->search_condition);
-                CheckSqlRows3.add();
-                CheckSqlRows3.next();
-                memcpy(CheckSqlRows3.data(),checksql,strlen(checksql));
+        dgt_sint64* tmp_result;
+        typedef struct {
+            dgt_schar enc_sql[512];
+            dgt_schar org_sql[512];
+        } def_fk_enc_table;
+        def_fk_enc_table def_enc_sql;
+        dgt_sint32 enc_tab_flag = 0;
+        if ((tmp_result = (dgt_sint64*)searchStmt->fetch())) {
+            enc_tab_flag = 1;
         }
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select constraint_name, a.schema_name, a.table_name, "
+                "b.column_name, c.ref_pk_owner, c.ref_pk_table, "
+                "c.ref_pk_column, c.position "
+                "from   ceea_table a, "
+                "ceea_column b, "
+                "ceea_col_ct c "
+                "where a.enc_tab_id = b.enc_tab_id "
+                "and   b.enc_col_id = c.enc_col_id "
+                "and   c.constraint_name = %lld "
+                "order by c.position",
+                *const_name);
+        DgcSqlStmt* fkStmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (fkStmt == 0 || fkStmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete sql_stmt;
+            delete fkStmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        pc_type_def_fksql2* def_fksql = 0;
+        dgt_schar dropSql[512];
+        dgt_schar createSql[512];
+        dgt_schar createSql2[512];
+        dgt_schar refSql[512];
+        dgt_schar refSql2[512];
+        dgt_schar pk_col[512];
+        dgt_schar fk_col[512];
+        memset(pk_col, 0, 512);
+        memset(fk_col, 0, 512);
+        memset(dropSql, 0, 512);
+        dgt_sint32 fetch = 0;
+        while ((def_fksql = (pc_type_def_fksql2*)fkStmt->fetch())) {
+            fetch = 1;
+            if (enc_tab_flag == 0) {
+                memset(createSql, 0, 512);
+                memset(createSql2, 0, 512);
+                memset(dropSql, 0, 512);
+                memset(refSql, 0, 512);
+                memset(refSql2, 0, 512);
+                sprintf(
+                    dropSql, "alter table %s.%s drop constraint %s",
+                    PetraNamePool->getNameString(def_fksql->schema_name),
+                    PetraNamePool->getNameString(def_fksql->table_name),
+                    PetraNamePool->getNameString(def_fksql->constraint_name));
+                sprintf(
+                    createSql,
+                    "alter table %s.%s add constraint %s foreign key(",
+                    PetraNamePool->getNameString(def_fksql->schema_name),
+                    PetraNamePool->getNameString(def_fksql->table_name),
+                    PetraNamePool->getNameString(def_fksql->constraint_name));
+                sprintf(
+                    createSql2,
+                    "alter table %s.%s add constraint %s foreign key(",
+                    PetraNamePool->getNameString(def_fksql->schema_name),
+                    PetraNamePool->getNameString(def_fksql->table_name),
+                    PetraNamePool->getNameString(def_fksql->constraint_name));
+                sprintf(refSql, " references %s.%s(", SchemaName,
+                        TabInfo.renamed_tab_name);
+                sprintf(refSql2, " references %s.%s_%lld(", SchemaName, "petra",
+                        TabInfo.enc_tab_id);
+                strcat(fk_col,
+                       PetraNamePool->getNameString(def_fksql->column_name));
+                strcat(fk_col, ",");
+                strcat(pk_col,
+                       PetraNamePool->getNameString(def_fksql->ref_column));
+                strcat(pk_col, ",");
+            } else {
+                memset(&def_enc_sql, 0, sizeof(def_fk_enc_table));
+                sprintf(
+                    def_enc_sql.enc_sql, "alter table %s.%s drop constraint %s",
+                    PetraNamePool->getNameString(def_fksql->schema_name),
+                    PetraNamePool->getNameString(def_fksql->table_name),
+                    PetraNamePool->getNameString(def_fksql->constraint_name));
+                if (TabInfo.enc_type == 0) {
+                    sprintf(
+                        def_enc_sql.org_sql,
+                        "alter table %s.%s$$ drop constraint %s",
+                        PetraNamePool->getNameString(def_fksql->schema_name),
+                        PetraNamePool->getNameString(def_fksql->table_name),
+                        PetraNamePool->getNameString(
+                            def_fksql->constraint_name));
+                } else {
+                    sprintf(
+                        def_enc_sql.org_sql,
+                        "alter table %s.%s drop constraint %s",
+                        PetraNamePool->getNameString(def_fksql->schema_name),
+                        PetraNamePool->getNameString(def_fksql->table_name),
+                        PetraNamePool->getNameString(
+                            def_fksql->constraint_name));
+                }
+            }
+        }
+        if (fetch == 1) {
+            if (enc_tab_flag == 0) {
+                DefFkDropSqlRows2.add();
+                DefFkDropSqlRows2.next();
+                memcpy(DefFkDropSqlRows2.data(), dropSql, strlen(dropSql));
+                DefFkCreSqlRows2.add();
+                DefFkCreSqlRows2.next();
+                fk_col[strlen(fk_col) - 1] = ')';
+                pk_col[strlen(pk_col) - 1] = ')';
+                strcat(createSql, fk_col);
+                strcat(createSql, refSql);
+                strcat(createSql, pk_col);
+                memcpy(DefFkCreSqlRows2.data(), createSql, strlen(createSql));
+                DefFkCreSqlRows3.add();
+                DefFkCreSqlRows3.next();
+                strcat(createSql2, fk_col);
+                strcat(createSql2, refSql2);
+                strcat(createSql2, pk_col);
+                memcpy(DefFkCreSqlRows3.data(), createSql2, strlen(createSql2));
+            } else {
+                DefFkDropSqlRows.add();
+                DefFkDropSqlRows.next();
+                memcpy(DefFkDropSqlRows.data(), &def_enc_sql,
+                       sizeof(def_fk_enc_table));
+            }
+        }
+        delete fkStmt;
+        e = EXCEPTnC;
+        if (e) {
+            delete e;
+        }
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    //
+    // checksql create (if non encryption column then create checksql)
+    //
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select b.column_name, b.renamed_col_name, "
+            "getname(a.search_condition), b.status "
+            "from   pct_enc_col_ct a, pct_enc_column b "
+            "where  a.enc_col_id = b.enc_col_id "
+            "and    a.enc_tab_id = %lld "
+            "and    b.status = 0 "
+            "and    a.constraint_type=3 ",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        e=EXCEPTnC;
-        if (e) {
-                delete e;
-        }	
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_checksql2* checksql_tmp;
+    while ((checksql_tmp = (pc_type_checksql2*)sql_stmt->fetch())) {
+        dgt_schar checksql[512];
+        memset(checksql, 0, 512);
+        sprintf(checksql, "check (%s)", checksql_tmp->search_condition);
+        CheckSqlRows2.add();
+        CheckSqlRows2.next();
+        memcpy(CheckSqlRows2.data(), checksql, strlen(checksql));
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select b.column_name, b.renamed_col_name, "
+            "getname(a.search_condition), b.status "
+            "from   pct_enc_col_ct a, pct_enc_column b "
+            "where  a.enc_col_id = b.enc_col_id "
+            "and    a.enc_tab_id = %lld "
+            "and    a.constraint_type=3 ",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    while ((checksql_tmp = (pc_type_checksql2*)sql_stmt->fetch())) {
+        dgt_schar checksql[512];
+        memset(checksql, 0, 512);
+        sprintf(checksql, "check (%s)", checksql_tmp->search_condition);
+        CheckSqlRows3.add();
+        CheckSqlRows3.next();
+        memcpy(CheckSqlRows3.data(), checksql, strlen(checksql));
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
 
-        //
-        // unique constraint create (enc_column and non enc_column)
-        //
-        memset(sql_text,0,2048);
-        sprintf(sql_text,
-"select distinct constraint_name "
-"from   pct_enc_col_ct "
-"where  constraint_type =4 "
-"and    enc_tab_id=%lld",TabInfo.enc_tab_id);
-        sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
+    //
+    // unique constraint create (enc_column and non enc_column)
+    //
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select distinct constraint_name "
+            "from   pct_enc_col_ct "
+            "where  constraint_type =4 "
+            "and    enc_tab_id=%lld",
+            TabInfo.enc_tab_id);
+    sql_stmt = Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    const_name = 0;
+    while ((const_name = (dgt_sint64*)sql_stmt->fetch())) {
+        memset(sql_text, 0, 2048);
+        sprintf(
+            sql_text,
+            "select b.column_name, b.renamed_col_name, b.status, a.position "
+            "from   pct_enc_col_ct a, pct_enc_column b "
+            "where  a.enc_col_id = b.enc_col_id "
+            "and    a.enc_tab_id = %lld "
+            "and    constraint_name = %lld "
+            "order by a.position",
+            TabInfo.enc_tab_id, *const_name);
+        DgcSqlStmt* sql_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
         if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+            DgcExcept* e = EXCEPTnC;
+            delete sql_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
         }
-        const_name=0;
-        while ((const_name=(dgt_sint64*)sql_stmt->fetch())) {
-                memset(sql_text,0,2048);
-		sprintf(sql_text,
-"select b.column_name, b.renamed_col_name, b.status, a.position "
-"from   pct_enc_col_ct a, pct_enc_column b "
-"where  a.enc_col_id = b.enc_col_id "
-"and    a.enc_tab_id = %lld "
-"and    constraint_name = %lld "
-"order by a.position",TabInfo.enc_tab_id,*const_name);
-		DgcSqlStmt* sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-	        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-        	        DgcExcept*      e=EXCEPTnC;
-	                delete sql_stmt;
-        	        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	        }
-		typedef struct {
-			dgt_schar	column_name[130];
-			dgt_schar	renamed_col_name[130];
-			dgt_uint8	status;
-			dgt_uint8	position;
-		} uniq_type;
-        	uniq_type* uniq_tmp=0;
-		dgt_sint32 seq=1;
-       	        dgt_schar uniqueSql[512];
-       	        dgt_schar uniqueSql2[512];
-               	memset(uniqueSql,0,512);
-               	memset(uniqueSql2,0,512);
-	        while ((uniq_tmp=(uniq_type*)sql_stmt->fetch())) {
-			if (seq == 1) {
-				if (uniq_tmp->status == 0) {
-			                sprintf(uniqueSql,"alter table %s.%s add unique(%s",SchemaName,TabInfo.renamed_tab_name,
-        			                                                                          uniq_tmp->column_name);
-               				sprintf(uniqueSql2,"alter table %s.%s_%lld add unique(%s",SchemaName,"petra",TabInfo.enc_tab_id,
-	                                                                                  uniq_tmp->column_name);
-				} else {
-		                	sprintf(uniqueSql,"alter table %s.%s add unique(%s",SchemaName,TabInfo.renamed_tab_name,
-	        		                                                                          uniq_tmp->column_name);
-               				sprintf(uniqueSql2,"alter table %s.%s_%lld add unique(%s",SchemaName,"petra",TabInfo.enc_tab_id,
-	                                                                                  uniq_tmp->column_name);
-				}
-			} else {
-				if (uniq_tmp->status == 0) {
-                                        strcat(uniqueSql,", ");
-                                        strcat(uniqueSql,uniq_tmp->column_name);
-                                        strcat(uniqueSql2,", ");
-                                        strcat(uniqueSql2,uniq_tmp->column_name);
-                                } else {
-                                        strcat(uniqueSql,", ");
-                                        strcat(uniqueSql,uniq_tmp->column_name);
-                                        strcat(uniqueSql2,", ");
-                                        strcat(uniqueSql2,uniq_tmp->column_name);
-                                }
-			}
-			seq++;
-		}
-		strcat(uniqueSql,") enable novalidate");
-		strcat(uniqueSql2,") enable novalidate");
-       	        UniqueSqlRows1.add();
-               	UniqueSqlRows1.next();
-                memcpy(UniqueSqlRows1.data(),uniqueSql,strlen(uniqueSql));
-       	        UniqueSqlRows2.add();
-               	UniqueSqlRows2.next();
-                memcpy(UniqueSqlRows2.data(),uniqueSql2,strlen(uniqueSql2));
-	        delete sql_stmt;
-        	e=EXCEPTnC;
-	        if (e) {
-        	        delete e;
-	        }
-	}
-	delete sql_stmt;
-	e=EXCEPTnC;
-	if (e) {
-		delete e;
-	}
+        typedef struct {
+            dgt_schar column_name[130];
+            dgt_schar renamed_col_name[130];
+            dgt_uint8 status;
+            dgt_uint8 position;
+        } uniq_type;
+        uniq_type* uniq_tmp = 0;
+        dgt_sint32 seq = 1;
+        dgt_schar uniqueSql[512];
+        dgt_schar uniqueSql2[512];
+        memset(uniqueSql, 0, 512);
+        memset(uniqueSql2, 0, 512);
+        while ((uniq_tmp = (uniq_type*)sql_stmt->fetch())) {
+            if (seq == 1) {
+                if (uniq_tmp->status == 0) {
+                    sprintf(uniqueSql, "alter table %s.%s add unique(%s",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            uniq_tmp->column_name);
+                    sprintf(uniqueSql2, "alter table %s.%s_%lld add unique(%s",
+                            SchemaName, "petra", TabInfo.enc_tab_id,
+                            uniq_tmp->column_name);
+                } else {
+                    sprintf(uniqueSql, "alter table %s.%s add unique(%s",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            uniq_tmp->column_name);
+                    sprintf(uniqueSql2, "alter table %s.%s_%lld add unique(%s",
+                            SchemaName, "petra", TabInfo.enc_tab_id,
+                            uniq_tmp->column_name);
+                }
+            } else {
+                if (uniq_tmp->status == 0) {
+                    strcat(uniqueSql, ", ");
+                    strcat(uniqueSql, uniq_tmp->column_name);
+                    strcat(uniqueSql2, ", ");
+                    strcat(uniqueSql2, uniq_tmp->column_name);
+                } else {
+                    strcat(uniqueSql, ", ");
+                    strcat(uniqueSql, uniq_tmp->column_name);
+                    strcat(uniqueSql2, ", ");
+                    strcat(uniqueSql2, uniq_tmp->column_name);
+                }
+            }
+            seq++;
+        }
+        strcat(uniqueSql, ") enable novalidate");
+        strcat(uniqueSql2, ") enable novalidate");
+        UniqueSqlRows1.add();
+        UniqueSqlRows1.next();
+        memcpy(UniqueSqlRows1.data(), uniqueSql, strlen(uniqueSql));
+        UniqueSqlRows2.add();
+        UniqueSqlRows2.next();
+        memcpy(UniqueSqlRows2.data(), uniqueSql2, strlen(uniqueSql2));
+        delete sql_stmt;
+        e = EXCEPTnC;
+        if (e) {
+            delete e;
+        }
+    }
+    delete sql_stmt;
+    e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
 
-        CheckSqlRows2.rewind();
-        DefFkDropSqlRows.rewind();
-        DefFkDropSqlRows2.rewind();
-        DefFkCreSqlRows2.rewind();
-        UniqueSqlRows1.rewind();
-        UniqueSqlRows2.rewind();
-	return 1;
+    CheckSqlRows2.rewind();
+    DefFkDropSqlRows.rewind();
+    DefFkDropSqlRows2.rewind();
+    DefFkCreSqlRows2.rewind();
+    UniqueSqlRows1.rewind();
+    UniqueSqlRows2.rewind();
+    return 1;
 }
 
 typedef struct {
-	dgt_schar	create_sql_id[1024];
-	dgt_schar	drop_sql_id[1024];
+    dgt_schar create_sql_id[1024];
+    dgt_schar drop_sql_id[1024];
 } pc_type_synonym_sql;
 
-dgt_sint32 PccTiberoScriptBuilder::prepareSynonymInfo() throw(DgcExcept)
-{
-        dgt_schar       sql_text[2048];
-        sprintf(sql_text,
-"select * "
-"from pct_enc_synonym where enc_tab_id=%lld",TabInfo.enc_tab_id);
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        pct_type_enc_synonym*       syn_info_tmp;
-        SynonymSqlRows.reset();
-	pc_type_synonym_sql	syn_sql;
-        while ((syn_info_tmp=(pct_type_enc_synonym*)sql_stmt->fetch())) {
-                dgt_schar creSql[1024];
-                dgt_schar dropSql[1024];
-                memset(creSql,0,1024);
-                memset(dropSql,0,1024);
-                sprintf(creSql,"create synonym %s.\"%s\" for \"%s\".\"%s\"", PetraNamePool->getNameString(syn_info_tmp->owner),
-                                                                             PetraNamePool->getNameString(syn_info_tmp->synonym_name),
-                                                                            SchemaName, TabInfo.table_name);
-                sprintf(dropSql,"drop synonym %s.\"%s\"" , PetraNamePool->getNameString(syn_info_tmp->owner),
-                                                          PetraNamePool->getNameString(syn_info_tmp->synonym_name));
-		memset(&syn_sql,0,sizeof(pc_type_synonym_sql));
-		memcpy(syn_sql.create_sql_id,creSql,1024);
-		memcpy(syn_sql.drop_sql_id,dropSql,1024);
-                SynonymSqlRows.add();
-                SynonymSqlRows.next();
-                memcpy(SynonymSqlRows.data(), &syn_sql, sizeof(pc_type_synonym_sql));
-        }
-        DgcExcept*      e=EXCEPTnC;
+dgt_sint32 PccTiberoScriptBuilder::prepareSynonymInfo() throw(DgcExcept) {
+    dgt_schar sql_text[2048];
+    sprintf(sql_text,
+            "select * "
+            "from pct_enc_synonym where enc_tab_id=%lld",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-        if (e) {
-                delete e;
-        }
-        SynonymSqlRows.rewind();
-        return 1;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pct_type_enc_synonym* syn_info_tmp;
+    SynonymSqlRows.reset();
+    pc_type_synonym_sql syn_sql;
+    while ((syn_info_tmp = (pct_type_enc_synonym*)sql_stmt->fetch())) {
+        dgt_schar creSql[1024];
+        dgt_schar dropSql[1024];
+        memset(creSql, 0, 1024);
+        memset(dropSql, 0, 1024);
+        sprintf(creSql, "create synonym %s.\"%s\" for \"%s\".\"%s\"",
+                PetraNamePool->getNameString(syn_info_tmp->owner),
+                PetraNamePool->getNameString(syn_info_tmp->synonym_name),
+                SchemaName, TabInfo.table_name);
+        sprintf(dropSql, "drop synonym %s.\"%s\"",
+                PetraNamePool->getNameString(syn_info_tmp->owner),
+                PetraNamePool->getNameString(syn_info_tmp->synonym_name));
+        memset(&syn_sql, 0, sizeof(pc_type_synonym_sql));
+        memcpy(syn_sql.create_sql_id, creSql, 1024);
+        memcpy(syn_sql.drop_sql_id, dropSql, 1024);
+        SynonymSqlRows.add();
+        SynonymSqlRows.next();
+        memcpy(SynonymSqlRows.data(), &syn_sql, sizeof(pc_type_synonym_sql));
+    }
+    DgcExcept* e = EXCEPTnC;
+    delete sql_stmt;
+    if (e) {
+        delete e;
+    }
+    SynonymSqlRows.rewind();
+    return 1;
 }
 
-dgt_schar* PccTiberoScriptBuilder::getFname(dgt_sint64 enc_col_id,dgt_uint8 fun_type,dgt_uint8 instead_of_trigger_flag) throw(DgcExcept)
-{
-        memset(fname,0,256);
-        ColInfoRows2.rewind();
-        pc_type_col_info* col_info;
-        //
-        // fun_type : 1=encrypt function name
-        //            2=decrypt function name
-        //            3=ophuek function name
-        //
-        if (fun_type == 1) {
-                while (ColInfoRows2.next() && (col_info=(pc_type_col_info*)ColInfoRows2.data())) {
-                        if (col_info->enc_col_id==enc_col_id) {
-				if (instead_of_trigger_flag) {
-					if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0 ) {
-						if (!strcasecmp(col_info->data_type,"date") || !strcasecmp(col_info->data_type,"timestamp")) {
-        	                                        sprintf(fname,"pls_encrypt_b64_id_date(nvl(:new.%s,%s),%lld)",
-									col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-                        	                } else if (!strcasecmp(col_info->data_type,"raw")) {
-                                	                sprintf(fname,"pls_encrypt_b64_id_raw(nvl(:new.%s,%s),%lld)",
-									col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-	                                        } else if (!strcasecmp(col_info->data_type,"clob")) {
-        	                                        sprintf(fname,"pls_encrypt_clob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                	                        } else if (!strcasecmp(col_info->data_type,"blob")) {
-                        	                        sprintf(fname,"pls_encrypt_blob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                                	        } else if (!strcasecmp(col_info->data_type,"long")) {
-							sprintf(fname,"pls_encrypt_clob(nvl(:new.%s,%s),%lld)",
-                                                                        col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"long raw")) {
-							sprintf(fname,"pls_encrypt_blob(nvl(:new.%s,%s),%lld)",
-                                                                        col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"char")) {
-                                        	        sprintf(fname,"pls_encrypt_b64_id(nvl(trim(:new.%s),%s),%lld)",
-									col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"nchar")) {
-                                                        sprintf(fname,"pls_encrypt_b64_id_n(nvl(trim(:new.%s),%s),%lld)",
-                                                                        col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-                                                                        col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"nvarchar2")) {
-                                                        sprintf(fname,"pls_encrypt_b64_id_n(nvl(:new.%s,%s),%lld)",
-                                                                        col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-                                                                        col_info->enc_col_id);
-						} else {
-                                        	        sprintf(fname,"pls_encrypt_b64_id(nvl(:new.%s,%s),%lld)",
-									col_info->col_name,PetraNamePool->getNameString(col_info->col_default),
-									col_info->enc_col_id);
-	                                        }  
-					} else {
-						if (!strcasecmp(col_info->data_type,"date") || !strcasecmp(col_info->data_type,"timestamp")) {
-                                        	        sprintf(fname,"pls_encrypt_b64_id_date(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-	                                        } else if (!strcasecmp(col_info->data_type,"raw")) {
-        	                                        sprintf(fname,"pls_encrypt_b64_id_raw(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                	                        } else if (!strcasecmp(col_info->data_type,"clob")) {
-                        	                        sprintf(fname,"pls_encrypt_clob(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                                	        } else if (!strcasecmp(col_info->data_type,"blob")) {
-                                        	        sprintf(fname,"pls_encrypt_blob(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-	                                        } else if (!strcasecmp(col_info->data_type,"long")) {
-							sprintf(fname,"pls_encrypt_clob(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);	
-						} else if (!strcasecmp(col_info->data_type,"long raw")) {
-							sprintf(fname,"pls_encrypt_blob(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"char")) {
-        	                                        sprintf(fname,"pls_encrypt_b64_id(trim(:new.%s),%lld)",col_info->col_name,col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"nchar")) {
-                                                        sprintf(fname,"pls_encrypt_b64_id_n(trim(:new.%s),%lld)",
-									col_info->col_name,col_info->enc_col_id);
-						} else if (!strcasecmp(col_info->data_type,"nvarchar2")) {
-                                                        sprintf(fname,"pls_encrypt_b64_id_n(:new.%s,%lld)",
-                                                                        col_info->col_name,col_info->enc_col_id);
-						} else {
-        	                                        sprintf(fname,"pls_encrypt_b64_id(:new.%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                	                        }
-					}
-				} else {
-	                                if (!strcasecmp(col_info->data_type,"date") || !strcasecmp(col_info->data_type,"timestamp")) {
-        	                                sprintf(fname,"pls_encrypt_b64_id_date(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                	                } else if (!strcasecmp(col_info->data_type,"raw")) {
-                        	                sprintf(fname,"pls_encrypt_b64_id_raw(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                                	} else if (!strcasecmp(col_info->data_type,"clob")) {
-	                                        sprintf(fname,"pls_encrypt_clob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-        	                        } else if (!strcasecmp(col_info->data_type,"blob")) {
-                	                        sprintf(fname,"pls_encrypt_blob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                        	        } else if (!strcasecmp(col_info->data_type,"long")) {
-						sprintf(fname,"pls_encrypt_clob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-					} else if (!strcasecmp(col_info->data_type,"long raw")) {
-						sprintf(fname,"pls_encrypt_blob(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-					} else if (!strcasecmp(col_info->data_type,"char")) {
-                                	        sprintf(fname,"pls_encrypt_b64_id(trim(%s),%lld)",col_info->col_name,col_info->enc_col_id);
-					} else if (!strcasecmp(col_info->data_type,"nchar")) {
-                                                sprintf(fname,"pls_encrypt_b64_id_n(trim(%s),%lld)",
-								col_info->col_name,col_info->enc_col_id);
-					} else if (!strcasecmp(col_info->data_type,"nvarchar2")) {
-                                                sprintf(fname,"pls_encrypt_b64_id_n(%s,%lld)",
-                                                                col_info->col_name,col_info->enc_col_id);	
-					} else {
-                                	        sprintf(fname,"pls_encrypt_b64_id(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-	                                }
-				}
+dgt_schar* PccTiberoScriptBuilder::getFname(
+    dgt_sint64 enc_col_id, dgt_uint8 fun_type,
+    dgt_uint8 instead_of_trigger_flag) throw(DgcExcept) {
+    memset(fname, 0, 256);
+    ColInfoRows2.rewind();
+    pc_type_col_info* col_info;
+    //
+    // fun_type : 1=encrypt function name
+    //            2=decrypt function name
+    //            3=ophuek function name
+    //
+    if (fun_type == 1) {
+        while (ColInfoRows2.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows2.data())) {
+            if (col_info->enc_col_id == enc_col_id) {
+                if (instead_of_trigger_flag) {
+                    if (col_info->col_default &&
+                        strlen(PetraNamePool->getNameString(
+                            col_info->col_default)) > 0) {
+                        if (!strcasecmp(col_info->data_type, "date") ||
+                            !strcasecmp(col_info->data_type, "timestamp")) {
+                            sprintf(
+                                fname,
+                                "pls_encrypt_b64_id_date(nvl(:new.%s,%s),%lld)",
+                                col_info->col_name,
+                                PetraNamePool->getNameString(
+                                    col_info->col_default),
+                                col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "raw")) {
+                            sprintf(
+                                fname,
+                                "pls_encrypt_b64_id_raw(nvl(:new.%s,%s),%lld)",
+                                col_info->col_name,
+                                PetraNamePool->getNameString(
+                                    col_info->col_default),
+                                col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "clob")) {
+                            sprintf(fname, "pls_encrypt_clob(%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "blob")) {
+                            sprintf(fname, "pls_encrypt_blob(%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "long")) {
+                            sprintf(fname,
+                                    "pls_encrypt_clob(nvl(:new.%s,%s),%lld)",
+                                    col_info->col_name,
+                                    PetraNamePool->getNameString(
+                                        col_info->col_default),
+                                    col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type,
+                                               "long raw")) {
+                            sprintf(fname,
+                                    "pls_encrypt_blob(nvl(:new.%s,%s),%lld)",
+                                    col_info->col_name,
+                                    PetraNamePool->getNameString(
+                                        col_info->col_default),
+                                    col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "char")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id(nvl(trim(:new.%s),%s),%"
+                                    "lld)",
+                                    col_info->col_name,
+                                    PetraNamePool->getNameString(
+                                        col_info->col_default),
+                                    col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "nchar")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id_n(nvl(trim(:new.%s),%s)"
+                                    ",%lld)",
+                                    col_info->col_name,
+                                    PetraNamePool->getNameString(
+                                        col_info->col_default),
+                                    col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type,
+                                               "nvarchar2")) {
+                            sprintf(
+                                fname,
+                                "pls_encrypt_b64_id_n(nvl(:new.%s,%s),%lld)",
+                                col_info->col_name,
+                                PetraNamePool->getNameString(
+                                    col_info->col_default),
+                                col_info->enc_col_id);
+                        } else {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id(nvl(:new.%s,%s),%lld)",
+                                    col_info->col_name,
+                                    PetraNamePool->getNameString(
+                                        col_info->col_default),
+                                    col_info->enc_col_id);
                         }
+                    } else {
+                        if (!strcasecmp(col_info->data_type, "date") ||
+                            !strcasecmp(col_info->data_type, "timestamp")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id_date(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "raw")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id_raw(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "clob")) {
+                            sprintf(fname, "pls_encrypt_clob(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "blob")) {
+                            sprintf(fname, "pls_encrypt_blob(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "long")) {
+                            sprintf(fname, "pls_encrypt_clob(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type,
+                                               "long raw")) {
+                            sprintf(fname, "pls_encrypt_blob(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "char")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id(trim(:new.%s),%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type, "nchar")) {
+                            sprintf(fname,
+                                    "pls_encrypt_b64_id_n(trim(:new.%s),%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else if (!strcasecmp(col_info->data_type,
+                                               "nvarchar2")) {
+                            sprintf(fname, "pls_encrypt_b64_id_n(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        } else {
+                            sprintf(fname, "pls_encrypt_b64_id(:new.%s,%lld)",
+                                    col_info->col_name, col_info->enc_col_id);
+                        }
+                    }
+                } else {
+                    if (!strcasecmp(col_info->data_type, "date") ||
+                        !strcasecmp(col_info->data_type, "timestamp")) {
+                        sprintf(fname, "pls_encrypt_b64_id_date(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "raw")) {
+                        sprintf(fname, "pls_encrypt_b64_id_raw(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "clob")) {
+                        sprintf(fname, "pls_encrypt_clob(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "blob")) {
+                        sprintf(fname, "pls_encrypt_blob(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "long")) {
+                        sprintf(fname, "pls_encrypt_clob(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "long raw")) {
+                        sprintf(fname, "pls_encrypt_blob(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "char")) {
+                        sprintf(fname, "pls_encrypt_b64_id(trim(%s),%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "nchar")) {
+                        sprintf(fname, "pls_encrypt_b64_id_n(trim(%s),%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "nvarchar2")) {
+                        sprintf(fname, "pls_encrypt_b64_id_n(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else {
+                        sprintf(fname, "pls_encrypt_b64_id(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    }
                 }
-        } else if (fun_type == 2) {
-                while (ColInfoRows2.next() && (col_info=(pc_type_col_info*)ColInfoRows2.data())) {
-                        dgt_schar renamed_col_name[4000];
-                        memset(renamed_col_name,0,4000);
-	                strncpy(renamed_col_name,col_info->col_name,strlen(col_info->col_name));
-                        if (col_info->enc_col_id==enc_col_id) {
-                        	if (TabInfo.cast_flag == 0) {
-                                	if (!strcasecmp(col_info->data_type,"date") || !strcasecmp(col_info->data_type,"timestamp")) {
-                                        	sprintf(fname,"pls_decrypt_b64_id_date(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"raw")) {
-                                        	sprintf(fname,"pls_decrypt_b64_id_raw(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"clob") || !strcasecmp(col_info->data_type,"long")) {
-                                        	sprintf(fname,"pls_decrypt_clob(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"blob") || !strcasecmp(col_info->data_type,"long raw")) {
-                                        	sprintf(fname,"pls_decrypt_blob(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"number")) {
-                                        	sprintf(fname,"pls_decrypt_b64_id_num(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                                        } else {
-                                        	sprintf(fname,"pls_decrypt_b64_id(%s,%lld)",renamed_col_name,col_info->enc_col_id);
-                               		}
-                                } else {
-					if (!strcasecmp(col_info->data_type,"number")) {
-                                        	if (col_info->data_precision == 0) {
-                                                	sprintf(fname,"cast(pls_decrypt_b64_id(%s,%lld) as %s)",
-                                                        		renamed_col_name, col_info->enc_col_id,
-									col_info->data_type);
-                                                } else {
-                                                	sprintf(fname,"cast(pls_decrypt_b64_id(%s,%lld) as %s(%d,%d))",
-                                                        		renamed_col_name, col_info->enc_col_id,
-                                                                        col_info->data_type,col_info->data_precision,
-                                                                        col_info->data_scale);
-                                                }
-                                        } else if (!strcasecmp(col_info->data_type,"char")) {
-						sprintf(fname,"cast(pls_decrypt_b64_id(%s,%lld) as %s(%d))",
-                                                                renamed_col_name, col_info->enc_col_id,
-                                                                col_info->data_type,col_info->data_length);
-                                        } else if (!strcasecmp(col_info->data_type,"date")) {
-                                                sprintf(fname,"to_date(pls_decrypt_b64_id(%s,%lld),'YYYYMMDDHH24MISS')",
-                                                                renamed_col_name, col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"raw")) {
-                                                sprintf(fname,"cast(pls_decrypt_b64_id_raw(%s,%lld) as %s(%d))",
-                                                                renamed_col_name, col_info->enc_col_id,
-                                                                col_info->data_type,col_info->data_length);
-                                        } else if (!strcasecmp(col_info->data_type,"clob") || !strcasecmp(col_info->data_type,"long")) {
-                                                sprintf(fname,"pls_decrypt_clob(%s,%lld)",
-                                                                renamed_col_name, col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"blob") || !strcasecmp(col_info->data_type,"long raw")) {
-                                                sprintf(fname,"pls_decrypt_blob(%s,%lld)",
-                                                                renamed_col_name, col_info->enc_col_id);
-                                        } else {
-                                                sprintf(fname,"cast(pls_decrypt_b64_id(%s,%lld) as %s(%d))",
-                                                                renamed_col_name, col_info->enc_col_id,
-                                                                col_info->data_type,col_info->data_length);
-                                        }
-                        	}
-			}
-                }
-        } else {
-		while (ColInfoRows2.next() && (col_info=(pc_type_col_info*)ColInfoRows2.data())) {
-			if (col_info->enc_col_id==enc_col_id) {
-				if (instead_of_trigger_flag) {
-					if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-				                sprintf(fname,"PLS_OPHUEK_B64(nvl(:new.%s,%s),%lld,0)",col_info->col_name,
-								PetraNamePool->getNameString(col_info->col_default),col_info->enc_col_id);
-					} else {
-		                		sprintf(fname,"PLS_OPHUEK_B64(:new.%s,%lld,0)",col_info->col_name,col_info->enc_col_id);
-					}
-				} else {
-			                sprintf(fname,"PLS_OPHUEK_B64(%s,%lld,0)",col_info->col_name,col_info->enc_col_id);
-				}
-			}
-		}
+            }
         }
-        return fname;
+    } else if (fun_type == 2) {
+        while (ColInfoRows2.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows2.data())) {
+            dgt_schar renamed_col_name[4000];
+            memset(renamed_col_name, 0, 4000);
+            strncpy(renamed_col_name, col_info->col_name,
+                    strlen(col_info->col_name));
+            if (col_info->enc_col_id == enc_col_id) {
+                if (TabInfo.cast_flag == 0) {
+                    if (!strcasecmp(col_info->data_type, "date") ||
+                        !strcasecmp(col_info->data_type, "timestamp")) {
+                        sprintf(fname, "pls_decrypt_b64_id_date(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "raw")) {
+                        sprintf(fname, "pls_decrypt_b64_id_raw(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "clob") ||
+                               !strcasecmp(col_info->data_type, "long")) {
+                        sprintf(fname, "pls_decrypt_clob(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "blob") ||
+                               !strcasecmp(col_info->data_type, "long raw")) {
+                        sprintf(fname, "pls_decrypt_blob(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "number")) {
+                        sprintf(fname, "pls_decrypt_b64_id_num(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else {
+                        sprintf(fname, "pls_decrypt_b64_id(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    }
+                } else {
+                    if (!strcasecmp(col_info->data_type, "number")) {
+                        if (col_info->data_precision == 0) {
+                            sprintf(fname,
+                                    "cast(pls_decrypt_b64_id(%s,%lld) as %s)",
+                                    renamed_col_name, col_info->enc_col_id,
+                                    col_info->data_type);
+                        } else {
+                            sprintf(fname,
+                                    "cast(pls_decrypt_b64_id(%s,%lld) as "
+                                    "%s(%d,%d))",
+                                    renamed_col_name, col_info->enc_col_id,
+                                    col_info->data_type,
+                                    col_info->data_precision,
+                                    col_info->data_scale);
+                        }
+                    } else if (!strcasecmp(col_info->data_type, "char")) {
+                        sprintf(fname,
+                                "cast(pls_decrypt_b64_id(%s,%lld) as %s(%d))",
+                                renamed_col_name, col_info->enc_col_id,
+                                col_info->data_type, col_info->data_length);
+                    } else if (!strcasecmp(col_info->data_type, "date")) {
+                        sprintf(fname,
+                                "to_date(pls_decrypt_b64_id(%s,%lld),'"
+                                "YYYYMMDDHH24MISS')",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "raw")) {
+                        sprintf(
+                            fname,
+                            "cast(pls_decrypt_b64_id_raw(%s,%lld) as %s(%d))",
+                            renamed_col_name, col_info->enc_col_id,
+                            col_info->data_type, col_info->data_length);
+                    } else if (!strcasecmp(col_info->data_type, "clob") ||
+                               !strcasecmp(col_info->data_type, "long")) {
+                        sprintf(fname, "pls_decrypt_clob(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "blob") ||
+                               !strcasecmp(col_info->data_type, "long raw")) {
+                        sprintf(fname, "pls_decrypt_blob(%s,%lld)",
+                                renamed_col_name, col_info->enc_col_id);
+                    } else {
+                        sprintf(fname,
+                                "cast(pls_decrypt_b64_id(%s,%lld) as %s(%d))",
+                                renamed_col_name, col_info->enc_col_id,
+                                col_info->data_type, col_info->data_length);
+                    }
+                }
+            }
+        }
+    } else {
+        while (ColInfoRows2.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows2.data())) {
+            if (col_info->enc_col_id == enc_col_id) {
+                if (instead_of_trigger_flag) {
+                    if (col_info->col_default &&
+                        strlen(PetraNamePool->getNameString(
+                            col_info->col_default)) > 0) {
+                        sprintf(
+                            fname, "PLS_OPHUEK_B64(nvl(:new.%s,%s),%lld,0)",
+                            col_info->col_name,
+                            PetraNamePool->getNameString(col_info->col_default),
+                            col_info->enc_col_id);
+                    } else {
+                        sprintf(fname, "PLS_OPHUEK_B64(:new.%s,%lld,0)",
+                                col_info->col_name, col_info->enc_col_id);
+                    }
+                } else {
+                    sprintf(fname, "PLS_OPHUEK_B64(%s,%lld,0)",
+                            col_info->col_name, col_info->enc_col_id);
+                }
+            }
+        }
+    }
+    return fname;
 }
-
 
 #include "PciCryptoIf.h"
 
-dgt_sint32 PccTiberoScriptBuilder::insteadOfTrigger(dgt_sint8 is_final,dgt_sint32 uniq_flag) throw(DgcExcept)
-{
-        //
-        // create a instead-of trigger for the view so for any DML on the view
-        // to be reflected on the original table.
-        // but the original column is still kepted for emergency recovery.
-        //
-	//
-	// if TabInfo.org_col_name_flag = 1 then use dbms_sql
-	// else update all columns
-	//
-	dgt_uint8 use_dbms_sql=TabInfo.org_col_name_flag;
-        *TextBuf=0;
-	dgt_sint32 ver_flag=1;
-//	if (!strcasecmp(DbVersion,"11g")) ver_flag=1;
-	if (TabInfo.user_view_flag == 1 || (TabInfo.double_flag && IdxColRows.numRows() == 0)) {
-	        sprintf(TextBuf,"create or replace trigger %s.%s\ninstead of insert or update on %s.%s for each row\ndeclare \n",
-	                        SchemaName,TabInfo.view_trigger_name, SchemaName, TabInfo.first_view_name);
-	} else {
-	        sprintf(TextBuf,"create or replace trigger %s.%s\ninstead of insert or update on %s.%s for each row\ndeclare \n",
-	                        SchemaName,TabInfo.view_trigger_name, SchemaName, TabInfo.second_view_name);
-	}
+dgt_sint32 PccTiberoScriptBuilder::insteadOfTrigger(
+    dgt_sint8 is_final, dgt_sint32 uniq_flag) throw(DgcExcept) {
+    //
+    // create a instead-of trigger for the view so for any DML on the view
+    // to be reflected on the original table.
+    // but the original column is still kepted for emergency recovery.
+    //
+    //
+    // if TabInfo.org_col_name_flag = 1 then use dbms_sql
+    // else update all columns
+    //
+    dgt_uint8 use_dbms_sql = TabInfo.org_col_name_flag;
+    *TextBuf = 0;
+    dgt_sint32 ver_flag = 1;
+    //	if (!strcasecmp(DbVersion,"11g")) ver_flag=1;
+    if (TabInfo.user_view_flag == 1 ||
+        (TabInfo.double_flag && IdxColRows.numRows() == 0)) {
+        sprintf(TextBuf,
+                "create or replace trigger %s.%s\ninstead of insert or update "
+                "on %s.%s for each row\ndeclare \n",
+                SchemaName, TabInfo.view_trigger_name, SchemaName,
+                TabInfo.first_view_name);
+    } else {
+        sprintf(TextBuf,
+                "create or replace trigger %s.%s\ninstead of insert or update "
+                "on %s.%s for each row\ndeclare \n",
+                SchemaName, TabInfo.view_trigger_name, SchemaName,
+                TabInfo.second_view_name);
+    }
 
-	*TmpBuf=0;
-	if (use_dbms_sql == 1) {
-		sprintf(TmpBuf,"\n\t v_sql_main varchar2(30000) := null;"
-			       "\n\t v_sql_set varchar2(30000) := null;"
-			       "\n\t v_cursor pls_integer;"
-			       "\n\t v_ret pls_integer;\n");
-		strcat(TextBuf,TmpBuf);
-		if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-			*TmpBuf=0;
-			sprintf(TmpBuf,"\n\t v_sql_main2 varchar2(30000) := null;"
-	                               "\n\t v_sql_set2 varchar2(30000) := null;"
-        	                       "\n\t v_cursor2 pls_integer;"
-                	               "\n\t v_ret2 pls_integer;\n");
-			strcat(TextBuf,TmpBuf);
-		}
-	}
-        ColInfoRows.rewind();
-        pc_type_col_info*       col_info;
-	//
-	// for 11g trigger (performance issue)
-	//
-	while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		if (col_info->status == 5) continue;
-		if (col_info->status >= 1 && col_info->status < 3) {
-			*TmpBuf=0;
-                	dgt_sint32      enc_len = 0;
-	                if (!strcasecmp(col_info->data_type,"NUMBER")) enc_len = (col_info->data_precision + 2);
-        	        else if (!strcasecmp(col_info->data_type,"DATE") || 
-				 !strcasecmp(col_info->data_type,"TIMESTAMP")) enc_len = 14;
-	                else if (col_info->multi_byte_flag) enc_len = col_info->data_length * 3;
-        	        else enc_len = col_info->data_length;
-                	PCI_Context     ctx;
-                        PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type, col_info->enc_mode,
-                        		col_info->iv_type, col_info->n2n_flag, col_info->b64_txt_enc_flag,
-                                       	col_info->enc_start_pos, col_info->enc_length);
-	                enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
-			if (col_info->index_type == 1) {
-                        	enc_len += PCI_ophuekLength(col_info->data_length,PCI_SRC_TYPE_CHAR,1);
-				enc_len += 4;
-			}
-			if (!strcasecmp(col_info->data_type,"NCHAR") ||
-                            !strcasecmp(col_info->data_type,"NVARCHAR2")) {
-				enc_len = enc_len * 3;
-                        }
-        	       	if (!strcasecmp(col_info->data_type,"CLOB") ||
-                	    !strcasecmp(col_info->data_type,"BLOB")) {
-                        	sprintf(TmpBuf,"\t v_%s BLOB;\n", col_info->col_name);
-			} else {
-				if (col_info->b64_txt_enc_flag) {
-					sprintf(TmpBuf,"\t v_%s varchar2(%d);\n", col_info->col_name, enc_len);
-				} else {
-					sprintf(TmpBuf,"\t v_%s raw(%d);\n", col_info->col_name, enc_len);
-				}
-			}
-			strcat(TextBuf,TmpBuf);
-		}
-		*TmpBuf=0;
-		if (use_dbms_sql == 1) {
-			sprintf(TmpBuf,"\t v_%d varchar2(1);\n",col_info->column_order);
-			strcat(TextBuf,TmpBuf);
-		}
-	}
-	strcat(TextBuf,"begin\n");
-	//
-	// for check constraint
-	//
-	CheckTrgRows.rewind();
-	typedef struct {
-		dgt_schar	search_condition[4000];
-		dgt_schar	default_val[4000];
-	} type_check;
-        type_check*    tmp_search=0;
-        while(CheckTrgRows.next() && (tmp_search=(type_check*)CheckTrgRows.data())) {
-		if (strlen(tmp_search->default_val) > 2 && strstr(tmp_search->search_condition,"IS NOT NULL")) continue;
-		*TmpBuf=0;
-		sprintf(TmpBuf,"\n if not ");
-		strcat(TextBuf,TmpBuf);
-		*TmpBuf=0;
-		sprintf(TmpBuf,"( :new.%s )",tmp_search->search_condition);
-		strcat(TextBuf,TmpBuf);
-		*TmpBuf=0;
-		sprintf(TmpBuf," then\n\t raise_application_error(-20001,'%s`s check constraint violated');\n end if;",
-				TabInfo.table_name);
-		strcat(TextBuf,TmpBuf);
-	}
-        *TmpBuf=0;
-	sprintf(TmpBuf,"\n   if inserting then\n");
-        strcat(TextBuf,TmpBuf);
-	*TmpBuf=0;
-	ColInfoRows.rewind();
-	while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		*TmpBuf=0;
-		if (col_info->status == 5) continue;
-		if (col_info->status >= 1 && col_info->status < 3) {
-			sprintf(TmpBuf,"\t\t v_%s := %s;\n",col_info->col_name,getFname(col_info->enc_col_id,1,1));
-			strcat(TextBuf,TmpBuf);
-		}
-	} 
-	//
-	// dual sync mode (keep_org_tab_flag == 1) 
-	//
-	if (TabInfo.keep_org_tab_flag == 1) {
-	        *TmpBuf=0;
-	        sprintf(TmpBuf,"\tinsert into %s.%s(",SchemaName, TabInfo.org_renamed_tab_name);
-	        strcat(TextBuf,TmpBuf);
-        	ColInfoRows.rewind();
-	        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-        	        *TmpBuf=0;
-                	sprintf(TmpBuf,"%s,",col_info->col_name);
-	                strcat(TextBuf,TmpBuf);
-        	}
-	        TextBuf[strlen(TextBuf)-1]=0;
-        	strcat(TextBuf,")\n\tvalues(");
-	        ColInfoRows.rewind();
-        	while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-				*TmpBuf=0;
-				sprintf(TmpBuf,"nvl(:new.%s,%s),",col_info->col_name,PetraNamePool->getNameString(col_info->col_default));
-				strcat(TextBuf,TmpBuf);
-			} else {
-				*TmpBuf=0;
-				sprintf(TmpBuf,":new.%s,",col_info->col_name);
-				strcat(TextBuf,TmpBuf);
-			}
-        	}
-	        TextBuf[strlen(TextBuf)-1]=0;
-        	*TmpBuf=0;
-        	sprintf(TmpBuf,");\n");
-	        strcat(TextBuf,TmpBuf);
-	}
-	*TmpBuf=0;
-	if (TabInfo.enc_type == 0) {
-		sprintf(TmpBuf,"\tinsert into %s.%s(",SchemaName, TabInfo.renamed_tab_name);
-	} else {
-		sprintf(TmpBuf,"\tinsert into %s.%s(",SchemaName, TabInfo.table_name);
-	}
-	strcat(TextBuf,TmpBuf);
-	
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		if (col_info->status == 5) continue;
-                if (col_info->status >= 1 && col_info->status < 3 && is_final) continue;
-                *TmpBuf=0;
-                sprintf(TmpBuf,"%s,",col_info->col_name);
-                strcat(TextBuf,TmpBuf);
+    *TmpBuf = 0;
+    if (use_dbms_sql == 1) {
+        sprintf(TmpBuf,
+                "\n\t v_sql_main varchar2(30000) := null;"
+                "\n\t v_sql_set varchar2(30000) := null;"
+                "\n\t v_cursor pls_integer;"
+                "\n\t v_ret pls_integer;\n");
+        strcat(TextBuf, TmpBuf);
+        if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf,
+                    "\n\t v_sql_main2 varchar2(30000) := null;"
+                    "\n\t v_sql_set2 varchar2(30000) := null;"
+                    "\n\t v_cursor2 pls_integer;"
+                    "\n\t v_ret2 pls_integer;\n");
+            strcat(TextBuf, TmpBuf);
         }
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		if (col_info->status == 5) continue;
-                if (col_info->status >= 1 && col_info->status < 3) {
-                        *TmpBuf=0;
-	                sprintf(TmpBuf,"%s,",col_info->col_name);
-        	        strcat(TextBuf,TmpBuf);
-                        *TmpBuf=0;
-                }
-        }
-        TextBuf[strlen(TextBuf)-1]=0;
-        strcat(TextBuf,")\n\tvalues(");
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		if (col_info->status == 5) continue;
-                if (col_info->status >= 1 && col_info->status < 3 && is_final) continue;
-                        if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"nvl(:new.%s,%s),",col_info->col_name,PetraNamePool->getNameString(col_info->col_default));
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,":new.%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-        }
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		if (col_info->status == 5) continue;
-                if (col_info->status >= 1 && col_info->status < 3) {
-                        dgt_sint32 idx_flag=col_info->index_type;
-                        *TmpBuf=0;
-	                sprintf(TmpBuf,"v_%s,",col_info->col_name);
-        	        strcat(TextBuf,TmpBuf);
-                        *TmpBuf=0;
-                }
-        }
-        TextBuf[strlen(TextBuf)-1]=0;
-        *TmpBuf=0;
-        sprintf(TmpBuf,");\n   elsif updating then");
-        strcat(TextBuf,TmpBuf);
-
-
-	if (use_dbms_sql == 1) {
-		*TmpBuf=0;
-		if (TabInfo.enc_type == 0) {
-			sprintf(TmpBuf,"\n\t\tv_sql_main := 'update %s.%s SET ';", SchemaName, TabInfo.renamed_tab_name);
-		} else {
-			sprintf(TmpBuf,"\n\t\tv_sql_main := 'update %s.%s SET ';", SchemaName, TabInfo.table_name);
-		}
-		strcat(TextBuf,TmpBuf);
-		if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-			*TmpBuf=0;
-			sprintf(TmpBuf,"\n\t\tv_sql_main2 := 'update %s.%s SET ';", SchemaName, TabInfo.org_renamed_tab_name);
-			strcat(TextBuf,TmpBuf);
-		}
-        	ColInfoRows.rewind();
-	        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->status == 5) continue;
-        	        if (col_info->status >= 1 && col_info->status < 3) continue;
-                        *TmpBuf=0;
-			if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-			        sprintf(TmpBuf,"\n\t\tif updating('%s') then "
-					       "\n\t\t\t v_%d := 'Y'; "
-					       "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
-					       "\n\t\t\t v_sql_set2 := v_sql_set2 || '%s=:d%d,';",
-               			               col_info->col_name, col_info->column_order, col_info->col_name, col_info->column_order,
-					       col_info->col_name, col_info->column_order);
-			} else {
-			        sprintf(TmpBuf,"\n\t\tif updating('%s') then "
-					       "\n\t\t\t v_%d := 'Y'; "
-					       "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';",
-               			               col_info->col_name, col_info->column_order, col_info->col_name, col_info->column_order);
-			}
-	                strcat(TextBuf,TmpBuf);
-        	        *TmpBuf=0;
-        	        sprintf(TmpBuf,"\n\t\tend if;");
-                	strcat(TextBuf,TmpBuf);
-	        }
-	        ColInfoRows.rewind();
-        	while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->status == 5) continue;
-                	if (col_info->status >= 1 && col_info->status < 3) {
-				*TmpBuf=0;
-				if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-	                        	sprintf(TmpBuf,"\n\t\tif updating('%s') then "
-        	                        	       "\n\t\t\t v_%d := 'Y'; "
-	        	                               "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
-	        	                               "\n\t\t\t v_sql_set2 := v_sql_set2 || '%s=:d%d,';"
-						       "\n\t\t\t v_%s := %s;",
-                	        	               col_info->col_name, col_info->column_order, col_info->col_name, col_info->column_order,
-						       col_info->col_name, col_info->column_order,
-						       col_info->col_name, getFname(col_info->enc_col_id,1,1));
-				} else {
-	                        	sprintf(TmpBuf,"\n\t\tif updating('%s') then "
-        	                        	       "\n\t\t\t v_%d := 'Y'; "
-	        	                               "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
-						       "\n\t\t\t v_%s := %s;",
-                	        	               col_info->col_name, col_info->column_order, col_info->col_name, col_info->column_order,
-						       col_info->col_name, getFname(col_info->enc_col_id,1,1));
-				}
-	                        strcat(TextBuf,TmpBuf);
-        	                *TmpBuf=0;
-                	        sprintf(TmpBuf,"\n\t\tend if;");
-                        	strcat(TextBuf,TmpBuf);
-			}
-		
-        	}
-        	*TmpBuf=0;
-		if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
-			sprintf(TmpBuf,"\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, length(v_sql_set)-1 );"
-				       "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' WHERE ROWID = :r1';"
-				       "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
-        	                       "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, DBMS_SQL.NATIVE);");
-		} else {
-			IdxColRows.rewind();
-			if (IdxColRows.numRows() == 0) {
-				sprintf(TmpBuf,"\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, length(v_sql_set)-1 );"
-					       "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' WHERE ROWID = :r1';"
-					       "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
-        		                       "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, DBMS_SQL.NATIVE);");
-			} else {
-				dgt_schar* col_name=0;
-				dgt_sint32 seq=0;
-				dgt_schar where_clause[512];
-				dgt_schar tmp_clause[128];
-				memset(where_clause,0,512);
-				memset(tmp_clause,0,128);
-				while (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-					seq++;
-					if (seq == 1) {
-						sprintf(tmp_clause," WHERE %s = :r%d",col_name,seq);
-					} else {
-						sprintf(tmp_clause," and %s = :r%d",col_name,seq);
-					}
-					strcat(where_clause,tmp_clause);
-				}
-				if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) { 
-					sprintf(TmpBuf,"\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, length(v_sql_set)-1 );"
-        	                                       "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' %s';"
-                	                               "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
-                        	                       "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, DBMS_SQL.NATIVE);"
-						       "\n\t\tv_sql_set2 := SUBSTR(v_sql_set2, 1, length(v_sql_set2)-1 );"
-                                                       "\n\t\tv_sql_main2 := v_sql_main2 || v_sql_set2 || ' %s';"
-                                                       "\n\t\tv_cursor2 := DBMS_SQL.OPEN_CURSOR;"
-                                                       "\n\t\tDBMS_SQL.PARSE(v_cursor2, v_sql_main2, DBMS_SQL.NATIVE);"
-							, where_clause, where_clause);
-				} else {
-					sprintf(TmpBuf,"\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, length(v_sql_set)-1 );"
-        	                                       "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' %s';"
-                	                               "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
-                        	                       "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, DBMS_SQL.NATIVE);", where_clause);
-				}
-			}
-		}
-		strcat(TextBuf,TmpBuf);
-        	*TmpBuf=0;
-		ColInfoRows.rewind();
-		while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-                        if (col_info->status == 5) continue;
-                        if (col_info->status >= 1 && col_info->status < 3) {
-				if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-					if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-							       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', v_%s);"
-							       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':d%d', nvl(:new.%s,%s));"
-							       "\n\t\tEND IF;", col_info->column_order, col_info->column_order, col_info->col_name,
-									        col_info->column_order, col_info->col_name, 
-										PetraNamePool->getNameString(col_info->col_default));
-					} else {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-							       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', v_%s);"
-							       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':d%d', :new.%s);"
-							       "\n\t\tEND IF;", col_info->column_order, col_info->column_order, col_info->col_name,
-										col_info->column_order, col_info->col_name);
-					}
-					strcat(TextBuf,TmpBuf);
-				} else {
-					sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-						       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', v_%s);"
-						       "\n\t\tEND IF;", col_info->column_order, col_info->column_order, col_info->col_name);
-					strcat(TextBuf,TmpBuf);
-				}
-                        } else {
-				if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-					if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', nvl(:new.%s,%s));"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':d%d', nvl(:new.%s,%s));"
-                		                               "\n\t\tEND IF;", col_info->column_order, col_info->column_order,
-										col_info->col_name, PetraNamePool->getNameString(col_info->col_default),
-										col_info->column_order, col_info->col_name,
-										PetraNamePool->getNameString(col_info->col_default));
-					} else {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', nvl(:new.%s,%s));"
-                		                               "\n\t\tEND IF;", col_info->column_order, col_info->column_order,
-										col_info->col_name, PetraNamePool->getNameString(col_info->col_default));
-						
-					}
-				} else {
-					if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', :new.%s);"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':d%d', :new.%s);"
-                		                               "\n\t\tEND IF;", col_info->column_order, col_info->column_order, col_info->col_name,
-										col_info->column_order, col_info->col_name);
-					} else {
-						sprintf(TmpBuf,"\n\t\tIF V_%d = 'Y' THEN"
-        		                                       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', :new.%s);"
-                		                               "\n\t\tEND IF;", col_info->column_order, col_info->column_order, col_info->col_name);
-					}
-				}
-                                strcat(TextBuf,TmpBuf);
-			}
-                }
-		*TmpBuf=0;
-                if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
-			sprintf(TmpBuf,"\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r1', :old.row_id);");
-			strcat(TextBuf,TmpBuf);
+    }
+    ColInfoRows.rewind();
+    pc_type_col_info* col_info;
+    //
+    // for 11g trigger (performance issue)
+    //
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3) {
+            *TmpBuf = 0;
+            dgt_sint32 enc_len = 0;
+            if (!strcasecmp(col_info->data_type, "NUMBER"))
+                enc_len = (col_info->data_precision + 2);
+            else if (!strcasecmp(col_info->data_type, "DATE") ||
+                     !strcasecmp(col_info->data_type, "TIMESTAMP"))
+                enc_len = 14;
+            else if (col_info->multi_byte_flag)
+                enc_len = col_info->data_length * 3;
+            else
+                enc_len = col_info->data_length;
+            PCI_Context ctx;
+            PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type,
+                            col_info->enc_mode, col_info->iv_type,
+                            col_info->n2n_flag, col_info->b64_txt_enc_flag,
+                            col_info->enc_start_pos, col_info->enc_length);
+            enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
+            if (col_info->index_type == 1) {
+                enc_len += PCI_ophuekLength(col_info->data_length,
+                                            PCI_SRC_TYPE_CHAR, 1);
+                enc_len += 4;
+            }
+            if (!strcasecmp(col_info->data_type, "NCHAR") ||
+                !strcasecmp(col_info->data_type, "NVARCHAR2")) {
+                enc_len = enc_len * 3;
+            }
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                sprintf(TmpBuf, "\t v_%s BLOB;\n", col_info->col_name);
+            } else {
+                if (col_info->b64_txt_enc_flag) {
+                    sprintf(TmpBuf, "\t v_%s varchar2(%d);\n",
+                            col_info->col_name, enc_len);
                 } else {
-                        IdxColRows.rewind();
-                        if (IdxColRows.numRows() == 0) {
-				sprintf(TmpBuf,"\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r1', :old.row_id);");
-				strcat(TextBuf,TmpBuf);
-                        } else {
-                                dgt_schar* col_name=0;
-                                dgt_sint32 seq=0;
-                                while (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-                                        seq++;
-					if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-						sprintf(TmpBuf,"\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r%d', :old.%s);"
-							       "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':r%d', :old.%s);",seq, col_name, seq, col_name);
-						strcat(TextBuf,TmpBuf);
-					} else {
-						sprintf(TmpBuf,"\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r%d', :old.%s);",seq, col_name);
-						strcat(TextBuf,TmpBuf);
-					}
-                                }
-                        }
+                    sprintf(TmpBuf, "\t v_%s raw(%d);\n", col_info->col_name,
+                            enc_len);
                 }
-		*TmpBuf=0;
-	        sprintf(TmpBuf,"\n\t\tv_ret := DBMS_SQL.EXECUTE (v_cursor);"
-			       "\n\t\tDBMS_SQL.CLOSE_CURSOR (v_cursor);");
-		strcat(TextBuf,TmpBuf);
-		if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-			*TmpBuf=0;
-		        sprintf(TmpBuf,"\n\t\tv_ret2 := DBMS_SQL.EXECUTE (v_cursor2);"
-				       "\n\t\tDBMS_SQL.CLOSE_CURSOR (v_cursor2);");
-			strcat(TextBuf,TmpBuf);
-		}
-	       strcat(TextBuf,"\n\tend if;\nend;");
-        	if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-		}
-	} else {
-		ColInfoRows.rewind();
-		while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {	
-			*TmpBuf=0;
-			if (col_info->status == 5) continue;
-			if (col_info->status >= 1 && col_info->status < 3) {
-				sprintf(TmpBuf,"\n\t v_%s := %s;",col_info->col_name,
-								  getFname(col_info->enc_col_id,1,1));
-				strcat(TextBuf,TmpBuf);
-			}
-			*TmpBuf=0;
-		}
-	        *TmpBuf=0;
-		if (TabInfo.enc_type == 0) {
-	        	sprintf(TmpBuf,"\n\tupdate %s.%s set\n",SchemaName,TabInfo.renamed_tab_name);
-		} else {
-	        	sprintf(TmpBuf,"\n\tupdate %s.%s set\n",SchemaName,TabInfo.table_name);
-		}
-	        strcat(TextBuf,TmpBuf);
-		ColInfoRows.rewind();
-	        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->status == 5) continue;
-        	        if (col_info->status >= 1 && col_info->status < 3 && is_final) continue;
-                	*TmpBuf=0;
-			if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-		                sprintf(TmpBuf,"\n\t\t%s=nvl(:new.%s,%s),",col_info->col_name,col_info->col_name,PetraNamePool->getNameString(col_info->col_default));
-        		        strcat(TextBuf,TmpBuf);
-			} else {
-		                sprintf(TmpBuf,"\n\t\t%s=:new.%s,",col_info->col_name,col_info->col_name);
-        		        strcat(TextBuf,TmpBuf);
-			}
-	        }
-        	ColInfoRows.rewind();
-	        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->status == 5) continue;
-        	        if (col_info->status >= 1 && col_info->status < 3) {
-                        	*TmpBuf=0;
-		               	sprintf(TmpBuf,"\n\t\t%s=v_%s,",col_info->col_name, col_info->col_name);
-				strcat(TextBuf,TmpBuf);
-                        }
-                }
-        	TextBuf[strlen(TextBuf)-1]=0;
-	        strcat(TextBuf,"\n      where ");
-                *TmpBuf=0;
-		if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
-                	strcat(TextBuf,"rowid = :old.row_id");
+            }
+            strcat(TextBuf, TmpBuf);
+        }
+        *TmpBuf = 0;
+        if (use_dbms_sql == 1) {
+            sprintf(TmpBuf, "\t v_%d varchar2(1);\n", col_info->column_order);
+            strcat(TextBuf, TmpBuf);
+        }
+    }
+    strcat(TextBuf, "begin\n");
+    //
+    // for check constraint
+    //
+    CheckTrgRows.rewind();
+    typedef struct {
+        dgt_schar search_condition[4000];
+        dgt_schar default_val[4000];
+    } type_check;
+    type_check* tmp_search = 0;
+    while (CheckTrgRows.next() &&
+           (tmp_search = (type_check*)CheckTrgRows.data())) {
+        if (strlen(tmp_search->default_val) > 2 &&
+            strstr(tmp_search->search_condition, "IS NOT NULL"))
+            continue;
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "\n if not ");
+        strcat(TextBuf, TmpBuf);
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "( :new.%s )", tmp_search->search_condition);
+        strcat(TextBuf, TmpBuf);
+        *TmpBuf = 0;
+        sprintf(TmpBuf,
+                " then\n\t raise_application_error(-20001,'%s`s check "
+                "constraint violated');\n end if;",
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+    }
+    *TmpBuf = 0;
+    sprintf(TmpBuf, "\n   if inserting then\n");
+    strcat(TextBuf, TmpBuf);
+    *TmpBuf = 0;
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        *TmpBuf = 0;
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3) {
+            sprintf(TmpBuf, "\t\t v_%s := %s;\n", col_info->col_name,
+                    getFname(col_info->enc_col_id, 1, 1));
+            strcat(TextBuf, TmpBuf);
+        }
+    }
+    //
+    // dual sync mode (keep_org_tab_flag == 1)
+    //
+    if (TabInfo.keep_org_tab_flag == 1) {
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "\tinsert into %s.%s(", SchemaName,
+                TabInfo.org_renamed_tab_name);
+        strcat(TextBuf, TmpBuf);
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "%s,", col_info->col_name);
+            strcat(TextBuf, TmpBuf);
+        }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        strcat(TextBuf, ")\n\tvalues(");
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->col_default && strlen(PetraNamePool->getNameString(
+                                             col_info->col_default)) > 0) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "nvl(:new.%s,%s),", col_info->col_name,
+                        PetraNamePool->getNameString(col_info->col_default));
+                strcat(TextBuf, TmpBuf);
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, ":new.%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        *TmpBuf = 0;
+        sprintf(TmpBuf, ");\n");
+        strcat(TextBuf, TmpBuf);
+    }
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        sprintf(TmpBuf, "\tinsert into %s.%s(", SchemaName,
+                TabInfo.renamed_tab_name);
+    } else {
+        sprintf(TmpBuf, "\tinsert into %s.%s(", SchemaName, TabInfo.table_name);
+    }
+    strcat(TextBuf, TmpBuf);
+
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3 && is_final) continue;
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "%s,", col_info->col_name);
+        strcat(TextBuf, TmpBuf);
+    }
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "%s,", col_info->col_name);
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+        }
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    strcat(TextBuf, ")\n\tvalues(");
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3 && is_final) continue;
+        if (col_info->col_default &&
+            strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "nvl(:new.%s,%s),", col_info->col_name,
+                    PetraNamePool->getNameString(col_info->col_default));
+            strcat(TextBuf, TmpBuf);
+        } else {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, ":new.%s,", col_info->col_name);
+            strcat(TextBuf, TmpBuf);
+        }
+    }
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 5) continue;
+        if (col_info->status >= 1 && col_info->status < 3) {
+            dgt_sint32 idx_flag = col_info->index_type;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "v_%s,", col_info->col_name);
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+        }
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    *TmpBuf = 0;
+    sprintf(TmpBuf, ");\n   elsif updating then");
+    strcat(TextBuf, TmpBuf);
+
+    if (use_dbms_sql == 1) {
+        *TmpBuf = 0;
+        if (TabInfo.enc_type == 0) {
+            sprintf(TmpBuf, "\n\t\tv_sql_main := 'update %s.%s SET ';",
+                    SchemaName, TabInfo.renamed_tab_name);
+        } else {
+            sprintf(TmpBuf, "\n\t\tv_sql_main := 'update %s.%s SET ';",
+                    SchemaName, TabInfo.table_name);
+        }
+        strcat(TextBuf, TmpBuf);
+        if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n\t\tv_sql_main2 := 'update %s.%s SET ';",
+                    SchemaName, TabInfo.org_renamed_tab_name);
+            strcat(TextBuf, TmpBuf);
+        }
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3) continue;
+            *TmpBuf = 0;
+            if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
+                sprintf(TmpBuf,
+                        "\n\t\tif updating('%s') then "
+                        "\n\t\t\t v_%d := 'Y'; "
+                        "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
+                        "\n\t\t\t v_sql_set2 := v_sql_set2 || '%s=:d%d,';",
+                        col_info->col_name, col_info->column_order,
+                        col_info->col_name, col_info->column_order,
+                        col_info->col_name, col_info->column_order);
+            } else {
+                sprintf(TmpBuf,
+                        "\n\t\tif updating('%s') then "
+                        "\n\t\t\t v_%d := 'Y'; "
+                        "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';",
+                        col_info->col_name, col_info->column_order,
+                        col_info->col_name, col_info->column_order);
+            }
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n\t\tend if;");
+            strcat(TextBuf, TmpBuf);
+        }
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3) {
+                *TmpBuf = 0;
+                if (TabInfo.keep_org_tab_flag == 1 &&
+                    IdxColRows.numRows() > 0) {
+                    sprintf(TmpBuf,
+                            "\n\t\tif updating('%s') then "
+                            "\n\t\t\t v_%d := 'Y'; "
+                            "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
+                            "\n\t\t\t v_sql_set2 := v_sql_set2 || '%s=:d%d,';"
+                            "\n\t\t\t v_%s := %s;",
+                            col_info->col_name, col_info->column_order,
+                            col_info->col_name, col_info->column_order,
+                            col_info->col_name, col_info->column_order,
+                            col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
                 } else {
-                	IdxColRows.rewind();
-                        if (IdxColRows.numRows() == 0) {
-                        	strcat(TextBuf,"rowid = :old.row_id");
-                        } else {
-                        	dgt_schar* col_name=0;
-                                dgt_sint32 seq=0;
-                                while (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-                                	seq++;
-                                        *TmpBuf=0;
-	                                if (seq == 1) {
-        	                        	sprintf(TmpBuf,"%s = :old.%s ",col_name,col_name);
-                	                } else {
-                        	        	sprintf(TmpBuf,"\n\t and %s = :old.%s",col_name,col_name);
-                                	}
-	                                strcat(TextBuf,TmpBuf);
-				}
-                       }
-		}
-		strcat(TextBuf,";");
-		*TmpBuf=0;
-		if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
-                        sprintf(TmpBuf,"\n\tupdate %s.%s set\n",SchemaName,TabInfo.org_renamed_tab_name);
-		        strcat(TextBuf,TmpBuf);
-        	        ColInfoRows.rewind();
-               		while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        	if (col_info->status == 5) continue;
-                        	*TmpBuf=0;
-	                        if (col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-        	                        sprintf(TmpBuf,"\n\t\t%s=nvl(:new.%s,%s),",col_info->col_name,col_info->col_name,PetraNamePool->getNameString(col_info->col_default));
-                	                strcat(TextBuf,TmpBuf);
-                        	} else {
-	                                sprintf(TmpBuf,"\n\t\t%s=:new.%s,",col_info->col_name,col_info->col_name);
-        	                        strcat(TextBuf,TmpBuf);
-                	        }
-                	}
-	                TextBuf[strlen(TextBuf)-1]=0;
-        	        strcat(TextBuf,"\n      where ");
-                	*TmpBuf=0;
-                        IdxColRows.rewind();
-			dgt_schar* col_name=0;
-			dgt_sint32 seq=0;
-			while (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-				seq++;
-				*TmpBuf=0;
-				if (seq == 1) {
-					sprintf(TmpBuf,"%s = :old.%s ",col_name,col_name);
-				} else {
-					sprintf(TmpBuf,"\n\t and %s = :old.%s",col_name,col_name);
-				}
-				strcat(TextBuf,TmpBuf);
-			}
-			strcat(TextBuf,";");
+                    sprintf(TmpBuf,
+                            "\n\t\tif updating('%s') then "
+                            "\n\t\t\t v_%d := 'Y'; "
+                            "\n\t\t\t v_sql_set := v_sql_set || '%s=:d%d,';"
+                            "\n\t\t\t v_%s := %s;",
+                            col_info->col_name, col_info->column_order,
+                            col_info->col_name, col_info->column_order,
+                            col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
                 }
-        	strcat(TextBuf,"\n   end if;\nend;\n");
-        	if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	        }
-	}
-	return 0;
+                strcat(TextBuf, TmpBuf);
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n\t\tend if;");
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        *TmpBuf = 0;
+        if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
+            sprintf(
+                TmpBuf,
+                "\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, length(v_sql_set)-1 );"
+                "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' WHERE ROWID "
+                "= :r1';"
+                "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
+                "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, DBMS_SQL.NATIVE);");
+        } else {
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                sprintf(TmpBuf,
+                        "\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, "
+                        "length(v_sql_set)-1 );"
+                        "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' "
+                        "WHERE ROWID = :r1';"
+                        "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
+                        "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, "
+                        "DBMS_SQL.NATIVE);");
+            } else {
+                dgt_schar* col_name = 0;
+                dgt_sint32 seq = 0;
+                dgt_schar where_clause[512];
+                dgt_schar tmp_clause[128];
+                memset(where_clause, 0, 512);
+                memset(tmp_clause, 0, 128);
+                while (IdxColRows.next() &&
+                       (col_name = (dgt_schar*)IdxColRows.data())) {
+                    seq++;
+                    if (seq == 1) {
+                        sprintf(tmp_clause, " WHERE %s = :r%d", col_name, seq);
+                    } else {
+                        sprintf(tmp_clause, " and %s = :r%d", col_name, seq);
+                    }
+                    strcat(where_clause, tmp_clause);
+                }
+                if (TabInfo.keep_org_tab_flag == 1 &&
+                    IdxColRows.numRows() > 0) {
+                    sprintf(
+                        TmpBuf,
+                        "\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, "
+                        "length(v_sql_set)-1 );"
+                        "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' %s';"
+                        "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
+                        "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, "
+                        "DBMS_SQL.NATIVE);"
+                        "\n\t\tv_sql_set2 := SUBSTR(v_sql_set2, 1, "
+                        "length(v_sql_set2)-1 );"
+                        "\n\t\tv_sql_main2 := v_sql_main2 || v_sql_set2 || ' "
+                        "%s';"
+                        "\n\t\tv_cursor2 := DBMS_SQL.OPEN_CURSOR;"
+                        "\n\t\tDBMS_SQL.PARSE(v_cursor2, v_sql_main2, "
+                        "DBMS_SQL.NATIVE);",
+                        where_clause, where_clause);
+                } else {
+                    sprintf(
+                        TmpBuf,
+                        "\n\t\tv_sql_set := SUBSTR(v_sql_set, 1, "
+                        "length(v_sql_set)-1 );"
+                        "\n\t\tv_sql_main := v_sql_main || v_sql_set || ' %s';"
+                        "\n\t\tv_cursor := DBMS_SQL.OPEN_CURSOR;"
+                        "\n\t\tDBMS_SQL.PARSE(v_cursor, v_sql_main, "
+                        "DBMS_SQL.NATIVE);",
+                        where_clause);
+                }
+            }
+        }
+        strcat(TextBuf, TmpBuf);
+        *TmpBuf = 0;
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3) {
+                if (TabInfo.keep_org_tab_flag == 1 &&
+                    IdxColRows.numRows() > 0) {
+                    if (col_info->col_default &&
+                        strlen(PetraNamePool->getNameString(
+                            col_info->col_default)) > 0) {
+                        sprintf(TmpBuf,
+                                "\n\t\tIF V_%d = 'Y' THEN"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':d%d', v_%s);"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, "
+                                "':d%d', nvl(:new.%s,%s));"
+                                "\n\t\tEND IF;",
+                                col_info->column_order, col_info->column_order,
+                                col_info->col_name, col_info->column_order,
+                                col_info->col_name,
+                                PetraNamePool->getNameString(
+                                    col_info->col_default));
+                    } else {
+                        sprintf(TmpBuf,
+                                "\n\t\tIF V_%d = 'Y' THEN"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':d%d', v_%s);"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, "
+                                "':d%d', :new.%s);"
+                                "\n\t\tEND IF;",
+                                col_info->column_order, col_info->column_order,
+                                col_info->col_name, col_info->column_order,
+                                col_info->col_name);
+                    }
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    sprintf(
+                        TmpBuf,
+                        "\n\t\tIF V_%d = 'Y' THEN"
+                        "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', v_%s);"
+                        "\n\t\tEND IF;",
+                        col_info->column_order, col_info->column_order,
+                        col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            } else {
+                if (col_info->col_default &&
+                    strlen(PetraNamePool->getNameString(
+                        col_info->col_default)) > 0) {
+                    if (TabInfo.keep_org_tab_flag == 1 &&
+                        IdxColRows.numRows() > 0) {
+                        sprintf(
+                            TmpBuf,
+                            "\n\t\tIF V_%d = 'Y' THEN"
+                            "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':d%d', "
+                            "nvl(:new.%s,%s));"
+                            "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, ':d%d', "
+                            "nvl(:new.%s,%s));"
+                            "\n\t\tEND IF;",
+                            col_info->column_order, col_info->column_order,
+                            col_info->col_name,
+                            PetraNamePool->getNameString(col_info->col_default),
+                            col_info->column_order, col_info->col_name,
+                            PetraNamePool->getNameString(
+                                col_info->col_default));
+                    } else {
+                        sprintf(TmpBuf,
+                                "\n\t\tIF V_%d = 'Y' THEN"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':d%d', nvl(:new.%s,%s));"
+                                "\n\t\tEND IF;",
+                                col_info->column_order, col_info->column_order,
+                                col_info->col_name,
+                                PetraNamePool->getNameString(
+                                    col_info->col_default));
+                    }
+                } else {
+                    if (TabInfo.keep_org_tab_flag == 1 &&
+                        IdxColRows.numRows() > 0) {
+                        sprintf(TmpBuf,
+                                "\n\t\tIF V_%d = 'Y' THEN"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':d%d', :new.%s);"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, "
+                                "':d%d', :new.%s);"
+                                "\n\t\tEND IF;",
+                                col_info->column_order, col_info->column_order,
+                                col_info->col_name, col_info->column_order,
+                                col_info->col_name);
+                    } else {
+                        sprintf(TmpBuf,
+                                "\n\t\tIF V_%d = 'Y' THEN"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':d%d', :new.%s);"
+                                "\n\t\tEND IF;",
+                                col_info->column_order, col_info->column_order,
+                                col_info->col_name);
+                    }
+                }
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        *TmpBuf = 0;
+        if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
+            sprintf(
+                TmpBuf,
+                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r1', :old.row_id);");
+            strcat(TextBuf, TmpBuf);
+        } else {
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                sprintf(TmpBuf,
+                        "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, ':r1', "
+                        ":old.row_id);");
+                strcat(TextBuf, TmpBuf);
+            } else {
+                dgt_schar* col_name = 0;
+                dgt_sint32 seq = 0;
+                while (IdxColRows.next() &&
+                       (col_name = (dgt_schar*)IdxColRows.data())) {
+                    seq++;
+                    if (TabInfo.keep_org_tab_flag == 1 &&
+                        IdxColRows.numRows() > 0) {
+                        sprintf(TmpBuf,
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':r%d', :old.%s);"
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor2, "
+                                "':r%d', :old.%s);",
+                                seq, col_name, seq, col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        sprintf(TmpBuf,
+                                "\n\t\tDBMS_SQL.BIND_VARIABLE (v_cursor, "
+                                "':r%d', :old.%s);",
+                                seq, col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                }
+            }
+        }
+        *TmpBuf = 0;
+        sprintf(TmpBuf,
+                "\n\t\tv_ret := DBMS_SQL.EXECUTE (v_cursor);"
+                "\n\t\tDBMS_SQL.CLOSE_CURSOR (v_cursor);");
+        strcat(TextBuf, TmpBuf);
+        if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf,
+                    "\n\t\tv_ret2 := DBMS_SQL.EXECUTE (v_cursor2);"
+                    "\n\t\tDBMS_SQL.CLOSE_CURSOR (v_cursor2);");
+            strcat(TextBuf, TmpBuf);
+        }
+        strcat(TextBuf, "\n\tend if;\nend;");
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    } else {
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3) {
+                sprintf(TmpBuf, "\n\t v_%s := %s;", col_info->col_name,
+                        getFname(col_info->enc_col_id, 1, 1));
+                strcat(TextBuf, TmpBuf);
+            }
+            *TmpBuf = 0;
+        }
+        *TmpBuf = 0;
+        if (TabInfo.enc_type == 0) {
+            sprintf(TmpBuf, "\n\tupdate %s.%s set\n", SchemaName,
+                    TabInfo.renamed_tab_name);
+        } else {
+            sprintf(TmpBuf, "\n\tupdate %s.%s set\n", SchemaName,
+                    TabInfo.table_name);
+        }
+        strcat(TextBuf, TmpBuf);
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3 && is_final)
+                continue;
+            *TmpBuf = 0;
+            if (col_info->col_default && strlen(PetraNamePool->getNameString(
+                                             col_info->col_default)) > 0) {
+                sprintf(TmpBuf, "\n\t\t%s=nvl(:new.%s,%s),", col_info->col_name,
+                        col_info->col_name,
+                        PetraNamePool->getNameString(col_info->col_default));
+                strcat(TextBuf, TmpBuf);
+            } else {
+                sprintf(TmpBuf, "\n\t\t%s=:new.%s,", col_info->col_name,
+                        col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 5) continue;
+            if (col_info->status >= 1 && col_info->status < 3) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n\t\t%s=v_%s,", col_info->col_name,
+                        col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        strcat(TextBuf, "\n      where ");
+        *TmpBuf = 0;
+        if (TabInfo.double_flag && IdxColRows.numRows() == 0) {
+            strcat(TextBuf, "rowid = :old.row_id");
+        } else {
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                strcat(TextBuf, "rowid = :old.row_id");
+            } else {
+                dgt_schar* col_name = 0;
+                dgt_sint32 seq = 0;
+                while (IdxColRows.next() &&
+                       (col_name = (dgt_schar*)IdxColRows.data())) {
+                    seq++;
+                    *TmpBuf = 0;
+                    if (seq == 1) {
+                        sprintf(TmpBuf, "%s = :old.%s ", col_name, col_name);
+                    } else {
+                        sprintf(TmpBuf, "\n\t and %s = :old.%s", col_name,
+                                col_name);
+                    }
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+        }
+        strcat(TextBuf, ";");
+        *TmpBuf = 0;
+        if (TabInfo.keep_org_tab_flag == 1 && IdxColRows.numRows() > 0) {
+            sprintf(TmpBuf, "\n\tupdate %s.%s set\n", SchemaName,
+                    TabInfo.org_renamed_tab_name);
+            strcat(TextBuf, TmpBuf);
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                if (col_info->status == 5) continue;
+                *TmpBuf = 0;
+                if (col_info->col_default &&
+                    strlen(PetraNamePool->getNameString(
+                        col_info->col_default)) > 0) {
+                    sprintf(
+                        TmpBuf, "\n\t\t%s=nvl(:new.%s,%s),", col_info->col_name,
+                        col_info->col_name,
+                        PetraNamePool->getNameString(col_info->col_default));
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    sprintf(TmpBuf, "\n\t\t%s=:new.%s,", col_info->col_name,
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            strcat(TextBuf, "\n      where ");
+            *TmpBuf = 0;
+            IdxColRows.rewind();
+            dgt_schar* col_name = 0;
+            dgt_sint32 seq = 0;
+            while (IdxColRows.next() &&
+                   (col_name = (dgt_schar*)IdxColRows.data())) {
+                seq++;
+                *TmpBuf = 0;
+                if (seq == 1) {
+                    sprintf(TmpBuf, "%s = :old.%s ", col_name, col_name);
+                } else {
+                    sprintf(TmpBuf, "\n\t and %s = :old.%s", col_name,
+                            col_name);
+                }
+                strcat(TextBuf, TmpBuf);
+            }
+            strcat(TextBuf, ";");
+        }
+        strcat(TextBuf, "\n   end if;\nend;\n");
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    return 0;
 }
 
 typedef struct {
-        dgt_schar org1[512];
-        dgt_schar org2[512];
-        dgt_schar enc1[512];
-        dgt_schar enc2[512];
-        dgt_schar org3[512];
-        dgt_schar org4[512];
+    dgt_schar org1[512];
+    dgt_schar org2[512];
+    dgt_schar enc1[512];
+    dgt_schar enc2[512];
+    dgt_schar org3[512];
+    dgt_schar org4[512];
 } pkfk_sql;
 
-dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
-{
-	//
-	// new copy table encryption (non add column)
-	//
-        // create the copy table (same as original table) 
-	//
-        pc_type_col_info*       col_info;
-        StepNo=1;
-        StmtNo=1000;
-        *TextBuf=0;
-	*TmpBuf=0;
-        dgt_schar       sql_text[2048];
-	memset(sql_text,0,2048);
-	sprintf(TextBuf,"CREATE TABLE %s.%s (",SchemaName,TabInfo.renamed_tab_name);
-	
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-		*TmpBuf=0;
-		dgt_schar type[128];
-		memset(type,0,128);
-		if (!strcasecmp(col_info->data_type,"NUMBER")) {
-			if (col_info->data_precision && col_info->data_scale) {
-				sprintf(type,"%s NUMBER(%d,%d)", col_info->col_name, col_info->data_precision, col_info->data_scale);
-			} else if (col_info->data_precision) {
-				sprintf(type,"%s NUMBER(%d)", col_info->col_name, col_info->data_precision);
-			} else {
-				sprintf(type,"%s NUMBER",col_info->col_name);
-			}
-		} else if (!strcasecmp(col_info->data_type, "TIMESTAMP")) {
-			if (col_info->data_scale) {
-				sprintf(type,"%s TIMESTAMP(%d)", col_info->col_name, col_info->data_scale);
-			} else {
-				sprintf(type,"%s TIMESTAMP", col_info->col_name);
-			}
-		} else if (!strcasecmp(col_info->data_type, "DATE")) {
-			sprintf(type,"%s %s", col_info->col_name, col_info->data_type);
-		} else if (!strcasecmp(col_info->data_type, "BLOB") || 
-			   !strcasecmp(col_info->data_type, "CLOB")) {
-			sprintf(type,"%s %s", col_info->col_name, col_info->data_type);
-		} else if (!strcasecmp(col_info->data_type, "LONG")) {
-			if (col_info->status == 1) {
-				sprintf(type,"%s CLOB", col_info->col_name);
-			} else {
-				sprintf(type,"%s %s",col_info->col_name, col_info->data_type);
-			}
-		} else if (!strcasecmp(col_info->data_type, "LONG RAW")) {
-			if (col_info->status == 1) {
-				sprintf(type,"%s BLOB", col_info->col_name);
-			} else {
-				sprintf(type,"%s %s",col_info->col_name, col_info->data_type);
-			}
-		} else if (col_info->data_length) {
-			sprintf(type,"%s %s(%d)", col_info->col_name, col_info->data_type, col_info->data_length);
-		} else {
-			sprintf(type,"%s %s", col_info->col_name, col_info->data_type);
-		}
-		strcat(TextBuf,type);
-		if (col_info->status == 0 && col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-			sprintf(TmpBuf," default %s,\n", PetraNamePool->getNameString(col_info->col_default));
-		} else {
-			sprintf(TmpBuf,",\n");
-		}
-		strcat(TextBuf,TmpBuf);
-	
-	}
+dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept) {
+    //
+    // new copy table encryption (non add column)
+    //
+    // create the copy table (same as original table)
+    //
+    pc_type_col_info* col_info;
+    StepNo = 1;
+    StmtNo = 1000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    sprintf(TextBuf, "CREATE TABLE %s.%s (", SchemaName,
+            TabInfo.renamed_tab_name);
 
-	TextBuf[strlen(TextBuf)-2]=0;
-	CheckSqlRows2.rewind();
-        dgt_schar* cksql=0;
-        while(CheckSqlRows2.next() && (cksql=(dgt_schar*)CheckSqlRows2.data())) {
-                if (cksql && strlen(cksql) > 2) {
-                        strcat(TextBuf,",");
-                        strcat(TextBuf,cksql);
-                }
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        *TmpBuf = 0;
+        dgt_schar type[128];
+        memset(type, 0, 128);
+        if (!strcasecmp(col_info->data_type, "NUMBER")) {
+            if (col_info->data_precision && col_info->data_scale) {
+                sprintf(type, "%s NUMBER(%d,%d)", col_info->col_name,
+                        col_info->data_precision, col_info->data_scale);
+            } else if (col_info->data_precision) {
+                sprintf(type, "%s NUMBER(%d)", col_info->col_name,
+                        col_info->data_precision);
+            } else {
+                sprintf(type, "%s NUMBER", col_info->col_name);
+            }
+        } else if (!strcasecmp(col_info->data_type, "TIMESTAMP")) {
+            if (col_info->data_scale) {
+                sprintf(type, "%s TIMESTAMP(%d)", col_info->col_name,
+                        col_info->data_scale);
+            } else {
+                sprintf(type, "%s TIMESTAMP", col_info->col_name);
+            }
+        } else if (!strcasecmp(col_info->data_type, "DATE")) {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+        } else if (!strcasecmp(col_info->data_type, "BLOB") ||
+                   !strcasecmp(col_info->data_type, "CLOB")) {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+        } else if (!strcasecmp(col_info->data_type, "LONG")) {
+            if (col_info->status == 1) {
+                sprintf(type, "%s CLOB", col_info->col_name);
+            } else {
+                sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+            }
+        } else if (!strcasecmp(col_info->data_type, "LONG RAW")) {
+            if (col_info->status == 1) {
+                sprintf(type, "%s BLOB", col_info->col_name);
+            } else {
+                sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+            }
+        } else if (col_info->data_length) {
+            sprintf(type, "%s %s(%d)", col_info->col_name, col_info->data_type,
+                    col_info->data_length);
+        } else {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
         }
+        strcat(TextBuf, type);
+        if (col_info->status == 0 && col_info->col_default &&
+            strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
+            sprintf(TmpBuf, " default %s,\n",
+                    PetraNamePool->getNameString(col_info->col_default));
+        } else {
+            sprintf(TmpBuf, ",\n");
+        }
+        strcat(TextBuf, TmpBuf);
+    }
 
-	
-	sprintf(TmpBuf,") TABLESPACE %s",TabInfo.target_tablespace_name);
-	strcat(TextBuf,TmpBuf);
-	if (saveSqlText() < 0) {
-		ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+    TextBuf[strlen(TextBuf) - 2] = 0;
+    CheckSqlRows2.rewind();
+    dgt_schar* cksql = 0;
+    while (CheckSqlRows2.next() && (cksql = (dgt_schar*)CheckSqlRows2.data())) {
+        if (cksql && strlen(cksql) > 2) {
+            strcat(TextBuf, ",");
+            strcat(TextBuf, cksql);
         }
+    }
+
+    sprintf(TmpBuf, ") TABLESPACE %s", TabInfo.target_tablespace_name);
+    strcat(TextBuf, TmpBuf);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
 #if 1
-        *TextBuf=0;
-        ColInfoRows.rewind();
-        dgt_sint32      lob_flag=0;
-        dgt_sint32      long_flag=0;
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 1) {
-                        if (!strcasecmp(col_info->data_type,"CLOB") ||
-                            !strcasecmp(col_info->data_type,"BLOB")) {
-				lob_flag=1;
-			}
-			if (!strcasecmp(col_info->data_type,"LONG") || 
-			    !strcasecmp(col_info->data_type,"LONG RAW")) {
-                                long_flag=1;
-                        }
-                }
+    *TextBuf = 0;
+    ColInfoRows.rewind();
+    dgt_sint32 lob_flag = 0;
+    dgt_sint32 long_flag = 0;
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 1) {
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                lob_flag = 1;
+            }
+            if (!strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW")) {
+                long_flag = 1;
+            }
         }
+    }
 #endif
-	//
-        // alter table modify column
-        //
-        StmtNo=2000;
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-        	if (col_info->status == 1) {
-                	dgt_sint32      enc_len = 0;
-                        if (!strcasecmp(col_info->data_type,"NUMBER")) enc_len = (col_info->data_precision + 2);
-                        else if (!strcasecmp(col_info->data_type,"DATE") || !strcasecmp(col_info->data_type,"TIMESTAMP")) enc_len = 14;
-                        else if (col_info->multi_byte_flag) enc_len = col_info->data_length * 3;
-                        else enc_len = col_info->data_length;
-                        PCI_Context     ctx;
-                        PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type, col_info->enc_mode,
-                                                col_info->iv_type, col_info->n2n_flag, col_info->b64_txt_enc_flag,
-                                                col_info->enc_start_pos, col_info->enc_length);
-                        enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
-			if (col_info->index_type == 1) {
-                        	enc_len += PCI_ophuekLength(col_info->data_length, PCI_SRC_TYPE_CHAR, 1);
-                        	enc_len += 4;
-			}
-			if (!strcasecmp(col_info->data_type,"NVARCHAR2") ||
-			    !strcasecmp(col_info->data_type,"NCHAR")) {
-				enc_len = enc_len * 3;
-			}
-                        *TextBuf=0;
-                        if (!strcasecmp(col_info->data_type,"CLOB") || 	!strcasecmp(col_info->data_type,"BLOB")) {
-                        	//sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
-                        } else if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-				sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
-			} else {
-                        	if (col_info->b64_txt_enc_flag) {
-                                	sprintf(TextBuf,"alter table %s.%s modify %s varchar2(%d)",
-                                        	SchemaName, TabInfo.renamed_tab_name, col_info->col_name, enc_len);
-                                } else {
-                                	sprintf(TextBuf,"alter table %s.%s modify %s raw(%d)",
-                                        	SchemaName, TabInfo.renamed_tab_name, col_info->col_name, enc_len);
-                                }
-                        }
-                        if (*TextBuf && saveSqlText() < 0) {
-                        	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
+    //
+    // alter table modify column
+    //
+    StmtNo = 2000;
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 1) {
+            dgt_sint32 enc_len = 0;
+            if (!strcasecmp(col_info->data_type, "NUMBER"))
+                enc_len = (col_info->data_precision + 2);
+            else if (!strcasecmp(col_info->data_type, "DATE") ||
+                     !strcasecmp(col_info->data_type, "TIMESTAMP"))
+                enc_len = 14;
+            else if (col_info->multi_byte_flag)
+                enc_len = col_info->data_length * 3;
+            else
+                enc_len = col_info->data_length;
+            PCI_Context ctx;
+            PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type,
+                            col_info->enc_mode, col_info->iv_type,
+                            col_info->n2n_flag, col_info->b64_txt_enc_flag,
+                            col_info->enc_start_pos, col_info->enc_length);
+            enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
+            if (col_info->index_type == 1) {
+                enc_len += PCI_ophuekLength(col_info->data_length,
+                                            PCI_SRC_TYPE_CHAR, 1);
+                enc_len += 4;
+            }
+            if (!strcasecmp(col_info->data_type, "NVARCHAR2") ||
+                !strcasecmp(col_info->data_type, "NCHAR")) {
+                enc_len = enc_len * 3;
+            }
+            *TextBuf = 0;
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                // sprintf(TextBuf,"alter table %s.%s modify %s BLOB",
+                // SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
+            } else if (!strcasecmp(col_info->data_type, "LONG") ||
+                       !strcasecmp(col_info->data_type, "LONG RAW")) {
+                sprintf(TextBuf, "alter table %s.%s modify %s BLOB", SchemaName,
+                        TabInfo.renamed_tab_name, col_info->col_name);
+            } else {
+                if (col_info->b64_txt_enc_flag) {
+                    sprintf(TextBuf, "alter table %s.%s modify %s varchar2(%d)",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            col_info->col_name, enc_len);
+                } else {
+                    sprintf(TextBuf, "alter table %s.%s modify %s raw(%d)",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            col_info->col_name, enc_len);
+                }
+            }
+            if (*TextBuf && saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
 
-                        *TextBuf=0;
-		} else {
-			*TextBuf=0;
-			if (TabInfo.enc_type == 0) {
+            *TextBuf = 0;
+        } else {
+            *TextBuf = 0;
+            if (TabInfo.enc_type == 0) {
 #if 0
 				if (!strcasecmp(col_info->data_type,"LONG")) {
 					sprintf(TextBuf,"alter table %s.%s modify %s clob",SchemaName,TabInfo.renamed_tab_name,col_info->col_name);
@@ -2657,12 +3097,12 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
                                         }
 				}
 #endif
-			} 
-		}
-	}
-	//
-	// Create the Transaction table
-	//
+            }
+        }
+    }
+    //
+    // Create the Transaction table
+    //
 #if 0
 	if (TabInfo.tran_trg_flag == 1 && TranIdxColRows.numRows() > 0) {
 		StmtNo=4000;
@@ -2785,9 +3225,9 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
 	        }
 	}
 #endif
-	//
-	// initial encrpytion(parallel insert)
-	//
+    //
+    // initial encrpytion(parallel insert)
+    //
 #if 0
 	if (lob_flag == 0) {
                 *TextBuf=0;
@@ -2797,99 +3237,113 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
                 }
 	}
 #endif
-	StmtNo=6000;
-	*TextBuf=0;
-	*TmpBuf=0;
-	if (lob_flag==1) {
-		ColInfoRows.rewind();
-		sprintf(TmpBuf,"insert into %s.%s( ",
-				SchemaName,TabInfo.renamed_tab_name);
-		strcat(TextBuf,TmpBuf);
-		while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			*TmpBuf=0;
-			if (col_info->status == 1) {
-				sprintf(TmpBuf,"%s,",col_info->col_name);
-				strcat(TextBuf,TmpBuf);
-			} else {
-				sprintf(TmpBuf,"%s,",col_info->col_name);
-				strcat(TextBuf,TmpBuf);
-			}
-		}
-		TextBuf[strlen(TextBuf)-1]=0;
-		strcat(TextBuf,") \nselect ");
-		ColInfoRows.rewind();
-		while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			*TmpBuf=0;
-			if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-				sprintf(TmpBuf,"to_lob(%s),",col_info->col_name);
-				strcat(TextBuf,TmpBuf);	
-			} else {
-				if (col_info->status == 1) {
-					sprintf(TmpBuf,"%s,",getFname(col_info->enc_col_id,1));
-					strcat(TextBuf,TmpBuf);	
-				} else {
-					sprintf(TmpBuf,"%s,",col_info->col_name);
-					strcat(TextBuf,TmpBuf);	
-				}
-			}
-		}
-	} else {
-		*TextBuf=0;
-	        ColInfoRows.rewind();
-        	sprintf(TmpBuf,"insert /*+ APPEND PARALLEL(%s,%d) */ into %s.%s \n select ",
-                	TabInfo.renamed_tab_name, ParallelDegree, SchemaName,TabInfo.renamed_tab_name);
-	        strcat(TextBuf,TmpBuf);
-		dgt_sint32	count_fun_use_flag=0;
-        	while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-			if (col_info->status == 1) {
-				*TmpBuf=0;
-				if (count_fun_use_flag == 0) {
-					if (!strcasecmp(col_info->data_type,"CHAR")) {
-		                                sprintf(TmpBuf,"PLS_ENCRYPT_B64_ID_C(TRIM(%s),%lld)",col_info->col_name,col_info->enc_col_id);
-						count_fun_use_flag=1;
-					} else if (!strcasecmp(col_info->data_type,"VARCHAR") || !strcasecmp(col_info->data_type,"VARCHAR2")) {
-		                                sprintf(TmpBuf,"PLS_ENCRYPT_B64_ID_C(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-						count_fun_use_flag=1;
-					} else {
-	                	                sprintf(TmpBuf,getFname(col_info->enc_col_id,1));
-					}
-				} else if (col_info->iv_type) {
-                                        if (!strcasecmp(col_info->data_type,"CHAR")) {
-                                                sprintf(TmpBuf,"PLS_ENCRYPT_B64_ID_C(TRIM(%s),%lld)",col_info->col_name,col_info->enc_col_id);
-                                        } else if (!strcasecmp(col_info->data_type,"VARCHAR") || !strcasecmp(col_info->data_type,"VARCHAR2")) {
-                                                sprintf(TmpBuf,"PLS_ENCRYPT_B64_ID_C(%s,%lld)",col_info->col_name,col_info->enc_col_id);
-                                        } else {
-                                                sprintf(TmpBuf,getFname(col_info->enc_col_id,1));
-                                        }
-				} else {
-	                		sprintf(TmpBuf,getFname(col_info->enc_col_id,1));
-				}
-                                strcat(TmpBuf,",");
-                                strcat(TextBuf,TmpBuf);
-			} else {
-				*TmpBuf=0;
-				if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-			                sprintf(TmpBuf,"to_lob(%s),",col_info->col_name);
-				} else {
-			                sprintf(TmpBuf,"%s,",col_info->col_name);
-				}
-        	        	strcat(TextBuf,TmpBuf);
-			}
-	        }
-	}
-        TextBuf[strlen(TextBuf)-1]=0;
-        *TmpBuf=0;
-        sprintf(TmpBuf," from %s.%s %s",SchemaName,TabInfo.table_name,TabInfo.table_name);
-        strcat(TextBuf,TmpBuf);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+    StmtNo = 6000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (lob_flag == 1) {
+        ColInfoRows.rewind();
+        sprintf(TmpBuf, "insert into %s.%s( ", SchemaName,
+                TabInfo.renamed_tab_name);
+        strcat(TextBuf, TmpBuf);
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 1) {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-        *TextBuf=0;
-        sprintf(TextBuf,"commit");
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        strcat(TextBuf, ") \nselect ");
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW")) {
+                sprintf(TmpBuf, "to_lob(%s),", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                if (col_info->status == 1) {
+                    sprintf(TmpBuf, "%s,", getFname(col_info->enc_col_id, 1));
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
         }
-	*TextBuf=0;
+    } else {
+        *TextBuf = 0;
+        ColInfoRows.rewind();
+        sprintf(TmpBuf,
+                "insert /*+ APPEND PARALLEL(%s,%d) */ into %s.%s \n select ",
+                TabInfo.renamed_tab_name, ParallelDegree, SchemaName,
+                TabInfo.renamed_tab_name);
+        strcat(TextBuf, TmpBuf);
+        dgt_sint32 count_fun_use_flag = 0;
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 1) {
+                *TmpBuf = 0;
+                if (count_fun_use_flag == 0) {
+                    if (!strcasecmp(col_info->data_type, "CHAR")) {
+                        sprintf(TmpBuf, "PLS_ENCRYPT_B64_ID_C(TRIM(%s),%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                        count_fun_use_flag = 1;
+                    } else if (!strcasecmp(col_info->data_type, "VARCHAR") ||
+                               !strcasecmp(col_info->data_type, "VARCHAR2")) {
+                        sprintf(TmpBuf, "PLS_ENCRYPT_B64_ID_C(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                        count_fun_use_flag = 1;
+                    } else {
+                        sprintf(TmpBuf, getFname(col_info->enc_col_id, 1));
+                    }
+                } else if (col_info->iv_type) {
+                    if (!strcasecmp(col_info->data_type, "CHAR")) {
+                        sprintf(TmpBuf, "PLS_ENCRYPT_B64_ID_C(TRIM(%s),%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else if (!strcasecmp(col_info->data_type, "VARCHAR") ||
+                               !strcasecmp(col_info->data_type, "VARCHAR2")) {
+                        sprintf(TmpBuf, "PLS_ENCRYPT_B64_ID_C(%s,%lld)",
+                                col_info->col_name, col_info->enc_col_id);
+                    } else {
+                        sprintf(TmpBuf, getFname(col_info->enc_col_id, 1));
+                    }
+                } else {
+                    sprintf(TmpBuf, getFname(col_info->enc_col_id, 1));
+                }
+                strcat(TmpBuf, ",");
+                strcat(TextBuf, TmpBuf);
+            } else {
+                *TmpBuf = 0;
+                if (!strcasecmp(col_info->data_type, "LONG") ||
+                    !strcasecmp(col_info->data_type, "LONG RAW")) {
+                    sprintf(TmpBuf, "to_lob(%s),", col_info->col_name);
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                }
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    *TmpBuf = 0;
+    sprintf(TmpBuf, " from %s.%s %s", SchemaName, TabInfo.table_name,
+            TabInfo.table_name);
+    strcat(TextBuf, TmpBuf);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
+    sprintf(TextBuf, "commit");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
 #if 0
 	sprintf(TextBuf,"ALTER SESSION DISABLE PARALLEL DML");
 	if (saveSqlText() < 0) {
@@ -2897,75 +3351,88 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
 	}
 #endif
 
-	if (long_flag ==1) {
-                sprintf(TextBuf,"declare\n   urows number := 0;\n   v_rowid rowid;\n");
-                *TmpBuf=0;
-                if (TabInfo.enc_type == 0) {
-                        sprintf(TmpBuf,"   cursor c1 is\n      select rowid from %s.%s",SchemaName, TabInfo.renamed_tab_name);
-                } else {
-                        sprintf(TmpBuf,"   cursor c1 is\n      select rowid from %s.%s",SchemaName, TabInfo.table_name);
-                }
-                strcat(TextBuf,TmpBuf);
-                strcat(TextBuf,";\nbegin\n   open c1;\n   loop\n\tfetch c1 into v_rowid;\n\texit when c1%NOTFOUND;\n");
-                *TmpBuf=0;
-                if (TabInfo.enc_type == 0) {
-                        sprintf(TmpBuf,"\tupdate %s.%s set",SchemaName, TabInfo.renamed_tab_name);
-                } else {
-                        sprintf(TmpBuf,"\tupdate %s.%s set",SchemaName, TabInfo.table_name);
-                }
-                strcat(TextBuf,TmpBuf);
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (col_info->status == 1 && (!strcasecmp(col_info->data_type, "LONG") || !strcasecmp(col_info->data_type, "LONG RAW"))) {
-                                dgt_sint32 idx_flag=col_info->index_type;
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n\t\t%s=%s,", col_info->col_name, getFname(col_info->enc_col_id,1));
-                                strcat(TextBuf,TmpBuf);
-                                *TmpBuf=0;
-                        }
-                }
-                TextBuf[strlen(TextBuf)-1]=0;
-                *TmpBuf=0;
-                sprintf(TmpBuf,"\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
-                                \n   commit;\nend;\n", 1000);
-                strcat(TextBuf,TmpBuf);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-	}
-	//
-	// Create the table`s original index 
-	//
-	StmtNo=7000;
-	*TextBuf=0;
-	*TmpBuf=0;
-	IdxSqlRows2.rewind();
-	IdxSqlRows3.rewind();
-	dgt_schar* idx_sql=0;
-	while (IdxSqlRows2.next() && (idx_sql=(dgt_schar*)IdxSqlRows2.data())) {
-		if (idx_sql && strlen(idx_sql) > 2) {
-			*TextBuf=0;
-			strcpy(TextBuf,idx_sql);
-			if (saveSqlText() < 0) {
-				ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-			}	
-		}
-	}
-	while (IdxSqlRows3.next() && (idx_sql=(dgt_schar*)IdxSqlRows3.data())) {
-                if (idx_sql && strlen(idx_sql) > 2) {
-			*TextBuf=0;
-                        strcpy(TextBuf,idx_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    if (long_flag == 1) {
+        sprintf(TextBuf, "declare\n   urows number := 0;\n   v_rowid rowid;\n");
+        *TmpBuf = 0;
+        if (TabInfo.enc_type == 0) {
+            sprintf(TmpBuf, "   cursor c1 is\n      select rowid from %s.%s",
+                    SchemaName, TabInfo.renamed_tab_name);
+        } else {
+            sprintf(TmpBuf, "   cursor c1 is\n      select rowid from %s.%s",
+                    SchemaName, TabInfo.table_name);
         }
-        //
-        // make check constraint
-        //
-	StmtNo=7500;
-        *TextBuf=0;
-        *TmpBuf=0;
+        strcat(TextBuf, TmpBuf);
+        strcat(TextBuf,
+               ";\nbegin\n   open c1;\n   loop\n\tfetch c1 into "
+               "v_rowid;\n\texit when c1%NOTFOUND;\n");
+        *TmpBuf = 0;
+        if (TabInfo.enc_type == 0) {
+            sprintf(TmpBuf, "\tupdate %s.%s set", SchemaName,
+                    TabInfo.renamed_tab_name);
+        } else {
+            sprintf(TmpBuf, "\tupdate %s.%s set", SchemaName,
+                    TabInfo.table_name);
+        }
+        strcat(TextBuf, TmpBuf);
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 1 &&
+                (!strcasecmp(col_info->data_type, "LONG") ||
+                 !strcasecmp(col_info->data_type, "LONG RAW"))) {
+                dgt_sint32 idx_flag = col_info->index_type;
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n\t\t%s=%s,", col_info->col_name,
+                        getFname(col_info->enc_col_id, 1));
+                strcat(TextBuf, TmpBuf);
+                *TmpBuf = 0;
+            }
+        }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        *TmpBuf = 0;
+        sprintf(
+            TmpBuf,
+            "\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
+                                \n   commit;\nend;\n",
+            1000);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    //
+    // Create the table`s original index
+    //
+    StmtNo = 7000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    IdxSqlRows2.rewind();
+    IdxSqlRows3.rewind();
+    dgt_schar* idx_sql = 0;
+    while (IdxSqlRows2.next() && (idx_sql = (dgt_schar*)IdxSqlRows2.data())) {
+        if (idx_sql && strlen(idx_sql) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, idx_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    while (IdxSqlRows3.next() && (idx_sql = (dgt_schar*)IdxSqlRows3.data())) {
+        if (idx_sql && strlen(idx_sql) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, idx_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // make check constraint
+    //
+    StmtNo = 7500;
+    *TextBuf = 0;
+    *TmpBuf = 0;
 #if 0
         CheckSqlRows2.rewind();
         dgt_schar* cksql=0;
@@ -2978,10 +3445,10 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
                 }
         }
 #endif
-        //
-        // rename enc column name
-        //
-        StmtNo=8000;
+    //
+    // rename enc column name
+    //
+    StmtNo = 8000;
 #if 0
         ColInfoRows.rewind();
         while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
@@ -2995,56 +3462,59 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
                 }
         }
 #endif
-        //
-        // index creation script if index_flag is on
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=9000;
-        PetraIdxInfoRows.rewind();
-        pc_type_petra_index*       pt_idx_info;
-        *TextBuf=0;
-        while(PetraIdxInfoRows.next() && (pt_idx_info=(pc_type_petra_index*)PetraIdxInfoRows.data())) {
-                *TextBuf=0;
-                if (pt_idx_info->sql_text && strlen(pt_idx_info->sql_text) > 2) {
-                        *TextBuf=0;
-                        sprintf(TextBuf,"%s",pt_idx_info->sql_text);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"%s",pt_idx_info->sql_text2);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-                if (pt_idx_info->normal_sql_text && strlen(pt_idx_info->normal_sql_text) > 2) {
-                        *TextBuf=0;
-                        sprintf(TextBuf,"%s",pt_idx_info->normal_sql_text);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"%s",pt_idx_info->normal_sql_text2);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-                if (pt_idx_info->idx_col_idx1 && strlen(pt_idx_info->idx_col_idx1) > 2) {
-                        sprintf(TextBuf,"%s",pt_idx_info->idx_col_idx1);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"%s",pt_idx_info->idx_col_idx2);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // index creation script if index_flag is on
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 9000;
+    PetraIdxInfoRows.rewind();
+    pc_type_petra_index* pt_idx_info;
+    *TextBuf = 0;
+    while (PetraIdxInfoRows.next() &&
+           (pt_idx_info = (pc_type_petra_index*)PetraIdxInfoRows.data())) {
+        *TextBuf = 0;
+        if (pt_idx_info->sql_text && strlen(pt_idx_info->sql_text) > 2) {
+            *TextBuf = 0;
+            sprintf(TextBuf, "%s", pt_idx_info->sql_text);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "%s", pt_idx_info->sql_text2);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-	//
-	// creating Transaction Logging apply procedure
-	// 
+        if (pt_idx_info->normal_sql_text &&
+            strlen(pt_idx_info->normal_sql_text) > 2) {
+            *TextBuf = 0;
+            sprintf(TextBuf, "%s", pt_idx_info->normal_sql_text);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "%s", pt_idx_info->normal_sql_text2);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+        if (pt_idx_info->idx_col_idx1 &&
+            strlen(pt_idx_info->idx_col_idx1) > 2) {
+            sprintf(TextBuf, "%s", pt_idx_info->idx_col_idx1);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "%s", pt_idx_info->idx_col_idx2);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // creating Transaction Logging apply procedure
+    //
 #if 0
 	if (TabInfo.tran_trg_flag == 1 && TranIdxColRows.numRows() > 0) {
         	StmtNo=11000;
@@ -3356,106 +3826,106 @@ dgt_sint32 PccTiberoScriptBuilder::step1() throw(DgcExcept)
         	}
 	}
 #endif
-        //
-        // create the unique constraint
-        //
-        StmtNo=12000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        UniqueSqlRows1.rewind();
-        dgt_schar* unisql=0;
-        while(UniqueSqlRows1.next() && (unisql=(dgt_schar*)UniqueSqlRows1.data())) {
-                if (unisql && strlen(unisql) > 2) {
-                        strcpy(TextBuf,unisql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // create the unique constraint
+    //
+    StmtNo = 12000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    UniqueSqlRows1.rewind();
+    dgt_schar* unisql = 0;
+    while (UniqueSqlRows1.next() &&
+           (unisql = (dgt_schar*)UniqueSqlRows1.data())) {
+        if (unisql && strlen(unisql) > 2) {
+            strcpy(TextBuf, unisql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        //
-        // If not null check constraint exist drop and create
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=15000;
-        CheckSqlRows.rewind();
-        pc_type_check_sql* check_sql=0;
-        while (CheckSqlRows.next() && (check_sql=(pc_type_check_sql*)CheckSqlRows.data())) {
-                *TextBuf=0;
-                if (check_sql->enc1 && strlen(check_sql->enc1) > 2) {
-                        strcpy(TextBuf,check_sql->enc1);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    }
+    //
+    // If not null check constraint exist drop and create
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 15000;
+    CheckSqlRows.rewind();
+    pc_type_check_sql* check_sql = 0;
+    while (CheckSqlRows.next() &&
+           (check_sql = (pc_type_check_sql*)CheckSqlRows.data())) {
+        *TextBuf = 0;
+        if (check_sql->enc1 && strlen(check_sql->enc1) > 2) {
+            strcpy(TextBuf, check_sql->enc1);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-
-
-
-	return 0;
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept)
-{
-	//
-	// new copy table encryption (non add column)
-	//
+dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept) {
+    //
+    // new copy table encryption (non add column)
+    //
 
-	//
-	// Create the Constraint (Dependency Fk,Check)
-        //
-	StepNo=2;
-        StmtNo=1000;
+    //
+    // Create the Constraint (Dependency Fk,Check)
+    //
+    StepNo = 2;
+    StmtNo = 1000;
 
-	*TextBuf=0;
-        *TmpBuf=0;
-	DefFkDropSqlRows2.rewind();
-	dgt_schar* fkdropsql=0;
-	while (DefFkDropSqlRows2.next() && (fkdropsql=(dgt_schar*)DefFkDropSqlRows2.data())) {
-		if (fkdropsql && strlen(fkdropsql) > 2) {
-			strcpy(TextBuf,fkdropsql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		}
-	}
-	if (TabInfo.keep_org_tab_flag == 0) {
-	        DefFkDropSqlRows.rewind();
-        	typedef struct {
-	                dgt_schar enc_sql[512];
-        	        dgt_schar org_sql[512];
-	        } enc_table_fk;
-        	enc_table_fk* tmp_ptr=0;
-	        StmtNo=2000;
-        	while (DefFkDropSqlRows.next() && (tmp_ptr=(enc_table_fk*)DefFkDropSqlRows.data())) {
-                	if (tmp_ptr->enc_sql && strlen(tmp_ptr->enc_sql) > 2) {
-                        	strcpy(TextBuf,tmp_ptr->enc_sql);
-	                        if (saveSqlText() < 0) {
-        	                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                	        }
-	                }
-        	}
-	}
-
-
-	*TextBuf=0;
-        *TmpBuf=0;
-        DefFkCreSqlRows2.rewind();
-        dgt_schar* fkcresql=0;
-	StmtNo=3000;
-        while (DefFkCreSqlRows2.next() && (fkcresql=(dgt_schar*)DefFkCreSqlRows2.data())) {
-                if (fkcresql && strlen(fkcresql) > 2) {
-                        strcpy(TextBuf,fkcresql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    DefFkDropSqlRows2.rewind();
+    dgt_schar* fkdropsql = 0;
+    while (DefFkDropSqlRows2.next() &&
+           (fkdropsql = (dgt_schar*)DefFkDropSqlRows2.data())) {
+        if (fkdropsql && strlen(fkdropsql) > 2) {
+            strcpy(TextBuf, fkdropsql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
+    if (TabInfo.keep_org_tab_flag == 0) {
+        DefFkDropSqlRows.rewind();
+        typedef struct {
+            dgt_schar enc_sql[512];
+            dgt_schar org_sql[512];
+        } enc_table_fk;
+        enc_table_fk* tmp_ptr = 0;
+        StmtNo = 2000;
+        while (DefFkDropSqlRows.next() &&
+               (tmp_ptr = (enc_table_fk*)DefFkDropSqlRows.data())) {
+            if (tmp_ptr->enc_sql && strlen(tmp_ptr->enc_sql) > 2) {
+                strcpy(TextBuf, tmp_ptr->enc_sql);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    }
 
-        //
-        // If Pk,Fk Working set table then pk,fk migration
-        //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    DefFkCreSqlRows2.rewind();
+    dgt_schar* fkcresql = 0;
+    StmtNo = 3000;
+    while (DefFkCreSqlRows2.next() &&
+           (fkcresql = (dgt_schar*)DefFkCreSqlRows2.data())) {
+        if (fkcresql && strlen(fkcresql) > 2) {
+            strcpy(TextBuf, fkcresql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+
+    //
+    // If Pk,Fk Working set table then pk,fk migration
+    //
 #if 0
 	*TextBuf=0;
         *TmpBuf=0;
@@ -3513,12 +3983,12 @@ dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept)
 
         }
 #endif
-        //
-        // Transaction Logging apply to encryption table
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=5000;
+    //
+    // Transaction Logging apply to encryption table
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 5000;
 #if 0
 	if (TabInfo.tran_trg_flag == 1 && TranIdxColRows.numRows() > 0) {
                 dgt_sint32 loop;
@@ -3562,20 +4032,20 @@ dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept)
 	}
 #endif
 
-
-	//
-	// rename orginal table
-	//
-	StmtNo=6000;
-	*TextBuf=0;
-        *TmpBuf=0;
-	sprintf(TextBuf,"alter table %s.%s rename to %s",SchemaName,TabInfo.table_name,TabInfo.org_renamed_tab_name);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        //
-        // rename enc column name -> original column name
-        //
+    //
+    // rename orginal table
+    //
+    StmtNo = 6000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    sprintf(TextBuf, "alter table %s.%s rename to %s", SchemaName,
+            TabInfo.table_name, TabInfo.org_renamed_tab_name);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    //
+    // rename enc column name -> original column name
+    //
 #if 0
         StmtNo=4500;
         pc_type_col_info*       col_info;
@@ -3602,257 +4072,304 @@ dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept)
         }
 #endif
 
-	//
-	// create view or rename encryption table -> original table name
-	//
-	StmtNo=7000;
-	*TextBuf=0;
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
-                if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.first_view_name);
-                        ColInfoRows.rewind();
-			pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status == 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-	                                        sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-	                                        strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-	                                       	sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2),col_info->col_name);
-        	                    		strcat(TextBuf,TmpBuf);
-					}
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        strcat(TextBuf,"rowid row_id");
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName, TabInfo.renamed_tab_name);
-                        strcat(TextBuf,TmpBuf);
-			if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName, TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                        TextBuf[strlen(TextBuf)-1]=0;   // cut the last ";" off
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," from %s.%s",SchemaName, TabInfo.first_view_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
+    //
+    // create view or rename encryption table -> original table name
+    //
+    StmtNo = 7000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.first_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
                 } else {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-			pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status == 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-	                                	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-        	                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-	                                       	sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2), col_info->col_name);
-		                                strcat(TextBuf,TmpBuf);
-					}
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-			TextBuf[strlen(TextBuf)-1]=0;
-			IdxColRows.rewind();
-                        if (IdxColRows.numRows() == 0) {
-	                        strcat(TextBuf,",rowid row_id");
-        	                *TmpBuf=0;
-                	        sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                        	strcat(TextBuf,TmpBuf);
-	                	if (saveSqlText() < 0) {
-        	                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	        	        }
-			} else {
-				*TmpBuf=0;
-                                sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                                strcat(TextBuf,TmpBuf);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-			}
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
+            }
+            strcat(TextBuf, "rowid row_id");
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                    TabInfo.renamed_tab_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;  // cut the last ";" off
+            *TmpBuf = 0;
+            sprintf(TmpBuf, " from %s.%s", SchemaName, TabInfo.first_view_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         } else {
-	        sprintf(TextBuf,"alter table %s.%s rename to %s",SchemaName,TabInfo.renamed_tab_name,TabInfo.table_name);
-        	if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	        }
-	}
-	StmtNo=8000;
-	*TextBuf=0;
-	*TmpBuf=0;
-	if (TabInfo.enc_type != 0 && TabInfo.user_view_flag == 1) {
-		sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.first_view_name);
-                ColInfoRows.rewind();
-		pc_type_col_info* col_info=0;
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                	*TmpBuf=0;
-                        if (col_info->status == 1) {
-                                if (col_info->cipher_type == 4) {
-                                	*TmpBuf=0;
-	                        	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-        	                        strcat(TextBuf,TmpBuf);
-                                } else {
-                                	*TmpBuf=0;
-                        		sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2),col_info->col_name);
-	                                strcat(TextBuf,TmpBuf);
-				}
-                        } else {
-                        	sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
-		IdxColRows.rewind();
-		if (IdxColRows.numRows() == 0) {
-	                strcat(TextBuf,"rowid row_id");
-        	        *TmpBuf=0;
-                	sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.table_name);
-	                strcat(TextBuf,TmpBuf);
-        	        if (saveSqlText() < 0) {
-                		ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-			}
-		} else {
-			TextBuf[strlen(TextBuf)-1]=0;
-			*TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.table_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                strcat(TextBuf, ",rowid row_id");
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    } else {
+        sprintf(TextBuf, "alter table %s.%s rename to %s", SchemaName,
+                TabInfo.renamed_tab_name, TabInfo.table_name);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    StmtNo = 8000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type != 0 && TabInfo.user_view_flag == 1) {
+        sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                SchemaName, TabInfo.first_view_name);
+        ColInfoRows.rewind();
+        pc_type_col_info* col_info = 0;
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 1) {
+                if (col_info->cipher_type == 4) {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "%s %s,", getFname(col_info->enc_col_id, 2),
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        IdxColRows.rewind();
+        if (IdxColRows.numRows() == 0) {
+            strcat(TextBuf, "rowid row_id");
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName, TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        } else {
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName, TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // if plugin view -> create the instead of trigger
+    // if dml_trg_flag=yes -> view + dml trigger(must modify update,insert sql`s
+    // tablename ex: insert into table -> insert into table$$
+    //
+    *TmpBuf = 0;
+    *TextBuf = 0;
+    StmtNo = 9000;
+    if (TabInfo.dml_trg_flag == 1) {
+        dgt_sint32 ver_flag = 0;
+        if (!strcasecmp(DbVersion, "11g")) ver_flag = 1;
+        if (TabInfo.enc_type == 0) {
+            sprintf(TextBuf,
+                    "create or replace trigger %s.%s\nbefore insert on %s.%s "
+                    "for each row\ndeclare \n",
+                    SchemaName, TabInfo.view_trigger_name, SchemaName,
+                    TabInfo.renamed_tab_name);
+        } else {
+            sprintf(TextBuf,
+                    "create or replace trigger %s.%s\nbefore insert on %s.%s "
+                    "for each row\ndeclare \n",
+                    SchemaName, TabInfo.view_trigger_name, SchemaName,
+                    TabInfo.table_name);
+        }
+        ColInfoRows.rewind();
+        pc_type_col_info* col_info;
+        //
+        // for 11g trigger (performance issue)
+        //
+        if (ver_flag) {
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                if (col_info->status == 1) {
+                    *TmpBuf = 0;
+                    dgt_sint32 enc_len = 0;
+                    if (!strcasecmp(col_info->data_type, "NUMBER"))
+                        enc_len = (col_info->data_precision + 2);
+                    else if (!strcasecmp(col_info->data_type, "DATE") ||
+                             !strcasecmp(col_info->data_type, "TIMESTAMP"))
+                        enc_len = 14;
+                    else if (col_info->multi_byte_flag)
+                        enc_len = col_info->data_length * 3;
+                    else
+                        enc_len = col_info->data_length;
+                    PCI_Context ctx;
+                    PCI_initContext(
+                        &ctx, 0, col_info->key_size, col_info->cipher_type,
+                        col_info->enc_mode, col_info->iv_type,
+                        col_info->n2n_flag, col_info->b64_txt_enc_flag,
+                        col_info->enc_start_pos, col_info->enc_length);
+                    enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
+                    if (col_info->index_type == 1) {
+                        enc_len += PCI_ophuekLength(col_info->data_length,
+                                                    PCI_SRC_TYPE_CHAR, 1);
+                        enc_len += 4;
+                    }
+                    if (!strcasecmp(col_info->data_type, "NCHAR") ||
+                        !strcasecmp(col_info->data_type, "NVARCHAR2")) {
+                        enc_len = enc_len * 3;
+                    }
+                    if (!strcasecmp(col_info->data_type, "CLOB") ||
+                        !strcasecmp(col_info->data_type, "BLOB")) {
+                        sprintf(TmpBuf, "\t v_%s BLOB;\n", col_info->col_name);
+                    } else {
+                        if (col_info->b64_txt_enc_flag) {
+                            sprintf(TmpBuf, "\t v_%s varchar2(%d);\n",
+                                    col_info->col_name, enc_len);
+                        } else {
+                            sprintf(TmpBuf, "\t v_%s raw(%d);\n",
+                                    col_info->col_name, enc_len);
                         }
-		}
-	}
-	//
-	// if plugin view -> create the instead of trigger
-	// if dml_trg_flag=yes -> view + dml trigger(must modify update,insert sql`s tablename ex: insert into table -> insert into table$$
-	// 
-	*TmpBuf=0;
-	*TextBuf=0;
-	StmtNo=9000;
-	if (TabInfo.dml_trg_flag == 1) {
-	        dgt_sint32 ver_flag=0;
-	        if (!strcasecmp(DbVersion,"11g")) ver_flag=1;
-		if (TabInfo.enc_type == 0) {
-	                sprintf(TextBuf,"create or replace trigger %s.%s\nbefore insert on %s.%s for each row\ndeclare \n",
-        	                        SchemaName,TabInfo.view_trigger_name, SchemaName, TabInfo.renamed_tab_name);
-		} else {
-	                sprintf(TextBuf,"create or replace trigger %s.%s\nbefore insert on %s.%s for each row\ndeclare \n",
-        	                        SchemaName,TabInfo.view_trigger_name, SchemaName, TabInfo.table_name);
-		}
-        	ColInfoRows.rewind();
-	        pc_type_col_info*       col_info;
-        	//
-	        // for 11g trigger (performance issue)
-        	//
-	        if (ver_flag) {
-        	        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                	        if (col_info->status == 1) {
-                        	        *TmpBuf=0;
-	                                dgt_sint32      enc_len = 0;
-        	                        if (!strcasecmp(col_info->data_type,"NUMBER")) enc_len = (col_info->data_precision + 2);
-                	                else if (!strcasecmp(col_info->data_type,"DATE") ||
-                        	                 !strcasecmp(col_info->data_type,"TIMESTAMP")) enc_len = 14;
-	                                else if (col_info->multi_byte_flag) enc_len = col_info->data_length * 3;
-        	                        else enc_len = col_info->data_length;
-                	                PCI_Context     ctx;
-                        	        PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type, col_info->enc_mode,
-                                	                col_info->iv_type, col_info->n2n_flag, col_info->b64_txt_enc_flag,
-                                        	        col_info->enc_start_pos, col_info->enc_length);
-	                                enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
-        	                        if (col_info->index_type == 1) {
-                	                        enc_len += PCI_ophuekLength(col_info->data_length,PCI_SRC_TYPE_CHAR,1);
-						enc_len += 4;
-                        	        }
-					if (!strcasecmp(col_info->data_type,"NCHAR") ||
-                                            !strcasecmp(col_info->data_type,"NVARCHAR2")) {
-						enc_len = enc_len * 3;
-					}
-	                                if (!strcasecmp(col_info->data_type,"CLOB") ||
-        	                            !strcasecmp(col_info->data_type,"BLOB")) {
-                	                        sprintf(TmpBuf,"\t v_%s BLOB;\n", col_info->col_name);
-                        	        } else {
-                                	        if (col_info->b64_txt_enc_flag) {
-                                        	        sprintf(TmpBuf,"\t v_%s varchar2(%d);\n", col_info->col_name, enc_len);
-	                                        } else {
-        	                                        sprintf(TmpBuf,"\t v_%s raw(%d);\n", col_info->col_name, enc_len);
-                	                        }
-                        	        }
-                                	strcat(TextBuf,TmpBuf);
-	                        }
-        	        }
-	        }
-        	strcat(TextBuf,"begin\n");
-	        //
-        	// for check constraint
-	        //
-        	CheckTrgRows.rewind();
-	        typedef struct {
-        	        dgt_schar       search_condition[4000];
-                	dgt_schar       default_val[4000];
-	        } type_check;
-        	type_check*    tmp_search=0;
-	        while(CheckTrgRows.next() && (tmp_search=(type_check*)CheckTrgRows.data())) {
-        	        if (strlen(tmp_search->default_val) > 2 && strstr(tmp_search->search_condition,"IS NOT NULL")) continue;
-                	*TmpBuf=0;
-	                sprintf(TmpBuf,"\n if not ");
-        	        strcat(TextBuf,TmpBuf);
-                	*TmpBuf=0;
-	                sprintf(TmpBuf,"( :new.%s )",tmp_search->search_condition);
-        	        strcat(TextBuf,TmpBuf);
-                	*TmpBuf=0;
-	                sprintf(TmpBuf," then\n\t raise_application_error(-20001,'%s`s check constraint violated');\n end if;\n",
-        	                        TabInfo.table_name);
-                	strcat(TextBuf,TmpBuf);
-	        }
-		*TmpBuf=0;
+                    }
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+        }
+        strcat(TextBuf, "begin\n");
+        //
+        // for check constraint
+        //
+        CheckTrgRows.rewind();
+        typedef struct {
+            dgt_schar search_condition[4000];
+            dgt_schar default_val[4000];
+        } type_check;
+        type_check* tmp_search = 0;
+        while (CheckTrgRows.next() &&
+               (tmp_search = (type_check*)CheckTrgRows.data())) {
+            if (strlen(tmp_search->default_val) > 2 &&
+                strstr(tmp_search->search_condition, "IS NOT NULL"))
+                continue;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n if not ");
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "( :new.%s )", tmp_search->search_condition);
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf,
+                    " then\n\t raise_application_error(-20001,'%s`s check "
+                    "constraint violated');\n end if;\n",
+                    TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+        }
+        *TmpBuf = 0;
 #if 0
 		sprintf(TmpBuf,"\tif inserting then\n");
 		strcat(TextBuf,TmpBuf);
 #endif
-		if (ver_flag) {
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status == 1) {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t v_%s := %s;\n",col_info->col_name,getFname(col_info->enc_col_id,1,1));
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t :new.%s := v_%s;\n",col_info->col_name, col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                } else {
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status == 1) {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t :new.%s := %s;\n",col_info->col_name,getFname(col_info->enc_col_id,1,1));
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
+        if (ver_flag) {
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 1) {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t v_%s := %s;\n", col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t :new.%s := v_%s;\n",
+                            col_info->col_name, col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
-		*TmpBuf=0;
+            }
+        } else {
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 1) {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t :new.%s := %s;\n", col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+        }
+        *TmpBuf = 0;
 #if 0
 		sprintf(TmpBuf,"\telsif updating then\n");
 		strcat(TextBuf,TmpBuf);
@@ -3890,360 +4407,386 @@ dgt_sint32 PccTiberoScriptBuilder::step2() throw(DgcExcept)
 		}
 		strcat(TextBuf,"\tend if;\n end;\n");
 #endif
-		strcat(TextBuf,"\n end;\n");
-		if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-		}
-	} else {
-		dgt_schar sql_text[2048];
-	        memset(sql_text,0,2048);
-        	sprintf(sql_text,"select count() from pct_enc_col_index where enc_tab_id = %lld and uniqueness=1 and column_position > 1",
-				  TabInfo.enc_tab_id);
-	        DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        	if (count_stmt == 0 || count_stmt->execute() < 0) {
-	                DgcExcept*      e=EXCEPTnC;
-        	        delete count_stmt;
-                	RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	        }
-	        dgt_sint64* count_tmp=0;
-        	dgt_sint64  count=0;
-	        if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-        	        memcpy(&count,count_tmp,sizeof(dgt_sint64));
-	        }
-        	delete count_stmt;
-	        dgt_sint32 uniq_idx_flag=0;
-        	if (count) {
-	                uniq_idx_flag=1;
-        	} else {
-	                memset(sql_text,0,2048);
-        	        sprintf(sql_text,"select count() from pct_enc_col_ct where enc_tab_id = %lld and constraint_type=1 and position > 1",TabInfo.enc_tab_id);
-                	DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-	                if (count_stmt == 0 || count_stmt->execute() < 0) {
-        	                DgcExcept*      e=EXCEPTnC;
-                	        delete count_stmt;
-                        	RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	                }
-        	        dgt_sint64* count_tmp=0;
-                	if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-	                        memcpy(&count,count_tmp,sizeof(dgt_sint64));
-        	        }
-                	delete count_stmt;
-	                if (count) {
-        	                uniq_idx_flag=1;
-                	}
-	        }
-        	if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
-	                if (insteadOfTrigger(1,uniq_idx_flag)) {
-        	                ATHROWnR(DgcError(SPOS,"insteadOfTigger failed."),-1);
-                	}
-	        }
-	}
-	//
-	// if not plugin view and dml table trigger flag is on -> create the table dml trigger
-	//
-	StmtNo=10000;
-	*TextBuf=0;
-	*TmpBuf=0;
-	//
-	// grant privilege
-	//
-	StmtNo=11000;
-	*TextBuf=0;
-	*TmpBuf=0;
-        PrivSqlRows.rewind();
-        if (TabInfo.grant_flag) {
-                while(PrivSqlRows.next()) {
-                        *TextBuf=0;
-                        strcat(TextBuf,(dgt_schar*)PrivSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+        strcat(TextBuf, "\n end;\n");
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-	//
-	// synonym recreate
-	//
-	StmtNo=12000;
-	*TextBuf=0;
-	*TmpBuf=0;
-        pc_type_synonym_sql*       syn_info_tmp;
-        SynonymSqlRows.rewind();
-	if (SynonymSqlRows.next() && (syn_info_tmp=(pc_type_synonym_sql*)SynonymSqlRows.data())) {
-		if (syn_info_tmp->drop_sql_id) {
-			strcpy(TextBuf,syn_info_tmp->drop_sql_id);	
-			if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		}
-		*TextBuf=0;
-		if (syn_info_tmp->create_sql_id && *syn_info_tmp->create_sql_id) {
-			strcpy(TextBuf,syn_info_tmp->create_sql_id);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		}
-	}
-	//
-        // create comment
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=13000;
-        CommentInfoRows.rewind();
-        dgt_schar* comment_sql;
-        while (CommentInfoRows.next() && (comment_sql=(dgt_schar*)CommentInfoRows.data())) {
-                *TextBuf=0;
-                if (comment_sql && strlen(comment_sql) > 2) {
-                        strcpy(TextBuf,comment_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    } else {
+        dgt_schar sql_text[2048];
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select count() from pct_enc_col_index where enc_tab_id = %lld "
+                "and uniqueness=1 and column_position > 1",
+                TabInfo.enc_tab_id);
+        DgcSqlStmt* count_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (count_stmt == 0 || count_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete count_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
         }
-	//
-	// Drop The Original table
-	// 
-	*TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=14000;
-	if (TabInfo.keep_org_tab_flag == 1) {
-		IdxSqlRows5.rewind();
-		dgt_schar* rename_idx=0;
-		while (IdxSqlRows5.next() && (rename_idx=(dgt_schar*)IdxSqlRows5.data())) {
-			if (rename_idx && strlen(rename_idx) > 2) {
-                        	*TextBuf=0;
-	                        strcpy(TextBuf,rename_idx);
-        	                if (saveSqlText() < 0) {
-                	                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        	}
-                	}
-		}
-	} else {
-		if (!strcasecmp(DbVersion,"9i")) sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.org_renamed_tab_name);
-		else sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.org_renamed_tab_name);
-		if (saveSqlText() < 0) {
-			ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-		}
-	}
+        dgt_sint64* count_tmp = 0;
+        dgt_sint64 count = 0;
+        if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+            memcpy(&count, count_tmp, sizeof(dgt_sint64));
+        }
+        delete count_stmt;
+        dgt_sint32 uniq_idx_flag = 0;
+        if (count) {
+            uniq_idx_flag = 1;
+        } else {
+            memset(sql_text, 0, 2048);
+            sprintf(sql_text,
+                    "select count() from pct_enc_col_ct where enc_tab_id = "
+                    "%lld and constraint_type=1 and position > 1",
+                    TabInfo.enc_tab_id);
+            DgcSqlStmt* count_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (count_stmt == 0 || count_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
+                delete count_stmt;
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            dgt_sint64* count_tmp = 0;
+            if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+                memcpy(&count, count_tmp, sizeof(dgt_sint64));
+            }
+            delete count_stmt;
+            if (count) {
+                uniq_idx_flag = 1;
+            }
+        }
+        if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
+            if (insteadOfTrigger(1, uniq_idx_flag)) {
+                ATHROWnR(DgcError(SPOS, "insteadOfTigger failed."), -1);
+            }
+        }
+    }
+    //
+    // if not plugin view and dml table trigger flag is on -> create the table
+    // dml trigger
+    //
+    StmtNo = 10000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    //
+    // grant privilege
+    //
+    StmtNo = 11000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    PrivSqlRows.rewind();
+    if (TabInfo.grant_flag) {
+        while (PrivSqlRows.next()) {
+            *TextBuf = 0;
+            strcat(TextBuf, (dgt_schar*)PrivSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // synonym recreate
+    //
+    StmtNo = 12000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    pc_type_synonym_sql* syn_info_tmp;
+    SynonymSqlRows.rewind();
+    if (SynonymSqlRows.next() &&
+        (syn_info_tmp = (pc_type_synonym_sql*)SynonymSqlRows.data())) {
+        if (syn_info_tmp->drop_sql_id) {
+            strcpy(TextBuf, syn_info_tmp->drop_sql_id);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+        *TextBuf = 0;
+        if (syn_info_tmp->create_sql_id && *syn_info_tmp->create_sql_id) {
+            strcpy(TextBuf, syn_info_tmp->create_sql_id);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // create comment
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 13000;
+    CommentInfoRows.rewind();
+    dgt_schar* comment_sql;
+    while (CommentInfoRows.next() &&
+           (comment_sql = (dgt_schar*)CommentInfoRows.data())) {
+        *TextBuf = 0;
+        if (comment_sql && strlen(comment_sql) > 2) {
+            strcpy(TextBuf, comment_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // Drop The Original table
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 14000;
+    if (TabInfo.keep_org_tab_flag == 1) {
+        IdxSqlRows5.rewind();
+        dgt_schar* rename_idx = 0;
+        while (IdxSqlRows5.next() &&
+               (rename_idx = (dgt_schar*)IdxSqlRows5.data())) {
+            if (rename_idx && strlen(rename_idx) > 2) {
+                *TextBuf = 0;
+                strcpy(TextBuf, rename_idx);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    } else {
+        if (!strcasecmp(DbVersion, "9i"))
+            sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                    TabInfo.org_renamed_tab_name);
+        else
+            sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                    TabInfo.org_renamed_tab_name);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
 
-        //
-        // If Pk,Fk Working set table then pk,fk migration
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=15000;
-        pkfk_sql* sql_row;
+    //
+    // If Pk,Fk Working set table then pk,fk migration
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 15000;
+    pkfk_sql* sql_row;
+    PkSqlRows.rewind();
+    FkSqlRows.rewind();
+    if (IsPkFk == 1) {
         PkSqlRows.rewind();
         FkSqlRows.rewind();
-        if (IsPkFk == 1) {
-                PkSqlRows.rewind();
-                FkSqlRows.rewind();
-                if (TabInfo.iot_type == 0) {
-                        while (PkSqlRows.next() && (sql_row=(pkfk_sql*)PkSqlRows.data())) {
-                                *TextBuf=0;
-                                if (sql_row->enc2 && strlen(sql_row->enc2) > 2) {
-                                        strcpy(TextBuf,sql_row->enc2);
-                                        if (saveSqlText() < 0) {
-                                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                        }
-                                }
-                        }
+        if (TabInfo.iot_type == 0) {
+            while (PkSqlRows.next() &&
+                   (sql_row = (pkfk_sql*)PkSqlRows.data())) {
+                *TextBuf = 0;
+                if (sql_row->enc2 && strlen(sql_row->enc2) > 2) {
+                    strcpy(TextBuf, sql_row->enc2);
+                    if (saveSqlText() < 0) {
+                        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                    }
                 }
-                while (FkSqlRows.next() && (sql_row=(pkfk_sql*)FkSqlRows.data())) {
-                        *TextBuf=0;
-                        if (sql_row->enc2 && strlen(sql_row->enc2) > 2) {
-                                strcpy(TextBuf,sql_row->enc2);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
+            }
+        }
+        while (FkSqlRows.next() && (sql_row = (pkfk_sql*)FkSqlRows.data())) {
+            *TextBuf = 0;
+            if (sql_row->enc2 && strlen(sql_row->enc2) > 2) {
+                strcpy(TextBuf, sql_row->enc2);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
                 }
-
-                PkSqlRows.rewind();
-                FkSqlRows.rewind();
-                if (TabInfo.iot_type == 0) {
-                        while (PkSqlRows.next() && (sql_row=(pkfk_sql*)PkSqlRows.data())) {
-                                *TextBuf=0;
-                                if (sql_row->enc1 && strlen(sql_row->enc1) > 2) {
-                                        strcpy(TextBuf,sql_row->enc1);
-                                        if (saveSqlText() < 0) {
-                                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                        }
-                                }
-                        }
-                }
-                while (FkSqlRows.next() && (sql_row=(pkfk_sql*)FkSqlRows.data())) {
-                        *TextBuf=0;
-                        if (sql_row->enc1 && strlen(sql_row->enc1) > 2) {
-                                strcpy(TextBuf,sql_row->enc1);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
-                }
+            }
         }
 
+        PkSqlRows.rewind();
+        FkSqlRows.rewind();
+        if (TabInfo.iot_type == 0) {
+            while (PkSqlRows.next() &&
+                   (sql_row = (pkfk_sql*)PkSqlRows.data())) {
+                *TextBuf = 0;
+                if (sql_row->enc1 && strlen(sql_row->enc1) > 2) {
+                    strcpy(TextBuf, sql_row->enc1);
+                    if (saveSqlText() < 0) {
+                        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                    }
+                }
+            }
+        }
+        while (FkSqlRows.next() && (sql_row = (pkfk_sql*)FkSqlRows.data())) {
+            *TextBuf = 0;
+            if (sql_row->enc1 && strlen(sql_row->enc1) > 2) {
+                strcpy(TextBuf, sql_row->enc1);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    }
 
-	//
-	// rename renamed index name -> orginal index name
-	// 
+    //
+    // rename renamed index name -> orginal index name
+    //
 #if 1
-        StmtNo=16000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        IdxSqlRows4.rewind();
-        dgt_schar* rename_idx=0;
-        while (IdxSqlRows4.next() && (rename_idx=(dgt_schar*)IdxSqlRows4.data())) {
-                if (rename_idx && strlen(rename_idx) > 2) {
-                        *TextBuf=0;
-                        strcpy(TextBuf,rename_idx);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    StmtNo = 16000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    IdxSqlRows4.rewind();
+    dgt_schar* rename_idx = 0;
+    while (IdxSqlRows4.next() &&
+           (rename_idx = (dgt_schar*)IdxSqlRows4.data())) {
+        if (rename_idx && strlen(rename_idx) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, rename_idx);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 #endif
-        //
-        // encrypt tables`s dependency object complie script
-        //
-        StmtNo=17000;
-        ObjTriggerSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjTriggerSqlRows.next()) {
-                        *TextBuf=0;
-                        sprintf(TextBuf,(dgt_schar*)ObjTriggerSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    StmtNo = 17000;
+    ObjTriggerSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjTriggerSqlRows.next()) {
+            *TextBuf = 0;
+            sprintf(TextBuf, (dgt_schar*)ObjTriggerSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-	//
-        // encrypt tables`s dependency object complie script
-        //
-        StmtNo=18000;
-        ObjSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjSqlRows.next()) {
-                        *TextBuf=0;
-                        strcat(TextBuf,(dgt_schar*)ObjSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    }
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    StmtNo = 18000;
+    ObjSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjSqlRows.next()) {
+            *TextBuf = 0;
+            strcat(TextBuf, (dgt_schar*)ObjSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-
-
-
-
-
-	//
-	// keep_org_tab_flag  == 1
-	// for supporting manual script(restore and instead of trigger)
-	//
-	if (TabInfo.keep_org_tab_flag == 1) {
-		StepNo=10;
-		StmtNo=-10;
-		// restore flag
-		*TextBuf=0;
-		*TmpBuf=0;
-	        if (TabInfo.enc_type == 0) {
-                	*TextBuf=0;
-	                sprintf(TextBuf,"drop view %s.%s",SchemaName,TabInfo.second_view_name);
-        	        if (saveSqlText() < 0) {
-                	        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	                }
-        	        if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
-                	        *TextBuf=0;
-                        	sprintf(TextBuf,"drop view %s.%s",SchemaName,TabInfo.first_view_name);
-	                        if (saveSqlText() < 0) {
-        	                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                	        }
-	                }
-        	} else {
-			if (!strcasecmp(DbVersion,"9i")) sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.table_name);
-        	        else sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.table_name);
-                	if (saveSqlText() < 0) {
-	                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        	        }
-		}
-		*TextBuf=0;
-		*TmpBuf=0;
-		sprintf(TextBuf,"alter table %s.%s rename to %s",SchemaName,TabInfo.org_renamed_tab_name,TabInfo.table_name);
-		if (saveSqlText() < 0) {
-			ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-		}
-		//
-		//  encrypt completion script(modify instead of trigger)
-		//
-		StepNo=10;
-		StmtNo=0;
-		TabInfo.keep_org_tab_flag=0;
-                dgt_schar sql_text[2048];
-                memset(sql_text,0,2048);
-                sprintf(sql_text,"select count() from pct_enc_col_index where enc_tab_id = %lld and uniqueness=1 and column_position > 1",
-                                  TabInfo.enc_tab_id);
-                DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (count_stmt == 0 || count_stmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete count_stmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+    //
+    // keep_org_tab_flag  == 1
+    // for supporting manual script(restore and instead of trigger)
+    //
+    if (TabInfo.keep_org_tab_flag == 1) {
+        StepNo = 10;
+        StmtNo = -10;
+        // restore flag
+        *TextBuf = 0;
+        *TmpBuf = 0;
+        if (TabInfo.enc_type == 0) {
+            *TextBuf = 0;
+            sprintf(TextBuf, "drop view %s.%s", SchemaName,
+                    TabInfo.second_view_name);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
+                *TextBuf = 0;
+                sprintf(TextBuf, "drop view %s.%s", SchemaName,
+                        TabInfo.first_view_name);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
                 }
-                dgt_sint64* count_tmp=0;
-                dgt_sint64  count=0;
-                if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                        memcpy(&count,count_tmp,sizeof(dgt_sint64));
-                }
+            }
+        } else {
+            if (!strcasecmp(DbVersion, "9i"))
+                sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                        TabInfo.table_name);
+            else
+                sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                        TabInfo.table_name);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+        *TextBuf = 0;
+        *TmpBuf = 0;
+        sprintf(TextBuf, "alter table %s.%s rename to %s", SchemaName,
+                TabInfo.org_renamed_tab_name, TabInfo.table_name);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+        //
+        //  encrypt completion script(modify instead of trigger)
+        //
+        StepNo = 10;
+        StmtNo = 0;
+        TabInfo.keep_org_tab_flag = 0;
+        dgt_schar sql_text[2048];
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select count() from pct_enc_col_index where enc_tab_id = %lld "
+                "and uniqueness=1 and column_position > 1",
+                TabInfo.enc_tab_id);
+        DgcSqlStmt* count_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (count_stmt == 0 || count_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete count_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        dgt_sint64* count_tmp = 0;
+        dgt_sint64 count = 0;
+        if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+            memcpy(&count, count_tmp, sizeof(dgt_sint64));
+        }
+        delete count_stmt;
+        dgt_sint32 uniq_idx_flag = 0;
+        if (count) {
+            uniq_idx_flag = 1;
+        } else {
+            memset(sql_text, 0, 2048);
+            sprintf(sql_text,
+                    "select count() from pct_enc_col_ct where enc_tab_id = "
+                    "%lld and constraint_type=1 and position > 1",
+                    TabInfo.enc_tab_id);
+            DgcSqlStmt* count_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (count_stmt == 0 || count_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
                 delete count_stmt;
-                dgt_sint32 uniq_idx_flag=0;
-                if (count) {
-                        uniq_idx_flag=1;
-                } else {
-                        memset(sql_text,0,2048);
-                        sprintf(sql_text,"select count() from pct_enc_col_ct where enc_tab_id = %lld and constraint_type=1 and position > 1",TabInfo.enc_tab_id);
-                        DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                        if (count_stmt == 0 || count_stmt->execute() < 0) {
-                                DgcExcept*      e=EXCEPTnC;
-                                delete count_stmt;
-                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                        }
-                        dgt_sint64* count_tmp=0;
-                        if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                                memcpy(&count,count_tmp,sizeof(dgt_sint64));
-                        }
-                        delete count_stmt;
-                        if (count) {
-                                uniq_idx_flag=1;
-                        }
-                }
-                if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
-                        if (insteadOfTrigger(1,uniq_idx_flag)) {
-                                ATHROWnR(DgcError(SPOS,"insteadOfTigger failed."),-1);
-                        }
-                }
-		*TmpBuf=0;
-		*TextBuf=0;
-		if (!strcasecmp(DbVersion,"9i")) sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.org_renamed_tab_name);
-		else sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.org_renamed_tab_name);
-		if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            dgt_sint64* count_tmp = 0;
+            if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+                memcpy(&count, count_tmp, sizeof(dgt_sint64));
+            }
+            delete count_stmt;
+            if (count) {
+                uniq_idx_flag = 1;
+            }
         }
+        if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
+            if (insteadOfTrigger(1, uniq_idx_flag)) {
+                ATHROWnR(DgcError(SPOS, "insteadOfTigger failed."), -1);
+            }
+        }
+        *TmpBuf = 0;
+        *TextBuf = 0;
+        if (!strcasecmp(DbVersion, "9i"))
+            sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                    TabInfo.org_renamed_tab_name);
+        else
+            sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                    TabInfo.org_renamed_tab_name);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
 
-		
-		
-	return 0;
-
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::reverse_step1() throw(DgcExcept)
-{
-	//
-	// new copy table encryption (non add column)
-	//
-	// 
-	StepNo=-1;
-	StmtNo=-11000;
+dgt_sint32 PccTiberoScriptBuilder::reverse_step1() throw(DgcExcept) {
+    //
+    // new copy table encryption (non add column)
+    //
+    //
+    StepNo = -1;
+    StmtNo = -11000;
 #if 0
         if (TabInfo.tran_trg_flag == 1 && TranIdxColRows.numRows() > 0) {
                 *TextBuf=0;
@@ -4273,117 +4816,130 @@ dgt_sint32 PccTiberoScriptBuilder::reverse_step1() throw(DgcExcept)
                 }
         }
 #endif
-        //
-        // drop enc table & rename original table
-        //
-	StmtNo=-1000;
-        *TextBuf=0;
-        *TmpBuf=0;
-	if (!strcasecmp(DbVersion,"9i")) {
-		sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.renamed_tab_name);
-	} else {
-		sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.renamed_tab_name);
-	}
-        if (saveSqlText() < 0) {
-        	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	}
-	*TextBuf=0;
-        *TmpBuf=0;
-	if (!strcasecmp(DbVersion,"9i")) sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.org_renamed_tab_name);
-	else sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.org_renamed_tab_name);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        return 0;
+    //
+    // drop enc table & rename original table
+    //
+    StmtNo = -1000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (!strcasecmp(DbVersion, "9i")) {
+        sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                TabInfo.renamed_tab_name);
+    } else {
+        sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                TabInfo.renamed_tab_name);
+    }
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (!strcasecmp(DbVersion, "9i"))
+        sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                TabInfo.org_renamed_tab_name);
+    else
+        sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                TabInfo.org_renamed_tab_name);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::reverse_step2() throw(DgcExcept)
-{
-	//
-	// new copy table encryption (non add column)
-	//
-        // create the copy table (same as original table)
-        //
-        pc_type_col_info* col_info=0;
-        StepNo=-2;
-        StmtNo=-17000;
-        *TextBuf=0;
-	*TmpBuf=0;
-        dgt_schar       sql_text[2048];
-        memset(sql_text,0,2048);
-        *TextBuf=0;
-        sprintf(TextBuf,"CREATE TABLE %s.petra_%lld (",SchemaName,TabInfo.enc_tab_id);
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                *TmpBuf=0;
-                dgt_schar type[128];
-                memset(type,0,128);
-                if (!strcasecmp(col_info->data_type,"NUMBER")) {
-                        if (col_info->data_precision && col_info->data_scale) {
-                                sprintf(type,"%s NUMBER(%d,%d)", col_info->col_name, col_info->data_precision, col_info->data_scale);
-                        } else if (col_info->data_precision) {
-                                sprintf(type,"%s NUMBER(%d)", col_info->col_name, col_info->data_precision);
-                        } else {
-                                sprintf(type,"%s NUMBER", col_info->col_name);
-                        }
+dgt_sint32 PccTiberoScriptBuilder::reverse_step2() throw(DgcExcept) {
+    //
+    // new copy table encryption (non add column)
+    //
+    // create the copy table (same as original table)
+    //
+    pc_type_col_info* col_info = 0;
+    StepNo = -2;
+    StmtNo = -17000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    *TextBuf = 0;
+    sprintf(TextBuf, "CREATE TABLE %s.petra_%lld (", SchemaName,
+            TabInfo.enc_tab_id);
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        *TmpBuf = 0;
+        dgt_schar type[128];
+        memset(type, 0, 128);
+        if (!strcasecmp(col_info->data_type, "NUMBER")) {
+            if (col_info->data_precision && col_info->data_scale) {
+                sprintf(type, "%s NUMBER(%d,%d)", col_info->col_name,
+                        col_info->data_precision, col_info->data_scale);
+            } else if (col_info->data_precision) {
+                sprintf(type, "%s NUMBER(%d)", col_info->col_name,
+                        col_info->data_precision);
+            } else {
+                sprintf(type, "%s NUMBER", col_info->col_name);
+            }
 
-                } else if (!strcasecmp(col_info->data_type, "TIMESTAMP")) {
-                        if (col_info->data_scale) {
-                                sprintf(type,"%s TIMESTAMP(%d)", col_info->col_name, col_info->data_scale);
-                        } else {
-                                sprintf(type,"%s TIMESTAMP", col_info->col_name);
-                        }
-                } else if (!strcasecmp(col_info->data_type, "DATE")) {
-                        sprintf(type,"%s %s", col_info->col_name, col_info->data_type);
-		} else if (!strcasecmp(col_info->data_type, "BLOB") ||
-                           !strcasecmp(col_info->data_type, "CLOB") ||
-                           !strcasecmp(col_info->data_type, "LONG") ||
-                           !strcasecmp(col_info->data_type, "LONG RAW")) {
-                        sprintf(type,"%s %s", col_info->col_name, col_info->data_type); 
-		} else if (col_info->data_length) {
-                        sprintf(type,"%s %s(%d)", col_info->col_name, col_info->data_type, col_info->data_length);
-                } else {
-                        sprintf(type,"%s %s", col_info->col_name, col_info->data_type);
-                }
-                strcat(TextBuf,type);
-                if (col_info->status == 0 && col_info->col_default && strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
-                        sprintf(TmpBuf," default %s,\n", PetraNamePool->getNameString(col_info->col_default));
-                } else {
-                        sprintf(TmpBuf,",\n");
-                }
-                strcat(TextBuf,TmpBuf);
+        } else if (!strcasecmp(col_info->data_type, "TIMESTAMP")) {
+            if (col_info->data_scale) {
+                sprintf(type, "%s TIMESTAMP(%d)", col_info->col_name,
+                        col_info->data_scale);
+            } else {
+                sprintf(type, "%s TIMESTAMP", col_info->col_name);
+            }
+        } else if (!strcasecmp(col_info->data_type, "DATE")) {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+        } else if (!strcasecmp(col_info->data_type, "BLOB") ||
+                   !strcasecmp(col_info->data_type, "CLOB") ||
+                   !strcasecmp(col_info->data_type, "LONG") ||
+                   !strcasecmp(col_info->data_type, "LONG RAW")) {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+        } else if (col_info->data_length) {
+            sprintf(type, "%s %s(%d)", col_info->col_name, col_info->data_type,
+                    col_info->data_length);
+        } else {
+            sprintf(type, "%s %s", col_info->col_name, col_info->data_type);
+        }
+        strcat(TextBuf, type);
+        if (col_info->status == 0 && col_info->col_default &&
+            strlen(PetraNamePool->getNameString(col_info->col_default)) > 0) {
+            sprintf(TmpBuf, " default %s,\n",
+                    PetraNamePool->getNameString(col_info->col_default));
+        } else {
+            sprintf(TmpBuf, ",\n");
+        }
+        strcat(TextBuf, TmpBuf);
+    }
+    TextBuf[strlen(TextBuf) - 2] = 0;
+    CheckSqlRows3.rewind();
+    dgt_schar* cksql = 0;
+    while (CheckSqlRows3.next() && (cksql = (dgt_schar*)CheckSqlRows3.data())) {
+        if (cksql && strlen(cksql) > 2) {
+            strcat(TextBuf, ",");
+            strcat(TextBuf, cksql);
+        }
+    }
+    sprintf(TmpBuf, ") TABLESPACE %s", TabInfo.target_tablespace_name);
+    strcat(TextBuf, TmpBuf);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
 
+    ColInfoRows.rewind();
+    dgt_sint32 lob_flag = 0;
+    dgt_sint32 long_flag = 0;
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 1) {
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                lob_flag = 1;
+            }
+            if (!strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW")) {
+                long_flag = 1;
+            }
         }
-        TextBuf[strlen(TextBuf)-2]=0;
-        CheckSqlRows3.rewind();
-        dgt_schar* cksql=0;
-        while(CheckSqlRows3.next() && (cksql=(dgt_schar*)CheckSqlRows3.data())) {
-                if (cksql && strlen(cksql) > 2) {
-                        strcat(TextBuf,",");
-                        strcat(TextBuf,cksql);
-                }
-        }
-        sprintf(TmpBuf,") TABLESPACE %s",TabInfo.target_tablespace_name);
-        strcat(TextBuf,TmpBuf);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-
-        ColInfoRows.rewind();
-        dgt_sint32      lob_flag=0;
-        dgt_sint32      long_flag=0;
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 1) {
-                        if (!strcasecmp(col_info->data_type,"CLOB") ||
-                            !strcasecmp(col_info->data_type,"BLOB")) {
-                                lob_flag=1;
-                        }
-			if (!strcasecmp(col_info->data_type,"LONG") ||
-                            !strcasecmp(col_info->data_type,"LONG RAW")) {
-                                long_flag=1;
-                        }
-                }
-        }
+    }
 #if 0
         if (lob_flag == 0) {
 		if (TabInfo.enc_type == 0) {
@@ -4399,204 +4955,234 @@ dgt_sint32 PccTiberoScriptBuilder::reverse_step2() throw(DgcExcept)
 		}
         }
 #endif
-        // insert decryption (parallel insert)
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (lob_flag==1) {
-                ColInfoRows.rewind();
-                sprintf(TmpBuf,"insert into %s.%s_%lld( ",
-                                SchemaName,"petra",TabInfo.enc_tab_id);
-                strcat(TextBuf,TmpBuf);
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-                        if (col_info->status == 1) {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-                TextBuf[strlen(TextBuf)-1]=0;
-                strcat(TextBuf,") \nselect ");
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-                        if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-				if (col_info->status == 1) {
-	                                sprintf(TmpBuf,"%s,",getFname(col_info->enc_col_id,2));
-	                                strcat(TextBuf,TmpBuf);	
-				} else {
-	                                sprintf(TmpBuf,"%s,",col_info->col_name);
-	                                strcat(TextBuf,TmpBuf);	
-				}
-                        }
-                }
-        } else {
-		*TextBuf=0;
-                sprintf(TextBuf,"ALTER SESSION FORCE PARALLEL DML");
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-		*TextBuf=0;
-                ColInfoRows.rewind();
-                sprintf(TmpBuf,"insert /*+ APPEND PARALLEL(petra_%lld,%d) */ into %s.%s_%lld \n select ",
-                        	TabInfo.enc_tab_id, ParallelDegree,  SchemaName,"petra",TabInfo.enc_tab_id);
-                strcat(TextBuf,TmpBuf);
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (col_info->status == 1) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,getFname(col_info->enc_col_id,2));
-                                strcat(TmpBuf,",");
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
+    // insert decryption (parallel insert)
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (lob_flag == 1) {
+        ColInfoRows.rewind();
+        sprintf(TmpBuf, "insert into %s.%s_%lld( ", SchemaName, "petra",
+                TabInfo.enc_tab_id);
+        strcat(TextBuf, TmpBuf);
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 1) {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-        TextBuf[strlen(TextBuf)-1]=0;
-        *TmpBuf=0;
-	if (TabInfo.enc_type == 0) {
-	        sprintf(TmpBuf," from %s.%s %s",SchemaName,TabInfo.renamed_tab_name,TabInfo.table_name);
-	        strcat(TextBuf,TmpBuf);
-        	if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	        }
-	} else {
-	        sprintf(TmpBuf," from %s.%s %s",SchemaName,TabInfo.table_name,TabInfo.table_name);
-	        strcat(TextBuf,TmpBuf);
-        	if (saveSqlText() < 0) {
-                	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	        }
-	}
-        *TextBuf=0;
-        sprintf(TextBuf,"commit");
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        strcat(TextBuf, ") \nselect ");
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW")) {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                if (col_info->status == 1) {
+                    sprintf(TmpBuf, "%s,", getFname(col_info->enc_col_id, 2));
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+        }
+    } else {
+        *TextBuf = 0;
+        sprintf(TextBuf, "ALTER SESSION FORCE PARALLEL DML");
         if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-	*TextBuf=0;
-	sprintf(TextBuf,"ALTER SESSION DISABLE PARALLEL DML");
-	if (saveSqlText() < 0) {
-		ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	}
-        if (long_flag == 1) {
-                sprintf(TextBuf,"declare\n   urows number := 0;\n   v_rowid rowid;\n");
-                *TmpBuf=0;
-                sprintf(TmpBuf,"   cursor c1 is\n      select rowid from %s.%s_%lld\n       where",SchemaName,"petra",TabInfo.enc_tab_id); 
-                strcat(TextBuf,TmpBuf);
-                ColInfoRows.rewind();
-                for(dgt_uint16 i=0; ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data());) {
-                        if (col_info->status == 1 && (!strcasecmp(col_info->data_type, "LONG") || !strcasecmp(col_info->data_type, "LONG RAW"))) {
-                                *TmpBuf=0;
-                                if (i++ == 0) sprintf(TmpBuf," %s is null", col_info->col_name);
-                                else sprintf(TmpBuf," or %s is null", col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-                strcat(TextBuf,";\nbegin\n   open c1;\n   loop\n\tfetch c1 into v_rowid;\n\texit when c1%NOTFOUND;\n");
-                *TmpBuf=0;
-                sprintf(TmpBuf,"\tupdate %s.%s_%lld set",SchemaName,"petra" ,TabInfo.enc_tab_id);
-                strcat(TextBuf,TmpBuf);
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (col_info->status == 1 && (!strcasecmp(col_info->data_type, "LONG") || !strcasecmp(col_info->data_type, "LONG RAW"))) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n\t\t%s=%s,", col_info->col_name, getFname(col_info->enc_col_id,2));
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-                TextBuf[strlen(TextBuf)-1]=0;
-                *TmpBuf=0;
-                sprintf(TmpBuf,"\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
-                                \n   commit;\nend;\n", 1000);
-                strcat(TextBuf,TmpBuf);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+        *TextBuf = 0;
+        ColInfoRows.rewind();
+        sprintf(TmpBuf,
+                "insert /*+ APPEND PARALLEL(petra_%lld,%d) */ into %s.%s_%lld "
+                "\n select ",
+                TabInfo.enc_tab_id, ParallelDegree, SchemaName, "petra",
+                TabInfo.enc_tab_id);
+        strcat(TextBuf, TmpBuf);
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 1) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, getFname(col_info->enc_col_id, 2));
+                strcat(TmpBuf, ",");
+                strcat(TextBuf, TmpBuf);
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-        //
-        // rename enc column name -> original column name
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        col_info=0;
-        if (TabInfo.org_col_name_flag == 1) {
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (col_info->status == 1) {
-                                *TextBuf=0;
-                                if (TabInfo.enc_type == 0) {
-                                        sprintf(TextBuf,"alter table %s.%s rename column %s to %s",
-                                                        SchemaName, TabInfo.renamed_tab_name, col_info->col_name, col_info->renamed_col_name);
-                                        if (saveSqlText() < 0) {
-                                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                        }
-                                } else {
-                                        sprintf(TextBuf,"alter table %s.%s rename column %s to %s",
-                                                        SchemaName, TabInfo.table_name, col_info->col_name, col_info->renamed_col_name);
-                                        if (saveSqlText() < 0) {
-                                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                        }
-                                }
-                        }
-                }
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        sprintf(TmpBuf, " from %s.%s %s", SchemaName, TabInfo.renamed_tab_name,
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
+    } else {
+        sprintf(TmpBuf, " from %s.%s %s", SchemaName, TabInfo.table_name,
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    *TextBuf = 0;
+    sprintf(TextBuf, "commit");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
+    sprintf(TextBuf, "ALTER SESSION DISABLE PARALLEL DML");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    if (long_flag == 1) {
+        sprintf(TextBuf, "declare\n   urows number := 0;\n   v_rowid rowid;\n");
+        *TmpBuf = 0;
+        sprintf(
+            TmpBuf,
+            "   cursor c1 is\n      select rowid from %s.%s_%lld\n       where",
+            SchemaName, "petra", TabInfo.enc_tab_id);
+        strcat(TextBuf, TmpBuf);
+        ColInfoRows.rewind();
+        for (dgt_uint16 i = 0;
+             ColInfoRows.next() &&
+             (col_info = (pc_type_col_info*)ColInfoRows.data());) {
+            if (col_info->status == 1 &&
+                (!strcasecmp(col_info->data_type, "LONG") ||
+                 !strcasecmp(col_info->data_type, "LONG RAW"))) {
+                *TmpBuf = 0;
+                if (i++ == 0)
+                    sprintf(TmpBuf, " %s is null", col_info->col_name);
+                else
+                    sprintf(TmpBuf, " or %s is null", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        strcat(TextBuf,
+               ";\nbegin\n   open c1;\n   loop\n\tfetch c1 into "
+               "v_rowid;\n\texit when c1%NOTFOUND;\n");
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "\tupdate %s.%s_%lld set", SchemaName, "petra",
+                TabInfo.enc_tab_id);
+        strcat(TextBuf, TmpBuf);
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 1 &&
+                (!strcasecmp(col_info->data_type, "LONG") ||
+                 !strcasecmp(col_info->data_type, "LONG RAW"))) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n\t\t%s=%s,", col_info->col_name,
+                        getFname(col_info->enc_col_id, 2));
+                strcat(TextBuf, TmpBuf);
+            }
+        }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        *TmpBuf = 0;
+        sprintf(
+            TmpBuf,
+            "\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
+                                \n   commit;\nend;\n",
+            1000);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    //
+    // rename enc column name -> original column name
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    col_info = 0;
+    if (TabInfo.org_col_name_flag == 1) {
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status == 1) {
+                *TextBuf = 0;
+                if (TabInfo.enc_type == 0) {
+                    sprintf(TextBuf, "alter table %s.%s rename column %s to %s",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            col_info->col_name, col_info->renamed_col_name);
+                    if (saveSqlText() < 0) {
+                        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                    }
+                } else {
+                    sprintf(TextBuf, "alter table %s.%s rename column %s to %s",
+                            SchemaName, TabInfo.table_name, col_info->col_name,
+                            col_info->renamed_col_name);
+                    if (saveSqlText() < 0) {
+                        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                    }
+                }
+            }
+        }
+    }
 
-
-
-        //
-        // Create the table`s original index
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        IdxSqlRows6.rewind();
-        IdxSqlRows3.rewind();
-        dgt_schar* idx_sql=0;
-        while (IdxSqlRows6.next() && (idx_sql=(dgt_schar*)IdxSqlRows6.data())) {
-                if (idx_sql && strlen(idx_sql) > 2) {
-                        *TextBuf=0;
-                        strcpy(TextBuf,idx_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // Create the table`s original index
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    IdxSqlRows6.rewind();
+    IdxSqlRows3.rewind();
+    dgt_schar* idx_sql = 0;
+    while (IdxSqlRows6.next() && (idx_sql = (dgt_schar*)IdxSqlRows6.data())) {
+        if (idx_sql && strlen(idx_sql) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, idx_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        while (IdxSqlRows3.next() && (idx_sql=(dgt_schar*)IdxSqlRows3.data())) {
-                if (idx_sql && strlen(idx_sql) > 2) {
-                        *TextBuf=0;
-                        strcpy(TextBuf,idx_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    }
+    while (IdxSqlRows3.next() && (idx_sql = (dgt_schar*)IdxSqlRows3.data())) {
+        if (idx_sql && strlen(idx_sql) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, idx_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-	//
-	// make unique constraint
-	//
-        *TextBuf=0;
-        *TmpBuf=0;
-        UniqueSqlRows2.rewind();
-        dgt_schar* unisql=0;
-        while(UniqueSqlRows2.next() && (unisql=(dgt_schar*)UniqueSqlRows2.data())) {
-                if (unisql && strlen(unisql) > 2) {
-                        strcpy(TextBuf,unisql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    }
+    //
+    // make unique constraint
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    UniqueSqlRows2.rewind();
+    dgt_schar* unisql = 0;
+    while (UniqueSqlRows2.next() &&
+           (unisql = (dgt_schar*)UniqueSqlRows2.data())) {
+        if (unisql && strlen(unisql) > 2) {
+            strcpy(TextBuf, unisql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-        //
-        // make check constraint
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
+    //
+    // make check constraint
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
 #if 0
         CheckSqlRows3.rewind();
         dgt_schar* cksql=0;
@@ -4609,821 +5195,944 @@ dgt_sint32 PccTiberoScriptBuilder::reverse_step2() throw(DgcExcept)
                 }
         }
 #endif
-        //
-        // If not null check constraint exist drop and create
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        CheckSqlRows.rewind();
-        pc_type_check_sql* check_sql=0;
-        while (CheckSqlRows.next() && (check_sql=(pc_type_check_sql*)CheckSqlRows.data())) {
-                *TextBuf=0;
-                if (check_sql->org1 && strlen(check_sql->org1) > 2) {
-                        strcpy(TextBuf,check_sql->org1);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // If not null check constraint exist drop and create
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    CheckSqlRows.rewind();
+    pc_type_check_sql* check_sql = 0;
+    while (CheckSqlRows.next() &&
+           (check_sql = (pc_type_check_sql*)CheckSqlRows.data())) {
+        *TextBuf = 0;
+        if (check_sql->org1 && strlen(check_sql->org1) > 2) {
+            strcpy(TextBuf, check_sql->org1);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-
-
-        //
-        // Create the Constraint (Pk,Fk,Check)
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        dgt_schar* pksql=0;
-        StmtNo=-2000;
-        DefFkDropSqlRows2.rewind();
-        dgt_schar* fkdropsql=0;
-        while (DefFkDropSqlRows2.next() && (fkdropsql=(dgt_schar*)DefFkDropSqlRows2.data())) {
-                if (fkdropsql && strlen(fkdropsql) > 2) {
-                        strcpy(TextBuf,fkdropsql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    //
+    // Create the Constraint (Pk,Fk,Check)
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    dgt_schar* pksql = 0;
+    StmtNo = -2000;
+    DefFkDropSqlRows2.rewind();
+    dgt_schar* fkdropsql = 0;
+    while (DefFkDropSqlRows2.next() &&
+           (fkdropsql = (dgt_schar*)DefFkDropSqlRows2.data())) {
+        if (fkdropsql && strlen(fkdropsql) > 2) {
+            strcpy(TextBuf, fkdropsql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        DefFkDropSqlRows.rewind();
-        typedef struct {
-                dgt_schar enc_sql[512];
-                dgt_schar org_sql[512];
-        } enc_table_fk;
-        enc_table_fk* tmp_ptr=0;
-        while (DefFkDropSqlRows.next() && (tmp_ptr=(enc_table_fk*)DefFkDropSqlRows.data())) {
-                if (tmp_ptr->org_sql && strlen(tmp_ptr->org_sql) > 2) {
-                        strcpy(TextBuf,tmp_ptr->org_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    }
+    DefFkDropSqlRows.rewind();
+    typedef struct {
+        dgt_schar enc_sql[512];
+        dgt_schar org_sql[512];
+    } enc_table_fk;
+    enc_table_fk* tmp_ptr = 0;
+    while (DefFkDropSqlRows.next() &&
+           (tmp_ptr = (enc_table_fk*)DefFkDropSqlRows.data())) {
+        if (tmp_ptr->org_sql && strlen(tmp_ptr->org_sql) > 2) {
+            strcpy(TextBuf, tmp_ptr->org_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=-1000;
-        DefFkCreSqlRows3.rewind();
-        dgt_schar* fkcresql=0;
-        while (DefFkCreSqlRows3.next() && (fkcresql=(dgt_schar*)DefFkCreSqlRows3.data())) {
-                if (fkcresql && strlen(fkcresql) > 2) {
-                        strcpy(TextBuf,fkcresql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = -1000;
+    DefFkCreSqlRows3.rewind();
+    dgt_schar* fkcresql = 0;
+    while (DefFkCreSqlRows3.next() &&
+           (fkcresql = (dgt_schar*)DefFkCreSqlRows3.data())) {
+        if (fkcresql && strlen(fkcresql) > 2) {
+            strcpy(TextBuf, fkcresql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        //
-        // drop enc table & rename original table
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
+    }
+    //
+    // drop enc table & rename original table
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
 #if 0
 		sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.renamed_tab_name);
                 if (saveSqlText() < 0) {
                         ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
                 }
 #endif
-		*TextBuf=0;
-                sprintf(TextBuf,"drop view %s.%s",SchemaName,TabInfo.second_view_name);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-		if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
-			*TextBuf=0;
-	                sprintf(TextBuf,"drop view %s.%s",SchemaName,TabInfo.first_view_name);
-        	        if (saveSqlText() < 0) {
-                	        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	                }
-		}
-        } else {
-#if 1
-                sprintf(TextBuf,"alter table %s.%s rename to %s",SchemaName,TabInfo.table_name, TabInfo.renamed_tab_name);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-#endif
-        }
-        *TextBuf=0;
-        *TmpBuf=0;
-        sprintf(TextBuf,"alter table %s.%s_%lld rename to %s",SchemaName,"petra",TabInfo.enc_tab_id,TabInfo.table_name);
+        *TextBuf = 0;
+        sprintf(TextBuf, "drop view %s.%s", SchemaName,
+                TabInfo.second_view_name);
         if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-        //
-        // grant privilege
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        PrivSqlRows.rewind();
-        if (TabInfo.grant_flag) {
-                while(PrivSqlRows.next()) {
-                        *TextBuf=0;
-                        strcat(TextBuf,(dgt_schar*)PrivSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+        if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
+            *TextBuf = 0;
+            sprintf(TextBuf, "drop view %s.%s", SchemaName,
+                    TabInfo.first_view_name);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-	//
-        // synonym recreate
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        pc_type_synonym_sql*       syn_info_tmp;
-        SynonymSqlRows.rewind();
-        if (SynonymSqlRows.next() && (syn_info_tmp=(pc_type_synonym_sql*)SynonymSqlRows.data())) {
-                if (syn_info_tmp->drop_sql_id && *syn_info_tmp->drop_sql_id) {
-                        strcpy(TextBuf,syn_info_tmp->drop_sql_id);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-                *TextBuf=0;
-                if (syn_info_tmp->create_sql_id && *syn_info_tmp->create_sql_id) {
-                        strcpy(TextBuf,syn_info_tmp->create_sql_id);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-        //
-        // create comment
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        CommentInfoRows.rewind();
-        dgt_schar* comment_sql;
-        while (CommentInfoRows.next() && (comment_sql=(dgt_schar*)CommentInfoRows.data())) {
-                *TextBuf=0;
-                if (comment_sql && strlen(comment_sql) > 2) {
-                        strcpy(TextBuf,comment_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-        //
-        // encrypt tables`s dependency object complie script
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        ObjTriggerSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjTriggerSqlRows.next()) {
-                        *TextBuf=0;
-                        sprintf(TextBuf,(dgt_schar*)ObjTriggerSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-
-        //
-        // encrypt tables`s dependency object complie script
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        ObjSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjSqlRows.next()) {
-                        *TextBuf=0;
-                        strcat(TextBuf,(dgt_schar*)ObjSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-
-        //
-        // drop enc table & rename original table
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (!strcasecmp(DbVersion,"9i")) {
-        	sprintf(TextBuf,"drop table %s.%s",SchemaName,TabInfo.renamed_tab_name);
-        } else {
-        	sprintf(TextBuf,"drop table %s.%s purge",SchemaName,TabInfo.renamed_tab_name);
-        }
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-
-        //
-        // If Pk,Fk Working set table then pk,fk migration
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        pkfk_sql* sql_row;
-        PkSqlRows.rewind();
-        FkSqlRows.rewind();
-        if (IsPkFk == 1) {
-                while (PkSqlRows.next() && (sql_row=(pkfk_sql*)PkSqlRows.data())) {
-                        *TextBuf=0;
-                        if (sql_row->org3 && strlen(sql_row->org3) > 2) {
-                                strcpy(TextBuf,sql_row->org3);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
-                }
-                while (FkSqlRows.next() && (sql_row=(pkfk_sql*)FkSqlRows.data())) {
-                        *TextBuf=0;
-                        if (sql_row->org3 && strlen(sql_row->org3) > 2) {
-                                strcpy(TextBuf,sql_row->org3);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
-                }
-        }
-
-
-        //
-        // rename renamed index name -> orginal index name
-        //
+    } else {
 #if 1
-        *TextBuf=0;
-        *TmpBuf=0;
-        IdxSqlRows4.rewind();
-        dgt_schar* rename_idx=0;
-        while (IdxSqlRows4.next() && (rename_idx=(dgt_schar*)IdxSqlRows4.data())) {
-                if (rename_idx && strlen(rename_idx) > 2) {
-                        *TextBuf=0;
-                        strcpy(TextBuf,rename_idx);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
+        sprintf(TextBuf, "alter table %s.%s rename to %s", SchemaName,
+                TabInfo.table_name, TabInfo.renamed_tab_name);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
 #endif
+    }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    sprintf(TextBuf, "alter table %s.%s_%lld rename to %s", SchemaName, "petra",
+            TabInfo.enc_tab_id, TabInfo.table_name);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    //
+    // grant privilege
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    PrivSqlRows.rewind();
+    if (TabInfo.grant_flag) {
+        while (PrivSqlRows.next()) {
+            *TextBuf = 0;
+            strcat(TextBuf, (dgt_schar*)PrivSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // synonym recreate
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    pc_type_synonym_sql* syn_info_tmp;
+    SynonymSqlRows.rewind();
+    if (SynonymSqlRows.next() &&
+        (syn_info_tmp = (pc_type_synonym_sql*)SynonymSqlRows.data())) {
+        if (syn_info_tmp->drop_sql_id && *syn_info_tmp->drop_sql_id) {
+            strcpy(TextBuf, syn_info_tmp->drop_sql_id);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+        *TextBuf = 0;
+        if (syn_info_tmp->create_sql_id && *syn_info_tmp->create_sql_id) {
+            strcpy(TextBuf, syn_info_tmp->create_sql_id);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // create comment
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    CommentInfoRows.rewind();
+    dgt_schar* comment_sql;
+    while (CommentInfoRows.next() &&
+           (comment_sql = (dgt_schar*)CommentInfoRows.data())) {
+        *TextBuf = 0;
+        if (comment_sql && strlen(comment_sql) > 2) {
+            strcpy(TextBuf, comment_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    ObjTriggerSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjTriggerSqlRows.next()) {
+            *TextBuf = 0;
+            sprintf(TextBuf, (dgt_schar*)ObjTriggerSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
 
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    ObjSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjSqlRows.next()) {
+            *TextBuf = 0;
+            strcat(TextBuf, (dgt_schar*)ObjSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
 
+    //
+    // drop enc table & rename original table
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (!strcasecmp(DbVersion, "9i")) {
+        sprintf(TextBuf, "drop table %s.%s", SchemaName,
+                TabInfo.renamed_tab_name);
+    } else {
+        sprintf(TextBuf, "drop table %s.%s purge", SchemaName,
+                TabInfo.renamed_tab_name);
+    }
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
 
-        return 0;
+    //
+    // If Pk,Fk Working set table then pk,fk migration
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    pkfk_sql* sql_row;
+    PkSqlRows.rewind();
+    FkSqlRows.rewind();
+    if (IsPkFk == 1) {
+        while (PkSqlRows.next() && (sql_row = (pkfk_sql*)PkSqlRows.data())) {
+            *TextBuf = 0;
+            if (sql_row->org3 && strlen(sql_row->org3) > 2) {
+                strcpy(TextBuf, sql_row->org3);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+        while (FkSqlRows.next() && (sql_row = (pkfk_sql*)FkSqlRows.data())) {
+            *TextBuf = 0;
+            if (sql_row->org3 && strlen(sql_row->org3) > 2) {
+                strcpy(TextBuf, sql_row->org3);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    }
+
+    //
+    // rename renamed index name -> orginal index name
+    //
+#if 1
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    IdxSqlRows4.rewind();
+    dgt_schar* rename_idx = 0;
+    while (IdxSqlRows4.next() &&
+           (rename_idx = (dgt_schar*)IdxSqlRows4.data())) {
+        if (rename_idx && strlen(rename_idx) > 2) {
+            *TextBuf = 0;
+            strcpy(TextBuf, rename_idx);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+#endif
+
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::addColStep() throw(DgcExcept)
-{
-        //
-        // alter table modify column
-        //
-        StepNo=3;
-        StmtNo=1000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        ColInfoRows.rewind();
-	pc_type_col_info* col_info=0;
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 2) {
-                        dgt_sint32      enc_len = 0;
-                        if (!strcasecmp(col_info->data_type,"NUMBER")) enc_len = (col_info->data_precision + 2);
-                        else if (!strcasecmp(col_info->data_type,"DATE") || !strcasecmp(col_info->data_type,"TIMESTAMP")) enc_len = 14;
-                        else if (col_info->multi_byte_flag) enc_len = col_info->data_length * 3;
-                        else enc_len = col_info->data_length;
-                        PCI_Context     ctx;
-                        PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type, col_info->enc_mode,
-                                                col_info->iv_type, col_info->n2n_flag, col_info->b64_txt_enc_flag,
-                                                col_info->enc_start_pos, col_info->enc_length);
-                        enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
-                        if (col_info->index_type == 1) {
-                                enc_len += PCI_ophuekLength(col_info->data_length, PCI_SRC_TYPE_CHAR, 1);
-				enc_len += 4;
-                        }
-			if (!strcasecmp(col_info->data_type,"NCHAR") ||
-			    !strcasecmp(col_info->data_type,"NVARCHAR2")) {
-				enc_len = enc_len * 3;
-			}
-                        *TextBuf=0;
-                        if (!strcasecmp(col_info->data_type,"CLOB") ||  !strcasecmp(col_info->data_type,"BLOB")) {
-				if (TabInfo.enc_type == 0) {
-	                                sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
-				} else {
-	                                sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.table_name, col_info->col_name);
-				}
-                        } else if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-				if (TabInfo.enc_type == 0) {
-                                	sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
-				} else {
-                                	sprintf(TextBuf,"alter table %s.%s modify %s BLOB", SchemaName, TabInfo.table_name, col_info->col_name);
-				}
-                        } else {
-                                if (col_info->b64_txt_enc_flag) {
-					if (TabInfo.enc_type == 0) {
-                                        	sprintf(TextBuf,"alter table %s.%s modify %s varchar2(%d)",
-                                                	SchemaName, TabInfo.renamed_tab_name, col_info->col_name, enc_len);
-					} else {
-                                        	sprintf(TextBuf,"alter table %s.%s modify %s varchar2(%d)",
-                                                	SchemaName, TabInfo.table_name, col_info->col_name, enc_len);
-					}
-                                } else {
-					if (TabInfo.enc_type == 0) {
-                                        	sprintf(TextBuf,"alter table %s.%s modify %s raw(%d)",
-                                                	SchemaName, TabInfo.renamed_tab_name, col_info->col_name, enc_len);
-					} else {
-                                        	sprintf(TextBuf,"alter table %s.%s modify %s raw(%d)",
-                                                	SchemaName, TabInfo.table_name, col_info->col_name, enc_len);
-					}
-                                }
-                        }
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		}
-        }
-        //
-        // encrypting data without exclusive access
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=2000;
-        sprintf(TextBuf,"declare\n   urows number := 0;\n   v_rowid rowid;\n");
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 2) {
-                        *TmpBuf=0;
-                        if (!strcasecmp(col_info->data_type,"number")) {
-                                if (col_info->data_precision == 0) {
-                                        sprintf(TmpBuf,"   v_%s %s;\n",col_info->col_name,col_info->data_type);
-                                } else {
-                                        sprintf(TmpBuf,"   v_%s %s(%d,%d);\n",col_info->col_name,col_info->data_type,
-                                                                              col_info->data_precision,col_info->data_scale);
-                                }
-                        } else if (!strcasecmp(col_info->data_type,"date")) {
-                                sprintf(TmpBuf,"   v_%s %s;\n",col_info->col_name,col_info->data_type);
-                        } else if (!strcasecmp(col_info->data_type,"raw")) {
-                                sprintf(TmpBuf,"   v_%s %s(%u);\n",col_info->col_name,col_info->data_type,col_info->data_length);
-                        } else {
-                                sprintf(TmpBuf,"   v_%s varchar2(%u);\n",col_info->col_name,col_info->data_length);
-                        }
-                        strcat(TextBuf,TmpBuf);
-                }
-        }
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
-                sprintf(TmpBuf,"   cursor c1 is\n      select rowid from %s.%s;\n",SchemaName, TabInfo.renamed_tab_name);
-        } else {
-                sprintf(TmpBuf,"   cursor c1 is\n      select rowid from %s.%s;\n",SchemaName, TabInfo.table_name);
-        }
-        strcat(TextBuf,TmpBuf);
-        strcat(TextBuf,"\nbegin\n   open c1;\n   loop\n\tfetch c1 into v_rowid;\n\texit when c1%NOTFOUND;\n");
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
-                sprintf(TmpBuf,"\tupdate %s.%s set",SchemaName, TabInfo.renamed_tab_name);
-        } else {
-                sprintf(TmpBuf,"\tupdate %s.%s set",SchemaName, TabInfo.table_name);
-        }
-        strcat(TextBuf,TmpBuf);
-        ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 2) {
-                        dgt_sint32 idx_flag=col_info->index_type;
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n\t\t%s=%s,",col_info->col_name,getFname(col_info->enc_col_id,1));
-                        strcat(TextBuf,TmpBuf);
-                }
-        }
-        TextBuf[strlen(TextBuf)-1]=0;
-        *TmpBuf=0;
-        sprintf(TmpBuf,"\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
-                        \n   commit;\nend;\n", 1000);
-        strcat(TextBuf,TmpBuf);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        *TextBuf=0;
-        *TmpBuf=0;
-        StmtNo=3000;
-        if (TabInfo.enc_type == 0) {
-                if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.first_view_name);
-                        ColInfoRows.rewind();
-                        pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status >= 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-                                        	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2),col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        strcat(TextBuf,"rowid row_id");
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName, TabInfo.renamed_tab_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName, TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                        TextBuf[strlen(TextBuf)-1]=0;   // cut the last ";" off
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," from %s.%s",SchemaName, TabInfo.first_view_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
+dgt_sint32 PccTiberoScriptBuilder::addColStep() throw(DgcExcept) {
+    //
+    // alter table modify column
+    //
+    StepNo = 3;
+    StmtNo = 1000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    ColInfoRows.rewind();
+    pc_type_col_info* col_info = 0;
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 2) {
+            dgt_sint32 enc_len = 0;
+            if (!strcasecmp(col_info->data_type, "NUMBER"))
+                enc_len = (col_info->data_precision + 2);
+            else if (!strcasecmp(col_info->data_type, "DATE") ||
+                     !strcasecmp(col_info->data_type, "TIMESTAMP"))
+                enc_len = 14;
+            else if (col_info->multi_byte_flag)
+                enc_len = col_info->data_length * 3;
+            else
+                enc_len = col_info->data_length;
+            PCI_Context ctx;
+            PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type,
+                            col_info->enc_mode, col_info->iv_type,
+                            col_info->n2n_flag, col_info->b64_txt_enc_flag,
+                            col_info->enc_start_pos, col_info->enc_length);
+            enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
+            if (col_info->index_type == 1) {
+                enc_len += PCI_ophuekLength(col_info->data_length,
+                                            PCI_SRC_TYPE_CHAR, 1);
+                enc_len += 4;
+            }
+            if (!strcasecmp(col_info->data_type, "NCHAR") ||
+                !strcasecmp(col_info->data_type, "NVARCHAR2")) {
+                enc_len = enc_len * 3;
+            }
+            *TextBuf = 0;
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                if (TabInfo.enc_type == 0) {
+                    sprintf(TextBuf, "alter table %s.%s modify %s BLOB",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            col_info->col_name);
                 } else {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-                        pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-                                if (col_info->status >= 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-                                        	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2), col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        TextBuf[strlen(TextBuf)-1]=0;
-                        IdxColRows.rewind();
-                        if (IdxColRows.numRows() == 0) {
-                                strcat(TextBuf,",rowid row_id");
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                                strcat(TextBuf,TmpBuf);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                                strcat(TextBuf,TmpBuf);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
+                    sprintf(TextBuf, "alter table %s.%s modify %s BLOB",
+                            SchemaName, TabInfo.table_name, col_info->col_name);
                 }
+            } else if (!strcasecmp(col_info->data_type, "LONG") ||
+                       !strcasecmp(col_info->data_type, "LONG RAW")) {
+                if (TabInfo.enc_type == 0) {
+                    sprintf(TextBuf, "alter table %s.%s modify %s BLOB",
+                            SchemaName, TabInfo.renamed_tab_name,
+                            col_info->col_name);
+                } else {
+                    sprintf(TextBuf, "alter table %s.%s modify %s BLOB",
+                            SchemaName, TabInfo.table_name, col_info->col_name);
+                }
+            } else {
+                if (col_info->b64_txt_enc_flag) {
+                    if (TabInfo.enc_type == 0) {
+                        sprintf(TextBuf,
+                                "alter table %s.%s modify %s varchar2(%d)",
+                                SchemaName, TabInfo.renamed_tab_name,
+                                col_info->col_name, enc_len);
+                    } else {
+                        sprintf(TextBuf,
+                                "alter table %s.%s modify %s varchar2(%d)",
+                                SchemaName, TabInfo.table_name,
+                                col_info->col_name, enc_len);
+                    }
+                } else {
+                    if (TabInfo.enc_type == 0) {
+                        sprintf(TextBuf, "alter table %s.%s modify %s raw(%d)",
+                                SchemaName, TabInfo.renamed_tab_name,
+                                col_info->col_name, enc_len);
+                    } else {
+                        sprintf(TextBuf, "alter table %s.%s modify %s raw(%d)",
+                                SchemaName, TabInfo.table_name,
+                                col_info->col_name, enc_len);
+                    }
+                }
+            }
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        //
-        // if plugin view -> create the instead of trigger
-        //
-        *TmpBuf=0;
-        *TextBuf=0;
-        StmtNo=4000;
-        dgt_schar sql_text[2048];
-        memset(sql_text,0,2048);
-        sprintf(sql_text,"select count() from pct_enc_col_index where enc_tab_id = %lld and uniqueness=1 and column_position > 1",TabInfo.enc_tab_id);
-        DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
+    }
+    //
+    // encrypting data without exclusive access
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 2000;
+    sprintf(TextBuf, "declare\n   urows number := 0;\n   v_rowid rowid;\n");
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 2) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "number")) {
+                if (col_info->data_precision == 0) {
+                    sprintf(TmpBuf, "   v_%s %s;\n", col_info->col_name,
+                            col_info->data_type);
+                } else {
+                    sprintf(TmpBuf, "   v_%s %s(%d,%d);\n", col_info->col_name,
+                            col_info->data_type, col_info->data_precision,
+                            col_info->data_scale);
+                }
+            } else if (!strcasecmp(col_info->data_type, "date")) {
+                sprintf(TmpBuf, "   v_%s %s;\n", col_info->col_name,
+                        col_info->data_type);
+            } else if (!strcasecmp(col_info->data_type, "raw")) {
+                sprintf(TmpBuf, "   v_%s %s(%u);\n", col_info->col_name,
+                        col_info->data_type, col_info->data_length);
+            } else {
+                sprintf(TmpBuf, "   v_%s varchar2(%u);\n", col_info->col_name,
+                        col_info->data_length);
+            }
+            strcat(TextBuf, TmpBuf);
+        }
+    }
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        sprintf(TmpBuf, "   cursor c1 is\n      select rowid from %s.%s;\n",
+                SchemaName, TabInfo.renamed_tab_name);
+    } else {
+        sprintf(TmpBuf, "   cursor c1 is\n      select rowid from %s.%s;\n",
+                SchemaName, TabInfo.table_name);
+    }
+    strcat(TextBuf, TmpBuf);
+    strcat(TextBuf,
+           "\nbegin\n   open c1;\n   loop\n\tfetch c1 into v_rowid;\n\texit "
+           "when c1%NOTFOUND;\n");
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        sprintf(TmpBuf, "\tupdate %s.%s set", SchemaName,
+                TabInfo.renamed_tab_name);
+    } else {
+        sprintf(TmpBuf, "\tupdate %s.%s set", SchemaName, TabInfo.table_name);
+    }
+    strcat(TextBuf, TmpBuf);
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 2) {
+            dgt_sint32 idx_flag = col_info->index_type;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n\t\t%s=%s,", col_info->col_name,
+                    getFname(col_info->enc_col_id, 1));
+            strcat(TextBuf, TmpBuf);
+        }
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    *TmpBuf = 0;
+    sprintf(
+        TmpBuf,
+        "\n\t where rowid = v_rowid;\n\turows := urows + 1;\n\tif ((urows mod %u) = 0) then\n\t\tcommit;\n\tend if;\n   end loop; \
+                        \n   commit;\nend;\n",
+        1000);
+    strcat(TextBuf, TmpBuf);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StmtNo = 3000;
+    if (TabInfo.enc_type == 0) {
+        if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.first_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status >= 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+            strcat(TextBuf, "rowid row_id");
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                    TabInfo.renamed_tab_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;  // cut the last ";" off
+            *TmpBuf = 0;
+            sprintf(TmpBuf, " from %s.%s", SchemaName, TabInfo.first_view_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        } else {
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status >= 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                } else {
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                strcat(TextBuf, ",rowid row_id");
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
+        }
+    }
+    //
+    // if plugin view -> create the instead of trigger
+    //
+    *TmpBuf = 0;
+    *TextBuf = 0;
+    StmtNo = 4000;
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select count() from pct_enc_col_index where enc_tab_id = %lld and "
+            "uniqueness=1 and column_position > 1",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* count_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (count_stmt == 0 || count_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete count_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    dgt_sint64* count_tmp = 0;
+    dgt_sint64 count = 0;
+    if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+        memcpy(&count, count_tmp, sizeof(dgt_sint64));
+    }
+    delete count_stmt;
+    dgt_sint32 uniq_idx_flag = 0;
+    if (count) {
+        uniq_idx_flag = 1;
+    } else {
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select count() from pct_enc_col_ct where enc_tab_id = %lld "
+                "and constraint_type=1 and position > 1",
+                TabInfo.enc_tab_id);
+        DgcSqlStmt* count_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
         if (count_stmt == 0 || count_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete count_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+            DgcExcept* e = EXCEPTnC;
+            delete count_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
         }
-        dgt_sint64* count_tmp=0;
-        dgt_sint64  count=0;
-        if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                memcpy(&count,count_tmp,sizeof(dgt_sint64));
+        dgt_sint64* count_tmp = 0;
+        if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+            memcpy(&count, count_tmp, sizeof(dgt_sint64));
         }
         delete count_stmt;
-        dgt_sint32 uniq_idx_flag=0;
         if (count) {
-                uniq_idx_flag=1;
-        } else {
-                memset(sql_text,0,2048);
-                sprintf(sql_text,"select count() from pct_enc_col_ct where enc_tab_id = %lld and constraint_type=1 and position > 1",TabInfo.enc_tab_id);
-                DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (count_stmt == 0 || count_stmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete count_stmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+            uniq_idx_flag = 1;
+        }
+    }
+    if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
+        if (insteadOfTrigger(1, uniq_idx_flag)) {
+            ATHROWnR(DgcError(SPOS, "insteadOfTigger failed."), -1);
+        }
+    }
+
+    //
+    // Petra Index sql create
+    //
+    dgt_schar idx_sql[512];
+    dgt_schar normal_sql[512];
+    dgt_schar idx_sql2[512];
+    dgt_schar normal_sql2[512];
+    dgt_schar idx_col_idx1[512];
+    dgt_schar idx_col_idx2[512];
+    memset(idx_sql, 0, 512);
+    memset(normal_sql, 0, 512);
+    memset(idx_sql2, 0, 512);
+    memset(normal_sql2, 0, 512);
+    memset(sql_text, 0, 2048);
+    memset(idx_col_idx1, 0, 512);
+    memset(idx_col_idx2, 0, 512);
+    StmtNo = 5000;
+    *TmpBuf = 0;
+    *TextBuf = 0;
+    sprintf(sql_text,
+            "select a.enc_col_id, b.renamed_col_name, b.data_type, "
+            "a.index_type, b.domain_index_name, b.fbi_index_name, "
+            "b.normal_index_name, a.tablespace_name, a.normal_idx_flag, "
+            "b.column_name, a.sql_text, a.normal_sql_text, a.sql_text2, "
+            "a.normal_sql_text2, a.normal_sql_text, a.normal_sql_text "
+            "from pct_enc_index a, pct_enc_column b, pct_enc_table c "
+            "where a.enc_col_id = b.enc_col_id "
+            "and   b.enc_tab_id = c.enc_tab_id "
+            "and   b.enc_tab_id = %lld"
+            "and   b.status = 2",
+            TabInfo.enc_tab_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_index_row* idx_info = 0;
+    while ((idx_info = (pc_type_index_row*)sql_stmt->fetch())) {
+        if (idx_info->index_type == 1) {
+            if (TabInfo.enc_type == 0 && idx_info->normal_idx_flag == 1) {
+                if (!strcasecmp(idx_info->data_type, "NUMBER")) {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP2",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.renamed_tab_name, idx_info->index_col_name,
+                            AgentName);
+                } else if (!strcasecmp(idx_info->data_type, "DATE") ||
+                           !strcasecmp(idx_info->data_type, "TIMESTAMP")) {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP3",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.renamed_tab_name, idx_info->index_col_name,
+                            AgentName);
+                } else {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP1",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.renamed_tab_name, idx_info->index_col_name,
+                            AgentName);
                 }
-                dgt_sint64* count_tmp=0;
-                if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                        memcpy(&count,count_tmp,sizeof(dgt_sint64));
+            } else if (TabInfo.enc_type == 1 &&
+                       idx_info->normal_idx_flag == 1) {
+                if (!strcasecmp(idx_info->data_type, "NUMBER")) {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP2",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.table_name, idx_info->index_col_name,
+                            AgentName);
+                } else if (!strcasecmp(idx_info->data_type, "DATE") ||
+                           !strcasecmp(idx_info->data_type, "TIMESTAMP")) {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP3",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.table_name, idx_info->index_col_name,
+                            AgentName);
+                } else {
+                    sprintf(idx_sql,
+                            "create index %s.%s on %s.%s(%s) indextype is "
+                            "%s.PC_IDX1_TYP1",
+                            SchemaName, idx_info->domain_index_name, SchemaName,
+                            TabInfo.table_name, idx_info->index_col_name,
+                            AgentName);
                 }
+            }
+            sprintf(TextBuf, idx_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+
+            // create domain index`s normal index
+            // if copy table encryption && enc column has normal index
+            // (position) do not create index because already generated normal
+            // index column
+            //
+            // getting the index_name in table
+            //
+            dgt_schar sql_text[2048];
+            memset(sql_text, 0, 2048);
+            sprintf(sql_text,
+                    "select count() from pct_enc_col_index where enc_col_id = "
+                    "%lld and column_position=1",
+                    idx_info->enc_col_id);
+            DgcSqlStmt* count_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (count_stmt == 0 || count_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
                 delete count_stmt;
-                if (count) {
-                        uniq_idx_flag=1;
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            dgt_sint64* count_tmp = 0;
+            dgt_sint64 count = 0;
+            if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+                memcpy(&count, count_tmp, sizeof(dgt_sint64));
+            }
+            if (count == 0) {
+                if (TabInfo.partitioned) {
+                    sprintf(idx_col_idx1,
+                            "create index %s.%s on %s.%s(%s) tablespace %s "
+                            "parallel %d nologging local",
+                            SchemaName, idx_info->fbi_index_name, SchemaName,
+                            TabInfo.renamed_tab_name, idx_info->index_col_name,
+                            idx_info->tablespace_name, ParallelDegree);
+                } else {
+                    sprintf(idx_col_idx1,
+                            "create index %s.%s on %s.%s(%s) tablespace %s "
+                            "parallel %d nologging",
+                            SchemaName, idx_info->fbi_index_name, SchemaName,
+                            TabInfo.renamed_tab_name, idx_info->index_col_name,
+                            idx_info->tablespace_name, ParallelDegree);
                 }
-        }
-        if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
-                if (insteadOfTrigger(1,uniq_idx_flag)) {
-                        ATHROWnR(DgcError(SPOS,"insteadOfTigger failed."),-1);
+                sprintf(TextBuf, idx_col_idx1);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
                 }
+                *TextBuf = 0;
+                sprintf(idx_col_idx2, "alter index %s.%s parallel %d logging",
+                        SchemaName, idx_info->fbi_index_name, TabInfo.degree);
+                sprintf(TextBuf, idx_col_idx2);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+                *TextBuf = 0;
+            }
+            delete count_stmt;
+            delete EXCEPTnC;
         }
-	
-        //
-        // Petra Index sql create
-        //
-        dgt_schar idx_sql[512];
-        dgt_schar normal_sql[512];
-        dgt_schar idx_sql2[512];
-        dgt_schar normal_sql2[512];
-        dgt_schar idx_col_idx1[512];
-        dgt_schar idx_col_idx2[512];
-        memset(idx_sql,0,512);
-        memset(normal_sql,0,512);
-        memset(idx_sql2,0,512);
-        memset(normal_sql2,0,512);
-        memset(sql_text,0,2048);
-        memset(idx_col_idx1,0,512);
-        memset(idx_col_idx2,0,512);
-        StmtNo=5000;
-	*TmpBuf=0;
-	*TextBuf=0;
-	sprintf(sql_text,
-"select a.enc_col_id, b.renamed_col_name, b.data_type, a.index_type, b.domain_index_name, b.fbi_index_name, "
-"b.normal_index_name, a.tablespace_name, a.normal_idx_flag, b.column_name, a.sql_text, a.normal_sql_text, a.sql_text2, a.normal_sql_text2, a.normal_sql_text, a.normal_sql_text "
-"from pct_enc_index a, pct_enc_column b, pct_enc_table c "
-"where a.enc_col_id = b.enc_col_id "
-"and   b.enc_tab_id = c.enc_tab_id "
-"and   b.enc_tab_id = %lld"
-"and   b.status = 2",TabInfo.enc_tab_id);
-        DgcSqlStmt* sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+    }
+    DgcExcept* e = EXCEPTnC;
+    if (e) {
+        delete e;
+    }
+    delete sql_stmt;
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    StmtNo = 6000;
+    ObjTriggerSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjTriggerSqlRows.next()) {
+            *TextBuf = 0;
+            sprintf(TextBuf, (dgt_schar*)ObjTriggerSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
-        pc_type_index_row*  idx_info=0;
-        while ((idx_info=(pc_type_index_row*)sql_stmt->fetch())) {
-                if (idx_info->index_type == 1) {
-                        if (TabInfo.enc_type == 0 && idx_info->normal_idx_flag ==1) {
-                                if (!strcasecmp(idx_info->data_type,"NUMBER")) {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP2",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.renamed_tab_name,idx_info->index_col_name,
-                                                        AgentName);
-                                } else if (!strcasecmp(idx_info->data_type,"DATE") || !strcasecmp(idx_info->data_type,"TIMESTAMP")) {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP3",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.renamed_tab_name,idx_info->index_col_name,
-                                                        AgentName);
-                                } else {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP1",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.renamed_tab_name,idx_info->index_col_name,
-                                                        AgentName);
-                                }
-                        } else if (TabInfo.enc_type == 1 && idx_info->normal_idx_flag ==1){
-                                if (!strcasecmp(idx_info->data_type,"NUMBER")) {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP2",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.table_name,idx_info->index_col_name,
-                                                        AgentName);
-                                } else if (!strcasecmp(idx_info->data_type,"DATE") || !strcasecmp(idx_info->data_type,"TIMESTAMP")) {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP3",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.table_name,idx_info->index_col_name,
-                                                        AgentName);
-                                } else {
-                                        sprintf(idx_sql,"create index %s.%s on %s.%s(%s) indextype is %s.PC_IDX1_TYP1",
-                                                        SchemaName,idx_info->domain_index_name,
-                                                        SchemaName,TabInfo.table_name,idx_info->index_col_name,
-                                                        AgentName);
-                                }
-                        }
-			sprintf(TextBuf,idx_sql);
-	                if (saveSqlText() < 0) {
-				ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-			}
-			*TextBuf=0;
+    }
+    //
+    // encrypt tables`s dependency object complie script
+    //
+    StmtNo = 7000;
+    ObjSqlRows.rewind();
+    if (TabInfo.obj_flag) {
+        while (ObjSqlRows.next()) {
+            *TextBuf = 0;
+            strcat(TextBuf, (dgt_schar*)ObjSqlRows.data());
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
+    // create comment
+    StmtNo = 7800;
+    CommentInfoRows.rewind();
+    dgt_schar* comment_sql;
+    while (CommentInfoRows.next() &&
+           (comment_sql = (dgt_schar*)CommentInfoRows.data())) {
+        *TextBuf = 0;
+        if (comment_sql && strlen(comment_sql) > 2) {
+            strcpy(TextBuf, comment_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
 
-                        // create domain index`s normal index
-                        // if copy table encryption && enc column has normal index (position) do not create index
-                        // because already generated normal index column
-                        //
-                        // getting the index_name in table
-                        //
-                        dgt_schar sql_text[2048];
-                        memset(sql_text,0,2048);
-                        sprintf(sql_text,"select count() from pct_enc_col_index where enc_col_id = %lld and column_position=1",idx_info->enc_col_id);
-                        DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                        if (count_stmt == 0 || count_stmt->execute() < 0) {
-                                DgcExcept*      e=EXCEPTnC;
-                                delete count_stmt;
-                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                        }
-                        dgt_sint64* count_tmp=0;
-                        dgt_sint64  count=0;
-                        if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                                memcpy(&count,count_tmp,sizeof(dgt_sint64));
-                        }
-                        if (count == 0) {
-                                if (TabInfo.partitioned) {
-                                        sprintf(idx_col_idx1,"create index %s.%s on %s.%s(%s) tablespace %s parallel %d nologging local",
-                                                        SchemaName,idx_info->fbi_index_name,
-                                                        SchemaName,TabInfo.renamed_tab_name,
-                                                        idx_info->index_col_name,idx_info->tablespace_name,
-                                                        ParallelDegree);
-                                } else {
-                                        sprintf(idx_col_idx1,"create index %s.%s on %s.%s(%s) tablespace %s parallel %d nologging",
-                                                        SchemaName,idx_info->fbi_index_name,
-                                                        SchemaName,TabInfo.renamed_tab_name,
-                                                        idx_info->index_col_name,idx_info->tablespace_name,
-                                                        ParallelDegree);
-                                }
-				sprintf(TextBuf,idx_col_idx1);
-				if (saveSqlText() < 0) {
-					ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-				}
-				*TextBuf=0;
-                                sprintf(idx_col_idx2,"alter index %s.%s parallel %d logging",
-                                                SchemaName,idx_info->fbi_index_name,
-                                                TabInfo.degree);
-				sprintf(TextBuf,idx_col_idx2);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                                *TextBuf=0;
-				
-                        }
-                        delete count_stmt;
-                        delete EXCEPTnC;
-		}
-	}
-	DgcExcept* e=EXCEPTnC;
-	if (e) {
-		delete e;
-	}
-	delete sql_stmt;
-        //
-        // encrypt tables`s dependency object complie script
-        //
-        StmtNo=6000;
-        ObjTriggerSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjTriggerSqlRows.next()) {
-                        *TextBuf=0;
-                        sprintf(TextBuf,(dgt_schar*)ObjTriggerSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-        //
-        // encrypt tables`s dependency object complie script
-        //
-        StmtNo=7000;
-        ObjSqlRows.rewind();
-        if (TabInfo.obj_flag) {
-                while(ObjSqlRows.next()) {
-                        *TextBuf=0;
-                        strcat(TextBuf,(dgt_schar*)ObjSqlRows.data());
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-        // create comment
-        StmtNo=7800;
-        CommentInfoRows.rewind();
-        dgt_schar* comment_sql;
-        while (CommentInfoRows.next() && (comment_sql=(dgt_schar*)CommentInfoRows.data())) {
-                *TextBuf=0;
-                if (comment_sql && strlen(comment_sql) > 2) {
-                        strcpy(TextBuf,comment_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
+    //
+    // for finish sign step
+    //
+    StmtNo = 8000;
+    *TextBuf = 0;
+    sprintf(TextBuf, "commit");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
 
-	//
-	// for finish sign step
-	//
-	StmtNo=8000;
-	*TextBuf=0;
-	sprintf(TextBuf,"commit");
-	if (saveSqlText() < 0) {
-		ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	}
-
-	//
-        // insert decryption (parallel insert)
-        //
-        dgt_sint32 lobFlag=0;
+    //
+    // insert decryption (parallel insert)
+    //
+    dgt_sint32 lobFlag = 0;
+    ColInfoRows.rewind();
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 1) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                lobFlag = 1;
+            }
+        }
+    }
+    if (lobFlag == 1) {
+        StepNo = -2;
+        StmtNo = -14999;
+    } else {
+        StepNo = -2;
+        StmtNo = -14998;
+    }
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (lobFlag == 1) {
         ColInfoRows.rewind();
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 1) {
-                        *TmpBuf=0;
-                        if (!strcasecmp(col_info->data_type, "CLOB") ||
-                            !strcasecmp(col_info->data_type, "BLOB")) {
-                                lobFlag=1;
-                        }
-                }
+        sprintf(TmpBuf, "insert into %s.%s_%lld( ", SchemaName, "petra",
+                TabInfo.enc_tab_id);
+        strcat(TextBuf, TmpBuf);
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status >= 1) {
+                sprintf(TmpBuf, "%s,", col_info->renamed_col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-	if (lobFlag==1) {
-		StepNo=-2;
-		StmtNo=-14999;
-	} else {
-		StepNo=-2;
-		StmtNo=-14998;
-	}
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (lobFlag==1) {
-                ColInfoRows.rewind();
-                sprintf(TmpBuf,"insert into %s.%s_%lld( ",
-                                SchemaName,"petra",TabInfo.enc_tab_id);
-                strcat(TextBuf,TmpBuf);
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-                        if (col_info->status >= 1) {
-                                sprintf(TmpBuf,"%s,",col_info->renamed_col_name);
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-                TextBuf[strlen(TextBuf)-1]=0;
-                strcat(TextBuf,") \nselect ");
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-                        if (!strcasecmp(col_info->data_type,"LONG") || !strcasecmp(col_info->data_type,"LONG RAW")) {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-        } else {
-                ColInfoRows.rewind();
-                sprintf(TmpBuf,"insert into %s.%s_%lld \n select /*+ PARALLEL(%s,%d) */ ",
-                        SchemaName,"petra",TabInfo.enc_tab_id,TabInfo.table_name,ParallelDegree);
-                strcat(TextBuf,TmpBuf);
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (col_info->status >= 1) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,getFname(col_info->enc_col_id,2));
-                                strcat(TmpBuf,",");
-                                strcat(TextBuf,TmpBuf);
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
+        TextBuf[strlen(TextBuf) - 1] = 0;
+        strcat(TextBuf, ") \nselect ");
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW")) {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-        TextBuf[strlen(TextBuf)-1]=0;
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
-                sprintf(TmpBuf," from %s.%s %s",SchemaName,TabInfo.renamed_tab_name,TabInfo.table_name);
-                strcat(TextBuf,TmpBuf);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-        } else {
-                sprintf(TmpBuf," from %s.%s %s",SchemaName,TabInfo.table_name,TabInfo.table_name);
-                strcat(TextBuf,TmpBuf);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+    } else {
+        ColInfoRows.rewind();
+        sprintf(TmpBuf,
+                "insert into %s.%s_%lld \n select /*+ PARALLEL(%s,%d) */ ",
+                SchemaName, "petra", TabInfo.enc_tab_id, TabInfo.table_name,
+                ParallelDegree);
+        strcat(TextBuf, TmpBuf);
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (col_info->status >= 1) {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, getFname(col_info->enc_col_id, 2));
+                strcat(TmpBuf, ",");
+                strcat(TextBuf, TmpBuf);
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
-	return 0;
+    }
+    TextBuf[strlen(TextBuf) - 1] = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        sprintf(TmpBuf, " from %s.%s %s", SchemaName, TabInfo.renamed_tab_name,
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    } else {
+        sprintf(TmpBuf, " from %s.%s %s", SchemaName, TabInfo.table_name,
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    }
+    return 0;
 }
 
-PccTiberoScriptBuilder::PccTiberoScriptBuilder(DgcDatabase* db, DgcSession* sess,dgt_schar* schema_link)
-	: PccScriptBuilder(db,sess,schema_link), 
-          PrivSqlRows(1), ObjSqlRows(1),ObjTriggerSqlRows(1), CheckSqlRows(4), SynonymSqlRows(2),
-          CommentInfoRows(1), PetraIdxInfoRows(6), PkSqlRows(6), FkSqlRows(6),
-          CheckSqlRows2(1), CheckSqlRows3(1), IdxSqlRows2(1), IdxSqlRows3(1), IdxSqlRows4(1),IdxSqlRows5(1), IdxSqlRows6(1),
-          IdxColRows(1), TranIdxColRows(1),DefFkDropSqlRows(2), DefFkDropSqlRows2(1), DefFkCreSqlRows2(1), DefFkCreSqlRows3(1),
-          CheckTrgRows(2), UniqueSqlRows1(1), UniqueSqlRows2(1)
-{
-        PrivSqlRows.addAttr(DGC_SCHR,1024,"sql_text");
-        ObjSqlRows.addAttr(DGC_SCHR,1024,"sql_text");
-        ObjTriggerSqlRows.addAttr(DGC_SCHR,30000,"sql_text");
+PccTiberoScriptBuilder::PccTiberoScriptBuilder(DgcDatabase* db,
+                                               DgcSession* sess,
+                                               dgt_schar* schema_link)
+    : PccScriptBuilder(db, sess, schema_link),
+      PrivSqlRows(1),
+      ObjSqlRows(1),
+      ObjTriggerSqlRows(1),
+      CheckSqlRows(4),
+      SynonymSqlRows(2),
+      CommentInfoRows(1),
+      PetraIdxInfoRows(6),
+      PkSqlRows(6),
+      FkSqlRows(6),
+      CheckSqlRows2(1),
+      CheckSqlRows3(1),
+      IdxSqlRows2(1),
+      IdxSqlRows3(1),
+      IdxSqlRows4(1),
+      IdxSqlRows5(1),
+      IdxSqlRows6(1),
+      IdxColRows(1),
+      TranIdxColRows(1),
+      DefFkDropSqlRows(2),
+      DefFkDropSqlRows2(1),
+      DefFkCreSqlRows2(1),
+      DefFkCreSqlRows3(1),
+      CheckTrgRows(2),
+      UniqueSqlRows1(1),
+      UniqueSqlRows2(1) {
+    PrivSqlRows.addAttr(DGC_SCHR, 1024, "sql_text");
+    ObjSqlRows.addAttr(DGC_SCHR, 1024, "sql_text");
+    ObjTriggerSqlRows.addAttr(DGC_SCHR, 30000, "sql_text");
 
-        CheckSqlRows.addAttr(DGC_SCHR,512,"org1");
-        CheckSqlRows.addAttr(DGC_SCHR,512,"org2");
-        CheckSqlRows.addAttr(DGC_SCHR,512,"enc1");
-        CheckSqlRows.addAttr(DGC_SCHR,512,"enc2");
+    CheckSqlRows.addAttr(DGC_SCHR, 512, "org1");
+    CheckSqlRows.addAttr(DGC_SCHR, 512, "org2");
+    CheckSqlRows.addAttr(DGC_SCHR, 512, "enc1");
+    CheckSqlRows.addAttr(DGC_SCHR, 512, "enc2");
 
-        SynonymSqlRows.addAttr(DGC_SCHR,1024,"create_sql_id");
-        SynonymSqlRows.addAttr(DGC_SCHR,1024,"drop_sql_id");
+    SynonymSqlRows.addAttr(DGC_SCHR, 1024, "create_sql_id");
+    SynonymSqlRows.addAttr(DGC_SCHR, 1024, "drop_sql_id");
 
-        CommentInfoRows.addAttr(DGC_SCHR,5000,"sql_id");
+    CommentInfoRows.addAttr(DGC_SCHR, 5000, "sql_id");
 
 #if 0
         PetraIdxInfoRows.addAttr(DGC_SB8,0,"enc_col_id");
@@ -5437,289 +6146,305 @@ PccTiberoScriptBuilder::PccTiberoScriptBuilder(DgcDatabase* db, DgcSession* sess
         PetraIdxInfoRows.addAttr(DGC_UB1,0,"normal_idx_flag");
         PetraIdxInfoRows.addAttr(DGC_SCHR,130,"index_col_name");
 #endif
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"sql_text");
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"normal_sql_text");
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"sql_text2");
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"normal_sql_text2");
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"idx_col_idx1");
-        PetraIdxInfoRows.addAttr(DGC_SCHR,512,"idx_col_idx2");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "sql_text");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "normal_sql_text");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "sql_text2");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "normal_sql_text2");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "idx_col_idx1");
+    PetraIdxInfoRows.addAttr(DGC_SCHR, 512, "idx_col_idx2");
 
-        PkSqlRows.addAttr(DGC_SCHR,512,"org1");
-        PkSqlRows.addAttr(DGC_SCHR,512,"org2");
-        PkSqlRows.addAttr(DGC_SCHR,512,"enc1");
-        PkSqlRows.addAttr(DGC_SCHR,512,"enc2");
-        PkSqlRows.addAttr(DGC_SCHR,512,"org3");
-        PkSqlRows.addAttr(DGC_SCHR,512,"org4");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "org1");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "org2");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "enc1");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "enc2");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "org3");
+    PkSqlRows.addAttr(DGC_SCHR, 512, "org4");
 
-        FkSqlRows.addAttr(DGC_SCHR,512,"org1");
-        FkSqlRows.addAttr(DGC_SCHR,512,"org2");
-        FkSqlRows.addAttr(DGC_SCHR,512,"enc1");
-        FkSqlRows.addAttr(DGC_SCHR,512,"enc2");
-        FkSqlRows.addAttr(DGC_SCHR,512,"org3");
-        FkSqlRows.addAttr(DGC_SCHR,512,"org4");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "org1");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "org2");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "enc1");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "enc2");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "org3");
+    FkSqlRows.addAttr(DGC_SCHR, 512, "org4");
 
-        CheckSqlRows2.addAttr(DGC_SCHR,512,"sql_id");
-        CheckSqlRows3.addAttr(DGC_SCHR,512,"sql_id");
-        IdxSqlRows2.addAttr(DGC_SCHR,30000,"sql_id");
-        IdxSqlRows3.addAttr(DGC_SCHR,30000,"sql_id");
+    CheckSqlRows2.addAttr(DGC_SCHR, 512, "sql_id");
+    CheckSqlRows3.addAttr(DGC_SCHR, 512, "sql_id");
+    IdxSqlRows2.addAttr(DGC_SCHR, 30000, "sql_id");
+    IdxSqlRows3.addAttr(DGC_SCHR, 30000, "sql_id");
 
-        IdxSqlRows4.addAttr(DGC_SCHR,512,"sql_id");
-        IdxSqlRows5.addAttr(DGC_SCHR,512,"sql_id");
-        IdxSqlRows6.addAttr(DGC_SCHR,30000,"sql_id");
+    IdxSqlRows4.addAttr(DGC_SCHR, 512, "sql_id");
+    IdxSqlRows5.addAttr(DGC_SCHR, 512, "sql_id");
+    IdxSqlRows6.addAttr(DGC_SCHR, 30000, "sql_id");
 
-        IdxColRows.addAttr(DGC_SCHR,130,"col_name");
-        TranIdxColRows.addAttr(DGC_SCHR,130,"col_name");
+    IdxColRows.addAttr(DGC_SCHR, 130, "col_name");
+    TranIdxColRows.addAttr(DGC_SCHR, 130, "col_name");
 
-        DefFkDropSqlRows.addAttr(DGC_SCHR,512,"enc_sql");
-        DefFkDropSqlRows.addAttr(DGC_SCHR,512,"org_sql");
+    DefFkDropSqlRows.addAttr(DGC_SCHR, 512, "enc_sql");
+    DefFkDropSqlRows.addAttr(DGC_SCHR, 512, "org_sql");
 
-        DefFkDropSqlRows2.addAttr(DGC_SCHR,512,"sql_id");
-        DefFkCreSqlRows2.addAttr(DGC_SCHR,512,"sql_id");
-        DefFkCreSqlRows3.addAttr(DGC_SCHR,512,"sql_id");
+    DefFkDropSqlRows2.addAttr(DGC_SCHR, 512, "sql_id");
+    DefFkCreSqlRows2.addAttr(DGC_SCHR, 512, "sql_id");
+    DefFkCreSqlRows3.addAttr(DGC_SCHR, 512, "sql_id");
 
-        CheckTrgRows.addAttr(DGC_SCHR,4000,"search_condition");
-        CheckTrgRows.addAttr(DGC_SCHR,4000,"default_value");
+    CheckTrgRows.addAttr(DGC_SCHR, 4000, "search_condition");
+    CheckTrgRows.addAttr(DGC_SCHR, 4000, "default_value");
 
-	UniqueSqlRows1.addAttr(DGC_SCHR,512,"sql_iq");
-	UniqueSqlRows2.addAttr(DGC_SCHR,512,"sql_iq");
+    UniqueSqlRows1.addAttr(DGC_SCHR, 512, "sql_iq");
+    UniqueSqlRows2.addAttr(DGC_SCHR, 512, "sql_iq");
 }
 
+PccTiberoScriptBuilder::~PccTiberoScriptBuilder() {}
 
-PccTiberoScriptBuilder::~PccTiberoScriptBuilder()
-{
+dgt_sint32 PccTiberoScriptBuilder::getTablespace(DgcMemRows* rtn_rows) throw(
+    DgcExcept) {
+    if (!getConnection()) {
+        ATHROWnR(DgcError(SPOS, "getConnection failed."), -1);
+    }
+    dgt_schar sql_text[256];
+    sprintf(sql_text,
+            "select tablespace_name, 1 relation from dba_tablespaces ");
+    DgcCliStmt* stmt = Connection->getStmt();
+    if (!stmt) {
+        Connection->disconnect();
+        ATHROWnR(DgcError(SPOS, "getStmt failed."), -1);
+    }
+    if (stmt->execute(sql_text, strlen(sql_text), 10) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete stmt;
+        Connection->disconnect();
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    DgcAttr* attr = rtn_rows->attr();
+    DgcMemRows* rows = stmt->returnRows();
+    while (rows && rows->numRows() > 0) {
+        while (rows->next()) {
+            rtn_rows->add();
+            rtn_rows->next();
+            for (dgt_uint32 i = 0; i < rtn_rows->numCols(); i++) {
+                dgt_sint32 rtn = rows->getColData(i + 1, (attr + i)->type(),
+                                                  (attr + i)->length(),
+                                                  rtn_rows->getColPtr(i + 1));
+                if (rtn) {
+                    DgcExcept* e = EXCEPTnC;
+                    delete stmt;
+                    Connection->disconnect();
+                    RTHROWnR(e, DgcError(SPOS, "getColData failed."), -1);
+                }
+            }
+        }
+        rows->reset();
+        if (stmt->fetch(10) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete stmt;
+            Connection->disconnect();
+            RTHROWnR(e, DgcError(SPOS, "fetch failed"), -1);
+        }
+    }
+    delete stmt;
+    Connection->disconnect();
+    rtn_rows->rewind();
+    return 0;
 }
-
-dgt_sint32 PccTiberoScriptBuilder::getTablespace(DgcMemRows* rtn_rows) throw(DgcExcept)
-{
-	if (!getConnection()) {
-		ATHROWnR(DgcError(SPOS,"getConnection failed."),-1);
-	}
-	dgt_schar	sql_text[256];
-	sprintf(sql_text,"select tablespace_name, 1 relation from dba_tablespaces ");
-	DgcCliStmt*	stmt=Connection->getStmt();
-	if (!stmt) {
-		Connection->disconnect();
-		ATHROWnR(DgcError(SPOS,"getStmt failed."),-1);
-	}
-	if (stmt->execute(sql_text,strlen(sql_text),10) < 0) {
-		DgcExcept*	e=EXCEPTnC;
-		delete stmt;
-		Connection->disconnect();
-		RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-	}
-	DgcAttr*	attr=rtn_rows->attr();
-	DgcMemRows*	rows=stmt->returnRows();
-        while(rows && rows->numRows() > 0) {
-		while(rows->next()) {
-			rtn_rows->add();
-			rtn_rows->next();
-			for(dgt_uint32 i=0; i<rtn_rows->numCols(); i++) {
-				dgt_sint32 	rtn=rows->getColData(i+1,(attr+i)->type(),(attr+i)->length(),rtn_rows->getColPtr(i+1));
-				if (rtn) {
-					DgcExcept*	e=EXCEPTnC;
-					delete stmt;
-					Connection->disconnect();
-					RTHROWnR(e,DgcError(SPOS,"getColData failed."),-1);
-				}
-			}
-		}
-		rows->reset();
-		if (stmt->fetch(10) < 0) {
-			DgcExcept*      e=EXCEPTnC;
-			delete stmt;
-			Connection->disconnect();
-			RTHROWnR(e,DgcError(SPOS,"fetch failed"),-1);
-		}
-	}
-	delete stmt;
-	Connection->disconnect();
-	rtn_rows->rewind();
-	return 0;
-}
-
 
 typedef struct {
-	dgt_uint8	enc_type;
-	dgt_uint8	init_enc_type;
+    dgt_uint8 enc_type;
+    dgt_uint8 init_enc_type;
 } pc_type_enc_type;
 
+dgt_sint32 PccTiberoScriptBuilder::buildScript(
+    dgt_sint64 enc_tab_id, dgt_uint16 version_no) throw(DgcExcept) {
+    //
+    // enc_type = 0 (view)
+    // enc_type = 1 (non view)
+    //
 
-dgt_sint32 PccTiberoScriptBuilder::buildScript(dgt_sint64 enc_tab_id,dgt_uint16 version_no) throw(DgcExcept)
-{
-	//
-	// enc_type = 0 (view)
-        // enc_type = 1 (non view)
-	//
+    VersionNo = version_no;
+    if (prepareTabInfo(enc_tab_id) < 0)
+        ATHROWnR(DgcError(SPOS, "prepareTabInfo failed."), -1);
+    if (prepareColInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareColInfo failed."), -1);
+    if (preparePrivInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "preparePrivInfo failed."), -1);
+    if (prepareObjInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareObjInfo failed."), -1);
+    if (prepareIdxInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    if (prepareCommentInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    if (prepareSynonymInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareSynonymInfo failed."), -1);
+    if (prepareCtInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareCtInfo failed."), -1);
 
-	VersionNo=version_no;
-	if (prepareTabInfo(enc_tab_id) < 0) ATHROWnR(DgcError(SPOS,"prepareTabInfo failed."),-1);
-	if (prepareColInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareColInfo failed."),-1);
-	if (preparePrivInfo() < 0) ATHROWnR(DgcError(SPOS,"preparePrivInfo failed."),-1);
-	if (prepareObjInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareObjInfo failed."),-1);
-	if (prepareIdxInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-	if (prepareCommentInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-	if (prepareSynonymInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareSynonymInfo failed."),-1);
-	if (prepareCtInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareCtInfo failed."),-1);
-
-	//
-	// for new table encryption mode (get Constraints)
-	//
-	if (prepareCt2Info() <0) ATHROWnR(DgcError(SPOS,"prepareCt2Info failed."),-1);
-	if (prepareIdx2Info() <0) ATHROWnR(DgcError(SPOS,"prepareCt2Info failed."),-1);
-        if (step1() < 0) ATHROWnR(DgcError(SPOS,"step1_ins failed."),-1);
-        if (step2() < 0) ATHROWnR(DgcError(SPOS,"step2_ins failed."),-1);
-        if (reverse_step1() < 0) ATHROWnR(DgcError(SPOS,"reverse step1_ins failed."),-1);
-        if (reverse_step2() < 0) ATHROWnR(DgcError(SPOS,"reverse step2_ins failed."),-1);
-	return 0;
+    //
+    // for new table encryption mode (get Constraints)
+    //
+    if (prepareCt2Info() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareCt2Info failed."), -1);
+    if (prepareIdx2Info() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareCt2Info failed."), -1);
+    if (step1() < 0) ATHROWnR(DgcError(SPOS, "step1_ins failed."), -1);
+    if (step2() < 0) ATHROWnR(DgcError(SPOS, "step2_ins failed."), -1);
+    if (reverse_step1() < 0)
+        ATHROWnR(DgcError(SPOS, "reverse step1_ins failed."), -1);
+    if (reverse_step2() < 0)
+        ATHROWnR(DgcError(SPOS, "reverse step2_ins failed."), -1);
+    return 0;
 }
 
 #include "DgcSqlHandle.h"
 
-dgt_sint32 PccTiberoScriptBuilder::buildScriptMig(dgt_sint64 enc_tab_id,dgt_uint16 version_no) throw(DgcExcept)
-{
-	VersionNo=version_no;
-        if (prepareTabInfo(enc_tab_id) < 0) ATHROWnR(DgcError(SPOS,"prepareTabInfo failed."),-1);
-        if (prepareColInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareColInfo failed."),-1);
-        DgcSqlHandle sql_handle(Session);
-        dgt_schar sql_text[1024];
-        //
-        // get it_tab_id
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        dgt_sint64      it_tab_id=0;
-        dgt_sint32      analy_percent=0;
-        memset(sql_text,0,1024);
-        sprintf(sql_text,
-"select distinct it_tab_id, analy_percent "
-"from   pct_mt_table "
-"where  enc_tab_id = %lld", enc_tab_id);
-        if (sql_handle.execute(sql_text) < 0) {
-                DgcExcept* e=EXCEPTnC;
-                if (e) {
-                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                }
+dgt_sint32 PccTiberoScriptBuilder::buildScriptMig(
+    dgt_sint64 enc_tab_id, dgt_uint16 version_no) throw(DgcExcept) {
+    VersionNo = version_no;
+    if (prepareTabInfo(enc_tab_id) < 0)
+        ATHROWnR(DgcError(SPOS, "prepareTabInfo failed."), -1);
+    if (prepareColInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareColInfo failed."), -1);
+    DgcSqlHandle sql_handle(Session);
+    dgt_schar sql_text[1024];
+    //
+    // get it_tab_id
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    dgt_sint64 it_tab_id = 0;
+    dgt_sint32 analy_percent = 0;
+    memset(sql_text, 0, 1024);
+    sprintf(sql_text,
+            "select distinct it_tab_id, analy_percent "
+            "from   pct_mt_table "
+            "where  enc_tab_id = %lld",
+            enc_tab_id);
+    if (sql_handle.execute(sql_text) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
         }
-        typedef struct {
-                dgt_sint64 it_tab_id;
-                dgt_sint32 analy_percent;
-        } target_it_tab;
-        dgt_void* rtn_row_ptr=0;
-        while (1){
-                if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                        }
-                } else if(rtn_row_ptr) {
-                        it_tab_id=((target_it_tab*)rtn_row_ptr)->it_tab_id;
-                        analy_percent=((target_it_tab*)rtn_row_ptr)->analy_percent;
-                } else {
-                        break;
-                }
-        }
-        if (it_tab_id == 0) {
-                ATHROWnR(DgcError(SPOS,"PCT_MT_TABLE.IT_TAB_ID not found."),-1);
-        }
-        //
-        // get index information
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        DgcMemRows      disableIdxSqlRows(1);
-        disableIdxSqlRows.addAttr(DGC_SCHR,512,"sql");
-        DgcMemRows      enableIdxSqlRows(1);
-        enableIdxSqlRows.addAttr(DGC_SCHR,512,"sql");
-        disableIdxSqlRows.reset();
-        enableIdxSqlRows.reset();
-        memset(sql_text,0,1024);
-        sprintf(sql_text,
-"select distinct a.index_name "
-"from   ceea_col_index a, "
-      " ceea_table b "
-"where a.enc_tab_id = b.enc_tab_id "
-"and   a.UNIQUENESS = 0 "
-"and   b.db_id = %lld "
-"and   b.schema_name = getnameid('%s') "
-"and   b.table_name = getnameid('%s')", Dbid, SchemaName, TabInfo.table_name);
-        if (sql_handle.execute(sql_text) < 0) {
-                DgcExcept* e=EXCEPTnC;
-                if (e) {
-                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                }
-        }
-        rtn_row_ptr=0;
-        while (1){
-                if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                        }
-                } else if(rtn_row_ptr) {
-                        disableIdxSqlRows.add();
-                        disableIdxSqlRows.next();
-                        enableIdxSqlRows.add();
-                        enableIdxSqlRows.next();
-                        sprintf(TextBuf,"ALTER INDEX %s.%s unusable",SchemaName, PetraNamePool->getNameString(*(dgt_sint64*)rtn_row_ptr));
-                        memcpy(disableIdxSqlRows.data(), TextBuf, strlen(TextBuf));
-                        sprintf(TextBuf,"ALTER INDEX %s.%s rebuild",SchemaName, PetraNamePool->getNameString(*(dgt_sint64*)rtn_row_ptr));
-                        memcpy(enableIdxSqlRows.data(), TextBuf, strlen(TextBuf));
-                } else {
-                        break;
-                }
-        }
-        disableIdxSqlRows.rewind();
-        enableIdxSqlRows.rewind();
-        //
-        // step 1 : disable index -> data migration -> enable index
-        //
-        *TextBuf=0;
-        *TmpBuf=0;
-        StepNo=1;
-        StmtNo=1000;
-        if (disableIdxSqlRows.next()) {
-                *TextBuf=0;
-                memcpy(TextBuf, (dgt_schar*)disableIdxSqlRows.data(), 512);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
-        }
-        StmtNo=2000;
-        *TextBuf=0;
-        sprintf(TextBuf,"ALTER SESSION FORCE PARALLEL DML");
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        if (migInsertSql(it_tab_id,1) < 0) {
-                DgcExcept* e=EXCEPTnC;
-                if (e) {
-                        RTHROWnR(e,DgcError(SPOS,"create MigrationInsertSql failed"),-1);
-                }
+    }
+    typedef struct {
+        dgt_sint64 it_tab_id;
+        dgt_sint32 analy_percent;
+    } target_it_tab;
+    dgt_void* rtn_row_ptr = 0;
+    while (1) {
+        if (sql_handle.fetch(rtn_row_ptr) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"), -1);
+            }
+        } else if (rtn_row_ptr) {
+            it_tab_id = ((target_it_tab*)rtn_row_ptr)->it_tab_id;
+            analy_percent = ((target_it_tab*)rtn_row_ptr)->analy_percent;
         } else {
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+            break;
         }
-        *TextBuf=0;
-        sprintf(TextBuf,"COMMIT");
+    }
+    if (it_tab_id == 0) {
+        ATHROWnR(DgcError(SPOS, "PCT_MT_TABLE.IT_TAB_ID not found."), -1);
+    }
+    //
+    // get index information
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    DgcMemRows disableIdxSqlRows(1);
+    disableIdxSqlRows.addAttr(DGC_SCHR, 512, "sql");
+    DgcMemRows enableIdxSqlRows(1);
+    enableIdxSqlRows.addAttr(DGC_SCHR, 512, "sql");
+    disableIdxSqlRows.reset();
+    enableIdxSqlRows.reset();
+    memset(sql_text, 0, 1024);
+    sprintf(sql_text,
+            "select distinct a.index_name "
+            "from   ceea_col_index a, "
+            " ceea_table b "
+            "where a.enc_tab_id = b.enc_tab_id "
+            "and   a.UNIQUENESS = 0 "
+            "and   b.db_id = %lld "
+            "and   b.schema_name = getnameid('%s') "
+            "and   b.table_name = getnameid('%s')",
+            Dbid, SchemaName, TabInfo.table_name);
+    if (sql_handle.execute(sql_text) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+        }
+    }
+    rtn_row_ptr = 0;
+    while (1) {
+        if (sql_handle.fetch(rtn_row_ptr) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"), -1);
+            }
+        } else if (rtn_row_ptr) {
+            disableIdxSqlRows.add();
+            disableIdxSqlRows.next();
+            enableIdxSqlRows.add();
+            enableIdxSqlRows.next();
+            sprintf(TextBuf, "ALTER INDEX %s.%s unusable", SchemaName,
+                    PetraNamePool->getNameString(*(dgt_sint64*)rtn_row_ptr));
+            memcpy(disableIdxSqlRows.data(), TextBuf, strlen(TextBuf));
+            sprintf(TextBuf, "ALTER INDEX %s.%s rebuild", SchemaName,
+                    PetraNamePool->getNameString(*(dgt_sint64*)rtn_row_ptr));
+            memcpy(enableIdxSqlRows.data(), TextBuf, strlen(TextBuf));
+        } else {
+            break;
+        }
+    }
+    disableIdxSqlRows.rewind();
+    enableIdxSqlRows.rewind();
+    //
+    // step 1 : disable index -> data migration -> enable index
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    StepNo = 1;
+    StmtNo = 1000;
+    if (disableIdxSqlRows.next()) {
+        *TextBuf = 0;
+        memcpy(TextBuf, (dgt_schar*)disableIdxSqlRows.data(), 512);
         if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-        *TextBuf=0;
-        sprintf(TextBuf,"ALTER SESSION DISABLE PARALLEL DML");
+    }
+    StmtNo = 2000;
+    *TextBuf = 0;
+    sprintf(TextBuf, "ALTER SESSION FORCE PARALLEL DML");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    if (migInsertSql(it_tab_id, 1) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            RTHROWnR(e, DgcError(SPOS, "create MigrationInsertSql failed"), -1);
+        }
+    } else {
         if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-        StmtNo=3000;
-        if (enableIdxSqlRows.next()) {
-                *TextBuf=0;
-                memcpy(TextBuf, (dgt_schar*)enableIdxSqlRows.data(), 512);
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+    }
+    *TextBuf = 0;
+    sprintf(TextBuf, "COMMIT");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    *TextBuf = 0;
+    sprintf(TextBuf, "ALTER SESSION DISABLE PARALLEL DML");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    StmtNo = 3000;
+    if (enableIdxSqlRows.next()) {
+        *TextBuf = 0;
+        memcpy(TextBuf, (dgt_schar*)enableIdxSqlRows.data(), 512);
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
         }
-        StmtNo=4000;
-        *TextBuf=0;
+    }
+    StmtNo = 4000;
+    *TextBuf = 0;
 #if 0
         if (analy_percent > 0) {
                 sprintf(TextBuf,"ANALYZE TABLE %s.%s ESTIMATE STATISTICS SAMPLE %d PERCENT",SchemaName, TabInfo.table_name, analy_percent);
@@ -5727,1445 +6452,1688 @@ dgt_sint32 PccTiberoScriptBuilder::buildScriptMig(dgt_sint64 enc_tab_id,dgt_uint
                 sprintf(TextBuf,"ANALYZE TABLE %s.%s COMPUTE STATISTICS",SchemaName, TabInfo.table_name);
         }
 #endif
-	sprintf(TextBuf,
-"BEGIN "
-" DBMS_STATS.GATHER_TABLE_STATS('%s','%s'); "
-"END; ",SchemaName, TabInfo.table_name);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        //
-        // step -1 : truncate table
-        //
-        StepNo=-1;
-        StmtNo=-1;
-        *TextBuf=0;
-        sprintf(TextBuf,"TRUNCATE TABLE %s.%s", SchemaName, TabInfo.table_name);
-        if (saveSqlText() < 0) {
-                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-        }
-        return 0;
+    sprintf(TextBuf,
+            "BEGIN "
+            " DBMS_STATS.GATHER_TABLE_STATS('%s','%s'); "
+            "END; ",
+            SchemaName, TabInfo.table_name);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    //
+    // step -1 : truncate table
+    //
+    StepNo = -1;
+    StmtNo = -1;
+    *TextBuf = 0;
+    sprintf(TextBuf, "TRUNCATE TABLE %s.%s", SchemaName, TabInfo.table_name);
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::runVerifyMig(dgt_sint64 enc_tab_id, pct_type_verify_job* job_row_ptr) throw(DgcExcept)
-{
-        if (prepareTabInfo(enc_tab_id) < 0) ATHROWnR(DgcError(SPOS,"prepareTabInfo failed."),-1);
-        if (prepareColInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareColInfo failed."),-1);
-        if (prepareIdxInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-        DgcSqlHandle sql_handle(Session);
-        dgt_schar sql_text[1024];
+dgt_sint32 PccTiberoScriptBuilder::runVerifyMig(
+    dgt_sint64 enc_tab_id, pct_type_verify_job* job_row_ptr) throw(DgcExcept) {
+    if (prepareTabInfo(enc_tab_id) < 0)
+        ATHROWnR(DgcError(SPOS, "prepareTabInfo failed."), -1);
+    if (prepareColInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareColInfo failed."), -1);
+    if (prepareIdxInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    DgcSqlHandle sql_handle(Session);
+    dgt_schar sql_text[1024];
+    //
+    // get it_tab_id
+    //
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    dgt_sint64 it_tab_id = 0;
+    dgt_sint32 analy_percent = 0;
+    memset(sql_text, 0, 1024);
+    sprintf(sql_text,
+            "select distinct it_tab_id, analy_percent "
+            "from   pct_mt_table "
+            "where  enc_tab_id = %lld",
+            enc_tab_id);
+    if (sql_handle.execute(sql_text) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+        }
+    }
+    typedef struct {
+        dgt_sint64 it_tab_id;
+        dgt_sint32 analy_percent;
+    } target_it_tab;
+    dgt_void* rtn_row_ptr = 0;
+    while (1) {
+        if (sql_handle.fetch(rtn_row_ptr) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"), -1);
+            }
+        } else if (rtn_row_ptr) {
+            it_tab_id = ((target_it_tab*)rtn_row_ptr)->it_tab_id;
+            analy_percent = ((target_it_tab*)rtn_row_ptr)->analy_percent;
+        } else {
+            break;
+        }
+    }
+    if (it_tab_id == 0) {
+        ATHROWnR(DgcError(SPOS, "PCT_MT_TABLE.IT_TAB_ID not found."), -1);
+    }
+    //
+    // verify row cnt
+    //
+    if (job_row_ptr->verify_mode == 0 || job_row_ptr->verify_mode == 1 ||
+        job_row_ptr->verify_mode == 3) {
         //
-        // get it_tab_id
+        // count target table`s row count
         //
-        *TextBuf=0;
-        *TmpBuf=0;
-        dgt_sint64      it_tab_id=0;
-        dgt_sint32      analy_percent=0;
-        memset(sql_text,0,1024);
+        *TextBuf = 0;
+        sprintf(TextBuf, "select count(rowid) from %s.%s", SchemaName,
+                TabInfo.table_name);
+        DgcMemRows rtn_row(1);
+        rtn_row.addAttr(DGC_UB4, 0, "count");
+        rtn_row.reset();
+        if (runVerifyScript(TextBuf, &rtn_row) < 0)
+            ATHROWnR(DgcError(SPOS, "runVerifyScript[%s] failed.", TextBuf),
+                     -1);
+        dgt_uint32 target_tab_cnt = 0;
+        dgt_uint32 src_tab_cnt = 0;
+        rtn_row.rewind();
+        rtn_row.next();
+        target_tab_cnt = *(dgt_uint32*)rtn_row.data();
+
+        if (migInsertSql(it_tab_id, 2) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "create MigrationInsertSql failed"),
+                         -1);
+            }
+        } else {
+            rtn_row.reset();
+            if (runVerifyScript(TextBuf, &rtn_row) < 0)
+                ATHROWnR(DgcError(SPOS, "runVerifyScript[%s] failed.", TextBuf),
+                         -1);
+            rtn_row.rewind();
+            rtn_row.next();
+            src_tab_cnt = *(dgt_uint32*)rtn_row.data();
+        }
+        if (target_tab_cnt != src_tab_cnt) {
+            job_row_ptr->row_verify_cnt_result = -1;
+            dgt_schar sql_text[512];
+            sprintf(sql_text,
+                    "insert into PCT_VERIFY_JOB_ROW_CNT_RESULT "
+                    "values(%lld,%d,%d)",
+                    job_row_ptr->verify_job_id, target_tab_cnt, src_tab_cnt);
+            DgcSqlStmt* sql_stmt = DgcDbProcess::db().getStmt(
+                DgcDbProcess::sess(), sql_text, strlen(sql_text));
+            if (sql_stmt == 0 || sql_stmt->execute() < 0) delete EXCEPTnC;
+            delete sql_stmt;
+        } else {
+            job_row_ptr->row_verify_cnt_result = 1;
+        }
+    }
+    //
+    // verify data
+    //
+    if (job_row_ptr->verify_mode == 0 || job_row_ptr->verify_mode == 2 ||
+        job_row_ptr->verify_mode == 3) {
+        if (IdxColRows.numRows() == 0) {
+            job_row_ptr->data_verify_result = -1;
+            sprintf(job_row_ptr->curr_err_msg,
+                    "not found primary key or unique(non enc column)");
+            return 0;
+        }
+        if (migInsertSql(it_tab_id, 3) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "create MigrationInsertSql failed"),
+                         -1);
+            }
+        } else {
+            DgcMemRows rtn_row(2);
+            rtn_row.addAttr(DGC_SCHR, 16384, "TARGET_DATA");
+            rtn_row.addAttr(DGC_SCHR, 16384, "SRC_DATA");
+            rtn_row.reset();
+            if (runVerifyScript(TextBuf, &rtn_row) < 0)
+                ATHROWnR(DgcError(SPOS, "runVerifyScript[%s] failed.", TextBuf),
+                         -1);
+            rtn_row.rewind();
+            typedef struct {
+                dgt_schar target_data[16384];
+                dgt_schar src_data[16384];
+            } rtn_data;
+            rtn_data* tmp_row_ptr = 0;
+            if (rtn_row.numRows()) {
+                job_row_ptr->data_verify_result = -1;
+                while (rtn_row.next()) {
+                    tmp_row_ptr = (rtn_data*)rtn_row.data();
+                    dgt_sint64 target_name_id =
+                        PetraNamePool->getNameID(tmp_row_ptr->target_data);
+                    dgt_sint64 src_name_id =
+                        PetraNamePool->getNameID(tmp_row_ptr->src_data);
+                    dgt_schar sql_text[512];
+                    sprintf(sql_text,
+                            "insert into PCT_VERIFY_JOB_DATA_RESULT "
+                            "values(%lld,%lld,%lld)",
+                            job_row_ptr->verify_job_id, target_name_id,
+                            src_name_id);
+                    DgcSqlStmt* sql_stmt = DgcDbProcess::db().getStmt(
+                        DgcDbProcess::sess(), sql_text, strlen(sql_text));
+                    if (sql_stmt == 0 || sql_stmt->execute() < 0)
+                        delete EXCEPTnC;
+                    delete sql_stmt;
+                }
+            } else {
+                job_row_ptr->data_verify_result = 1;
+            }
+        }
+    }
+    return 0;
+}
+
+dgt_sint32 PccTiberoScriptBuilder::migInsertSql(
+    dgt_sint64 it_tab_id, dgt_uint8 gen_flag) throw(DgcExcept) {
+    //
+    // gen_flag == 0 (syntax test)
+    // gen_flag == 1 (migration insert script)
+    // gen_flag == 2 (verify row count script)
+    // gen_flag == 3 (verify data script)
+    //
+    if (!ScriptText) ScriptText = new dgt_schar[PCC_MAX_SCRIPT_LEN];
+    *ScriptText = 0;
+    DgcSqlHandle sql_handle(Session);
+    dgt_schar sql_text[1024];
+    memset(sql_text, 0, 1024);
+    dgt_schar insert_part[2048] = {
+        0,
+    };
+    dgt_schar insert_select_part[2048] = {
+        0,
+    };
+    dgt_schar select_m_list[24000] = {
+        0,
+    };
+    dgt_schar select_s_list[24000] = {
+        0,
+    };
+    dgt_schar from_part[1024] = {
+        0,
+    };
+    dgt_schar join_part[1024] = {
+        0,
+    };
+    dgt_schar where_part[1024] = {
+        0,
+    };
+
+    //
+    // insert_part, insert_select_part
+    // join_clause, where_clause
+    //
+    typedef struct {
+        dgt_sint64 enc_col_id;
+        dgt_sint64 schema_name;
+        dgt_sint64 table_name;
+        dgt_sint64 column_name;
+        dgt_sint64 map_col_id;
+        dgt_sint64 col_expression;
+        dgt_sint64 key_id;
+        dgt_sint64 join_clause;
+        dgt_sint64 where_clause;
+        dgt_sint32 column_order;
+    } insert_st;
+    insert_st* insert_st_tmp = 0;
+    if (gen_flag == 0) {
+        //
+        // for validation test
+        //
         sprintf(sql_text,
-"select distinct it_tab_id, analy_percent "
-"from   pct_mt_table "
-"where  enc_tab_id = %lld", enc_tab_id);
+                "select b.it_col_id, "
+                " a.schema_name, "
+                " a.table_name, "
+                " b.column_name, "
+                " b.map_col_id, "
+                " b.col_expression, "
+                " b.key_id, "
+                " a.join_clause, "
+                " a.where_clause, "
+                " b.column_order "
+                "from   PCT_IT_TABLE a, "
+                " PCT_IT_COLUMN b "
+                "where  a.IT_TAB_ID = b.IT_TAB_ID "
+                "and    a.IT_TAB_ID = %lld "
+                "order by column_order",
+                it_tab_id);
         if (sql_handle.execute(sql_text) < 0) {
-                DgcExcept* e=EXCEPTnC;
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
+        }
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
                 if (e) {
-                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
                 }
-        }
-        typedef struct {
-                dgt_sint64 it_tab_id;
-                dgt_sint32 analy_percent;
-        } target_it_tab;
-        dgt_void* rtn_row_ptr=0;
-        while (1){
-                if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                        }
-                } else if(rtn_row_ptr) {
-                        it_tab_id=((target_it_tab*)rtn_row_ptr)->it_tab_id;
-                        analy_percent=((target_it_tab*)rtn_row_ptr)->analy_percent;
+            } else if (rtn_row_ptr) {
+                insert_st_tmp = (insert_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(join_part, " %s ",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->join_clause));
+                    sprintf(where_part, " %s ",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->where_clause));
+                    sprintf(
+                        insert_part, "INSERT INTO %s.%s \n( %s,",
+                        PetraNamePool->getNameString(
+                            insert_st_tmp->schema_name),
+                        PetraNamePool->getNameString(insert_st_tmp->table_name),
+                        PetraNamePool->getNameString(
+                            insert_st_tmp->column_name));
+                    if (insert_st_tmp->key_id > 0) {
+                        sprintf(insert_select_part,
+                                "\nSELECT \n pls_encrypt_b64_id(%s,1),",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                    } else {
+                        sprintf(insert_select_part, "\nSELECT \n %s,",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                    }
                 } else {
-                        break;
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\n  %s,",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->column_name));
+                    strcat(insert_part, TmpBuf);
+                    if (insert_st_tmp->key_id > 0) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n  pls_encrypt_b64_id(%s,1),",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                        strcat(insert_select_part, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n  %s,",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                        strcat(insert_select_part, TmpBuf);
+                    }
                 }
-        }
-        if (it_tab_id == 0) {
-                ATHROWnR(DgcError(SPOS,"PCT_MT_TABLE.IT_TAB_ID not found."),-1);
-        }
-        //
-        // verify row cnt
-        //
-        if (job_row_ptr->verify_mode == 0 || job_row_ptr->verify_mode == 1 || job_row_ptr->verify_mode == 3) {
-                //
-                // count target table`s row count
-                //
-                *TextBuf=0;
-                sprintf(TextBuf,"select count(rowid) from %s.%s",SchemaName,TabInfo.table_name);
-                DgcMemRows      rtn_row(1);
-                rtn_row.addAttr(DGC_UB4,0,"count");
-                rtn_row.reset();
-                if ( runVerifyScript(TextBuf,&rtn_row) < 0) ATHROWnR(DgcError(SPOS,"runVerifyScript[%s] failed.",TextBuf),-1);
-                dgt_uint32      target_tab_cnt=0;
-                dgt_uint32      src_tab_cnt=0;
-                rtn_row.rewind();
-                rtn_row.next();
-                target_tab_cnt=*(dgt_uint32*)rtn_row.data();
 
-                if (migInsertSql(it_tab_id,2) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"create MigrationInsertSql failed"),-1);
-                        }
+            } else {
+                break;
+            }
+            seq++;
+        }
+        insert_part[strlen(insert_part) - 1] = 0;
+        insert_select_part[strlen(insert_select_part) - 1] = 0;
+        strcat(insert_part, "\n)");
+        strcat(insert_select_part, "\nfrom");
+        delete EXCEPTnC;
+    } else {
+        //
+        // for generate script
+        //
+        sprintf(sql_text,
+                "select b.enc_col_id, "
+                " a.schema_name, "
+                " a.table_name, "
+                " b.column_name, "
+                " b.map_col_id, "
+                " b.col_expression, "
+                " b.key_id, "
+                " a.join_clause, "
+                " a.where_clause, "
+                " b.column_order "
+                "from   PCT_MT_TABLE a, "
+                " PCT_MT_COLUMN b "
+                "where  a.IT_TAB_ID = b.IT_TAB_ID "
+                "and    a.IT_TAB_ID = %lld "
+                "order by column_order",
+                it_tab_id);
+        if (sql_handle.execute(sql_text) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
+        }
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
+                if (e) {
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
+                }
+            } else if (rtn_row_ptr) {
+                insert_st_tmp = (insert_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(join_part, " %s ",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->join_clause));
+                    sprintf(where_part, " %s ",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->where_clause));
+                    sprintf(
+                        insert_part,
+                        "INSERT /*+ APPEND PARALLEL(%s,%d) */ INTO %s.%s \n( "
+                        "%s,",
+                        PetraNamePool->getNameString(insert_st_tmp->table_name),
+                        ParallelDegree,
+                        PetraNamePool->getNameString(
+                            insert_st_tmp->schema_name),
+                        PetraNamePool->getNameString(insert_st_tmp->table_name),
+                        PetraNamePool->getNameString(
+                            insert_st_tmp->column_name));
+                    if (insert_st_tmp->key_id > 0) {
+                        sprintf(insert_select_part, "\nSELECT \n %s,",
+                                getFname(insert_st_tmp->enc_col_id, 1));
+                    } else {
+                        sprintf(insert_select_part, "\nSELECT \n %s,",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                    }
                 } else {
-                        rtn_row.reset();
-                        if ( runVerifyScript(TextBuf,&rtn_row) < 0) ATHROWnR(DgcError(SPOS,"runVerifyScript[%s] failed.",TextBuf),-1);
-                        rtn_row.rewind();
-                        rtn_row.next();
-                        src_tab_cnt=*(dgt_uint32*)rtn_row.data();
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\n  %s,",
+                            PetraNamePool->getNameString(
+                                insert_st_tmp->column_name));
+                    strcat(insert_part, TmpBuf);
+                    if (insert_st_tmp->key_id > 0) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n  %s,",
+                                getFname(insert_st_tmp->enc_col_id, 1));
+                        strcat(insert_select_part, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n  %s,",
+                                PetraNamePool->getNameString(
+                                    insert_st_tmp->column_name));
+                        strcat(insert_select_part, TmpBuf);
+                    }
                 }
-                if (target_tab_cnt != src_tab_cnt) {
-                        job_row_ptr->row_verify_cnt_result=-1;
-                        dgt_schar       sql_text[512];
-                        sprintf(sql_text,"insert into PCT_VERIFY_JOB_ROW_CNT_RESULT "
-                                         "values(%lld,%d,%d)",
-                                        job_row_ptr->verify_job_id,target_tab_cnt,src_tab_cnt);
-                        DgcSqlStmt*     sql_stmt=DgcDbProcess::db().getStmt(DgcDbProcess::sess(),sql_text,strlen(sql_text));
-                        if (sql_stmt == 0 || sql_stmt->execute() < 0) delete EXCEPTnC;
-                        delete sql_stmt;
+
+            } else {
+                break;
+            }
+            seq++;
+        }
+        insert_part[strlen(insert_part) - 1] = 0;
+        insert_select_part[strlen(insert_select_part) - 1] = 0;
+        strcat(insert_part, "\n)");
+        strcat(insert_select_part, "\nfrom");
+        delete EXCEPTnC;
+    }
+    //
+    // select_list
+    //
+    typedef struct {
+        dgt_sint64 column_name;
+        dgt_sint64 col_expression;
+        dgt_sint64 alias_name;
+        dgt_sint64 t_alias_name;
+        dgt_sint32 column_order;
+    } select_list_st;
+    select_list_st* select_list_tmp = 0;
+    if (gen_flag == 0) {
+        //
+        // only validation test
+        //
+        sprintf(sql_text,
+                "select   b.column_name, "
+                " a.col_expression, "
+                " a.column_name, "
+                " c.alias_name, "
+                " a.column_order "
+                "from pct_it_column a, "
+                " pct_is_column b, "
+                " pct_is_table  c  "
+                "where   a.it_tab_id = b.it_tab_id "
+                "and     b.is_tab_id = c.is_tab_id "
+                "and     a.it_tab_id = %lld "
+                "and     a.map_col_id = b.is_col_id "
+                "order   by a.column_order",
+                it_tab_id);
+        if (sql_handle.execute(sql_text) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
+        }
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
+                if (e) {
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
+                }
+            } else if (rtn_row_ptr) {
+                select_list_tmp = (select_list_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(select_m_list, "\n\t(SELECT %s,",
+                            PetraNamePool->getNameString(
+                                select_list_tmp->alias_name));
+                    if (select_list_tmp->col_expression) {
+                        sprintf(select_s_list, "\n\t\t(SELECT %s %s,",
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->col_expression),
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->alias_name));
+                    } else {
+                        if (select_list_tmp->t_alias_name) {
+                            sprintf(select_s_list, "\n\t\t(SELECT %s.%s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->t_alias_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                        } else {
+                            sprintf(select_s_list, "\n\t\t(SELECT %s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                        }
+                    }
                 } else {
-                        job_row_ptr->row_verify_cnt_result=1;
-                }
-        }
-        //
-        // verify data
-        //
-        if (job_row_ptr->verify_mode == 0 || job_row_ptr->verify_mode == 2 || job_row_ptr->verify_mode == 3) {
-                if (IdxColRows.numRows() == 0) {
-                        job_row_ptr->data_verify_result=-1;
-                        sprintf(job_row_ptr->curr_err_msg,"not found primary key or unique(non enc column)");
-                        return 0;
-                }
-                if (migInsertSql(it_tab_id,3) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"create MigrationInsertSql failed"),-1);
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\n\t        %s,",
+                            PetraNamePool->getNameString(
+                                select_list_tmp->alias_name));
+                    strcat(select_m_list, TmpBuf);
+                    if (select_list_tmp->col_expression) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n\t\t        %s %s,",
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->col_expression),
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->alias_name));
+                        strcat(select_s_list, TmpBuf);
+                    } else {
+                        if (select_list_tmp->t_alias_name) {
+                            *TmpBuf = 0;
+                            sprintf(TmpBuf, "\n\t\t        %s.%s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->t_alias_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                            strcat(select_s_list, TmpBuf);
+                        } else {
+                            *TmpBuf = 0;
+                            sprintf(TmpBuf, "\n\t\t        %s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                            strcat(select_s_list, TmpBuf);
                         }
+                    }
+                }
+            } else {
+                break;
+            }
+            seq++;
+        }
+        select_m_list[strlen(select_m_list) - 1] = 0;
+        select_s_list[strlen(select_s_list) - 1] = 0;
+        strcat(select_m_list, "\n\tFROM");
+        delete EXCEPTnC;
+    } else {
+        //
+        // for generate script
+        //
+        sprintf(sql_text,
+                "select   b.column_name, "
+                " a.col_expression, "
+                " a.column_name, "
+                " c.alias_name, "
+                " a.column_order "
+                "from pct_mt_column a, "
+                " pct_ms_column b, "
+                " pct_ms_table  c  "
+                "where   a.it_tab_id = b.it_tab_id "
+                "and     b.enc_tab_id = c.enc_tab_id "
+                "and     a.it_tab_id = %lld "
+                "and     a.map_col_id = b.enc_col_id "
+                "order   by a.column_order",
+                it_tab_id);
+        if (sql_handle.execute(sql_text) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
+        }
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
+                if (e) {
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
+                }
+            } else if (rtn_row_ptr) {
+                select_list_tmp = (select_list_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(select_m_list, "\n\t(SELECT %s,",
+                            PetraNamePool->getNameString(
+                                select_list_tmp->alias_name));
+                    if (select_list_tmp->col_expression) {
+                        sprintf(select_s_list, "\n\t\t(SELECT %s %s,",
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->col_expression),
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->alias_name));
+                    } else {
+                        if (select_list_tmp->t_alias_name) {
+                            sprintf(select_s_list, "\n\t\t(SELECT %s.%s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->t_alias_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                        } else {
+                            sprintf(select_s_list, "\n\t\t(SELECT %s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                        }
+                    }
                 } else {
-                        DgcMemRows      rtn_row(2);
-                        rtn_row.addAttr(DGC_SCHR,16384,"TARGET_DATA");
-                        rtn_row.addAttr(DGC_SCHR,16384,"SRC_DATA");
-                        rtn_row.reset();
-                        if ( runVerifyScript(TextBuf,&rtn_row) < 0) ATHROWnR(DgcError(SPOS,"runVerifyScript[%s] failed.",TextBuf),-1);
-                        rtn_row.rewind();
-                        typedef struct {
-                                dgt_schar target_data[16384];
-                                dgt_schar src_data[16384];
-                        } rtn_data;
-                        rtn_data* tmp_row_ptr=0;
-                        if (rtn_row.numRows()) {
-                                job_row_ptr->data_verify_result=-1;
-                                while (rtn_row.next()) {
-                                        tmp_row_ptr=(rtn_data*)rtn_row.data();
-                                        dgt_sint64 target_name_id=PetraNamePool->getNameID(tmp_row_ptr->target_data);
-                                        dgt_sint64 src_name_id=PetraNamePool->getNameID(tmp_row_ptr->src_data);
-                                        dgt_schar       sql_text[512];
-                                        sprintf(sql_text,"insert into PCT_VERIFY_JOB_DATA_RESULT "
-                                                         "values(%lld,%lld,%lld)",
-                                                        job_row_ptr->verify_job_id,target_name_id,src_name_id);
-                                        DgcSqlStmt*     sql_stmt=DgcDbProcess::db().getStmt(DgcDbProcess::sess(),sql_text,strlen(sql_text));
-                                        if (sql_stmt == 0 || sql_stmt->execute() < 0) delete EXCEPTnC;
-                                        delete sql_stmt;
-                                }
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\n\t        %s,",
+                            PetraNamePool->getNameString(
+                                select_list_tmp->alias_name));
+                    strcat(select_m_list, TmpBuf);
+                    if (select_list_tmp->col_expression) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "\n\t\t        %s %s,",
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->col_expression),
+                                PetraNamePool->getNameString(
+                                    select_list_tmp->alias_name));
+                        strcat(select_s_list, TmpBuf);
+                    } else {
+                        if (select_list_tmp->t_alias_name) {
+                            *TmpBuf = 0;
+                            sprintf(TmpBuf, "\n\t\t        %s.%s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->t_alias_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                            strcat(select_s_list, TmpBuf);
                         } else {
-                                job_row_ptr->data_verify_result=1;
+                            *TmpBuf = 0;
+                            sprintf(TmpBuf, "\n\t\t        %s %s,",
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->column_name),
+                                    PetraNamePool->getNameString(
+                                        select_list_tmp->alias_name));
+                            strcat(select_s_list, TmpBuf);
                         }
+                    }
                 }
+            } else {
+                break;
+            }
+            seq++;
         }
-        return 0;
-}
-
-dgt_sint32 PccTiberoScriptBuilder::migInsertSql(dgt_sint64 it_tab_id, dgt_uint8 gen_flag) throw(DgcExcept)
-{
+        select_m_list[strlen(select_m_list) - 1] = 0;
+        select_s_list[strlen(select_s_list) - 1] = 0;
+        strcat(select_m_list, "\n\tFROM");
+        delete EXCEPTnC;
+    }
+    //
+    // from part
+    //
+    typedef struct {
+        dgt_sint64 schema_name;
+        dgt_sint64 table_name;
+        dgt_sint64 alias_name;
+        dgt_sint64 dblink_name;
+    } from_st;
+    from_st* from_tmp = 0;
+    if (gen_flag == 0) {
         //
-        // gen_flag == 0 (syntax test)
-        // gen_flag == 1 (migration insert script)
-        // gen_flag == 2 (verify row count script)
-        // gen_flag == 3 (verify data script)
+        // only validation test
         //
-        if (!ScriptText) ScriptText=new dgt_schar[PCC_MAX_SCRIPT_LEN];
-        *ScriptText=0;
-        DgcSqlHandle sql_handle(Session);
-        dgt_schar sql_text[1024];
-        memset(sql_text,0,1024);
-        dgt_schar       insert_part[2048]={0,};
-        dgt_schar       insert_select_part[2048]={0,};
-        dgt_schar       select_m_list[24000]={0,};
-        dgt_schar       select_s_list[24000]={0,};
-        dgt_schar       from_part[1024]={0,};
-        dgt_schar       join_part[1024]={0,};
-        dgt_schar       where_part[1024]={0,};
-
-        //
-        // insert_part, insert_select_part
-        // join_clause, where_clause
-        //
-        typedef struct {
-                dgt_sint64      enc_col_id;
-                dgt_sint64      schema_name;
-                dgt_sint64      table_name;
-                dgt_sint64      column_name;
-                dgt_sint64      map_col_id;
-                dgt_sint64      col_expression;
-                dgt_sint64      key_id;
-                dgt_sint64      join_clause;
-                dgt_sint64      where_clause;
-                dgt_sint32      column_order;
-        } insert_st;
-        insert_st*      insert_st_tmp=0;
-        if (gen_flag == 0) {
-                //
-                // for validation test
-                //
-                sprintf(sql_text,
-"select b.it_col_id, "
-      " a.schema_name, "
-      " a.table_name, "
-      " b.column_name, "
-      " b.map_col_id, "
-      " b.col_expression, "
-      " b.key_id, "
-      " a.join_clause, "
-      " a.where_clause, "
-      " b.column_order "
-"from   PCT_IT_TABLE a, "
-      " PCT_IT_COLUMN b "
-"where  a.IT_TAB_ID = b.IT_TAB_ID "
-"and    a.IT_TAB_ID = %lld "
-"order by column_order", it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
-                }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                insert_st_tmp=(insert_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(join_part," %s ",PetraNamePool->getNameString(insert_st_tmp->join_clause));
-                                        sprintf(where_part," %s ",PetraNamePool->getNameString(insert_st_tmp->where_clause));
-                                        sprintf(insert_part,"INSERT INTO %s.%s \n( %s,",PetraNamePool->getNameString(insert_st_tmp->schema_name),
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->table_name),
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        if (insert_st_tmp->key_id > 0) {
-                                                sprintf(insert_select_part,"\nSELECT \n pls_encrypt_b64_id(%s,1),",
-                                                                                   PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        } else {
-                                                sprintf(insert_select_part,"\nSELECT \n %s,",
-                                                                                   PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\n  %s,",PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        strcat(insert_part,TmpBuf);
-                                        if (insert_st_tmp->key_id > 0) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n  pls_encrypt_b64_id(%s,1),",
-                                                                            PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                                strcat(insert_select_part,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n  %s,", PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                                strcat(insert_select_part,TmpBuf);
-                                        }
-
-                                }
-
-                        } else {
-                                break;
-                        }
-                        seq++;
-                }
-                insert_part[strlen(insert_part)-1]=0;
-                insert_select_part[strlen(insert_select_part)-1]=0;
-                strcat(insert_part,"\n)");
-                strcat(insert_select_part,"\nfrom");
-                delete EXCEPTnC;
-        } else {
-                //
-                // for generate script
-                //
-                sprintf(sql_text,
-"select b.enc_col_id, "
-      " a.schema_name, "
-      " a.table_name, "
-      " b.column_name, "
-      " b.map_col_id, "
-      " b.col_expression, "
-      " b.key_id, "
-      " a.join_clause, "
-      " a.where_clause, "
-      " b.column_order "
-"from   PCT_MT_TABLE a, "
-      " PCT_MT_COLUMN b "
-"where  a.IT_TAB_ID = b.IT_TAB_ID "
-"and    a.IT_TAB_ID = %lld "
-"order by column_order", it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
-                }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                insert_st_tmp=(insert_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(join_part," %s ",PetraNamePool->getNameString(insert_st_tmp->join_clause));
-                                        sprintf(where_part," %s ",PetraNamePool->getNameString(insert_st_tmp->where_clause));
-                                        sprintf(insert_part,"INSERT /*+ APPEND PARALLEL(%s,%d) */ INTO %s.%s \n( %s,",
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->table_name),
-                                                                                       ParallelDegree,
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->schema_name),
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->table_name),
-                                                                                       PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        if (insert_st_tmp->key_id > 0) {
-                                                sprintf(insert_select_part,"\nSELECT \n %s,",getFname(insert_st_tmp->enc_col_id,1));
-                                        } else {
-                                                sprintf(insert_select_part,"\nSELECT \n %s,",
-                                                                PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\n  %s,",PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                        strcat(insert_part,TmpBuf);
-                                        if (insert_st_tmp->key_id > 0) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n  %s,", getFname(insert_st_tmp->enc_col_id,1));
-                                                strcat(insert_select_part,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n  %s,", PetraNamePool->getNameString(insert_st_tmp->column_name));
-                                                strcat(insert_select_part,TmpBuf);
-                                        }
-
-                                }
-
-                        } else {
-                                break;
-                        }
-                        seq++;
-                }
-                insert_part[strlen(insert_part)-1]=0;
-                insert_select_part[strlen(insert_select_part)-1]=0;
-                strcat(insert_part,"\n)");
-                strcat(insert_select_part,"\nfrom");
-                delete EXCEPTnC;
+        sprintf(sql_text,
+                "select  schema_name, "
+                " table_name, "
+                " alias_name, "
+                " dblink_name "
+                "from    pct_is_table "
+                "where   it_tab_id = %lld",
+                it_tab_id);
+        if (sql_handle.execute(sql_text) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
         }
-        //
-        // select_list
-        //
-        typedef struct {
-                dgt_sint64      column_name;
-                dgt_sint64      col_expression;
-                dgt_sint64      alias_name;
-                dgt_sint64      t_alias_name;
-                dgt_sint32      column_order;
-        } select_list_st;
-        select_list_st* select_list_tmp=0;
-        if (gen_flag == 0) {
-                //
-                // only validation test
-                //
-                sprintf(sql_text,
-"select   b.column_name, "
-        " a.col_expression, "
-        " a.column_name, "
-        " c.alias_name, "
-        " a.column_order "
-"from pct_it_column a, "
-    " pct_is_column b, "
-    " pct_is_table  c  "
-"where   a.it_tab_id = b.it_tab_id "
-"and     b.is_tab_id = c.is_tab_id "
-"and     a.it_tab_id = %lld "
-"and     a.map_col_id = b.is_col_id "
-"order   by a.column_order",it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
+                if (e) {
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
                 }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                select_list_tmp=(select_list_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(select_m_list,"\n\t(SELECT %s,",PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        if (select_list_tmp->col_expression) {
-                                                sprintf(select_s_list,"\n\t\t(SELECT %s %s,",
-                                                                                PetraNamePool->getNameString(select_list_tmp->col_expression),
-                                                                                PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        } else {
-                                                if (select_list_tmp->t_alias_name) {
-                                                        sprintf(select_s_list,"\n\t\t(SELECT %s.%s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->t_alias_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                } else {
-                                                        sprintf(select_s_list,"\n\t\t(SELECT %s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                }
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\n\t        %s,",PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        strcat(select_m_list,TmpBuf);
-                                        if (select_list_tmp->col_expression) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n\t\t        %s %s,",
-                                                                                PetraNamePool->getNameString(select_list_tmp->col_expression),
-                                                                                PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                strcat(select_s_list,TmpBuf);
-                                        } else {
-                                                if (select_list_tmp->t_alias_name) {
-                                                        *TmpBuf=0;
-                                                        sprintf(TmpBuf,"\n\t\t        %s.%s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->t_alias_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                        strcat(select_s_list,TmpBuf);
-                                                } else {
-                                                        *TmpBuf=0;
-                                                        sprintf(TmpBuf,"\n\t\t        %s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                        strcat(select_s_list,TmpBuf);
-                                                }
-                                        }
-                                }
-                        } else {
-                                break;
-                        }
-                        seq++;
+            } else if (rtn_row_ptr) {
+                from_tmp = (from_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(from_part, "\n\t\tFROM %s.%s",
+                            PetraNamePool->getNameString(from_tmp->schema_name),
+                            PetraNamePool->getNameString(from_tmp->table_name));
+                    if (from_tmp->dblink_name) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "@%s ",
+                                PetraNamePool->getNameString(
+                                    from_tmp->dblink_name));
+                        strcat(from_part, TmpBuf);
+                    }
+                    if (from_tmp->alias_name) {
+                        *TmpBuf = 0;
+                        sprintf(
+                            TmpBuf, " %s,",
+                            PetraNamePool->getNameString(from_tmp->alias_name));
+                        strcat(from_part, TmpBuf);
+                    } else {
+                        strcat(from_part, ",");
+                    }
+                } else {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, " %s.%s",
+                            PetraNamePool->getNameString(from_tmp->schema_name),
+                            PetraNamePool->getNameString(from_tmp->table_name));
+                    strcat(from_part, TmpBuf);
+                    if (from_tmp->dblink_name) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "@%s ",
+                                PetraNamePool->getNameString(
+                                    from_tmp->dblink_name));
+                        strcat(from_part, TmpBuf);
+                    }
+                    if (from_tmp->alias_name) {
+                        *TmpBuf = 0;
+                        sprintf(
+                            TmpBuf, " %s,",
+                            PetraNamePool->getNameString(from_tmp->alias_name));
+                        strcat(from_part, TmpBuf);
+                    } else {
+                        strcat(from_part, ",");
+                    }
                 }
-                select_m_list[strlen(select_m_list)-1]=0;
-                select_s_list[strlen(select_s_list)-1]=0;
-                strcat(select_m_list,"\n\tFROM");
-                delete EXCEPTnC;
-        } else {
-                //
-                // for generate script
-                //
-                sprintf(sql_text,
-"select   b.column_name, "
-        " a.col_expression, "
-        " a.column_name, "
-        " c.alias_name, "
-        " a.column_order "
-"from pct_mt_column a, "
-    " pct_ms_column b, "
-    " pct_ms_table  c  "
-"where   a.it_tab_id = b.it_tab_id "
-"and     b.enc_tab_id = c.enc_tab_id "
-"and     a.it_tab_id = %lld "
-"and     a.map_col_id = b.enc_col_id "
-"order   by a.column_order",it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
-                }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                select_list_tmp=(select_list_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(select_m_list,"\n\t(SELECT %s,",PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        if (select_list_tmp->col_expression) {
-                                                sprintf(select_s_list,"\n\t\t(SELECT %s %s,",
-                                                                                PetraNamePool->getNameString(select_list_tmp->col_expression),
-                                                                                PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        } else {
-                                                if (select_list_tmp->t_alias_name) {
-                                                        sprintf(select_s_list,"\n\t\t(SELECT %s.%s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->t_alias_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                } else {
-                                                        sprintf(select_s_list,"\n\t\t(SELECT %s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                }
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\n\t        %s,",PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                        strcat(select_m_list,TmpBuf);
-                                        if (select_list_tmp->col_expression) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"\n\t\t        %s %s,",
-                                                                                PetraNamePool->getNameString(select_list_tmp->col_expression),
-                                                                                PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                strcat(select_s_list,TmpBuf);
-                                        } else {
-                                                if (select_list_tmp->t_alias_name) {
-                                                        *TmpBuf=0;
-                                                        sprintf(TmpBuf,"\n\t\t        %s.%s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->t_alias_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                        strcat(select_s_list,TmpBuf);
-                                                } else {
-                                                        *TmpBuf=0;
-                                                        sprintf(TmpBuf,"\n\t\t        %s %s,",
-                                                                                        PetraNamePool->getNameString(select_list_tmp->column_name),
-                                                                                        PetraNamePool->getNameString(select_list_tmp->alias_name));
-                                                        strcat(select_s_list,TmpBuf);
-                                                }
-                                        }
-                                }
-                        } else {
-                                break;
-                        }
-                        seq++;
-                }
-                select_m_list[strlen(select_m_list)-1]=0;
-                select_s_list[strlen(select_s_list)-1]=0;
-                strcat(select_m_list,"\n\tFROM");
-                delete EXCEPTnC;
+            } else {
+                break;
+            }
+            seq++;
         }
+        from_part[strlen(from_part) - 1] = 0;
+        delete EXCEPTnC;
+    } else {
         //
-        // from part
+        // for generate script
         //
-        typedef struct {
-                dgt_sint64 schema_name;
-                dgt_sint64 table_name;
-                dgt_sint64 alias_name;
-                dgt_sint64 dblink_name;
-        } from_st;
-        from_st*        from_tmp=0;
-        if (gen_flag == 0) {
-                //
-                // only validation test
-                //
-                sprintf(sql_text,
-"select  schema_name, "
-       " table_name, "
-       " alias_name, "
-       " dblink_name "
-"from    pct_is_table "
-"where   it_tab_id = %lld",it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
-                }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                from_tmp=(from_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(from_part,"\n\t\tFROM %s.%s",PetraNamePool->getNameString(from_tmp->schema_name),
-                                                                             PetraNamePool->getNameString(from_tmp->table_name));
-                                        if (from_tmp->dblink_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"@%s ",PetraNamePool->getNameString(from_tmp->dblink_name));
-                                                strcat(from_part,TmpBuf);
-                                        }
-                                        if (from_tmp->alias_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf," %s,",PetraNamePool->getNameString(from_tmp->alias_name));
-                                                strcat(from_part,TmpBuf);
-                                        } else {
-                                                strcat(from_part,",");
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf," %s.%s",PetraNamePool->getNameString(from_tmp->schema_name),
-                                                                PetraNamePool->getNameString(from_tmp->table_name));
-                                        strcat(from_part,TmpBuf);
-                                        if (from_tmp->dblink_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"@%s ",PetraNamePool->getNameString(from_tmp->dblink_name));
-                                                strcat(from_part,TmpBuf);
-                                        }
-                                        if (from_tmp->alias_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf," %s,",PetraNamePool->getNameString(from_tmp->alias_name));
-                                                strcat(from_part,TmpBuf);
-                                        } else {
-                                                strcat(from_part,",");
-                                        }
-
-                                }
-                        } else {
-                                break;
-                        }
-                        seq++;
-                }
-                from_part[strlen(from_part)-1]=0;
-                delete EXCEPTnC;
-        } else {
-                //
-                // for generate script
-                //
-                sprintf(sql_text,
-"select  schema_name, "
-       " table_name, "
-       " alias_name, "
-       " dblink_name "
-"from    pct_ms_table "
-"where   it_tab_id = %lld",it_tab_id);
-                if (sql_handle.execute(sql_text) < 0) {
-                        DgcExcept* e=EXCEPTnC;
-                        if (e) {
-                                RTHROWnR(e,DgcError(SPOS,"sql_handle execute Failed"),-1);
-                        }
-                }
-                dgt_void* rtn_row_ptr=0;
-                dgt_sint32      seq=1;
-                while (1){
-                        if (sql_handle.fetch(rtn_row_ptr) < 0) {
-                                DgcExcept* e=EXCEPTnC;
-                                if (e) {
-                                        RTHROWnR(e,DgcError(SPOS,"sql_handle execute failed"),-1);
-                                }
-                        } else if(rtn_row_ptr) {
-                                from_tmp=(from_st*)rtn_row_ptr;
-                                if (seq == 1) {
-                                        sprintf(from_part,"\n\t\tFROM %s.%s",PetraNamePool->getNameString(from_tmp->schema_name),
-                                                                             PetraNamePool->getNameString(from_tmp->table_name));
-                                        if (from_tmp->dblink_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"@%s ",PetraNamePool->getNameString(from_tmp->dblink_name));
-                                                strcat(from_part,TmpBuf);
-                                        }
-                                        if (from_tmp->alias_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf," %s,",PetraNamePool->getNameString(from_tmp->alias_name));
-                                                strcat(from_part,TmpBuf);
-                                        } else {
-                                                strcat(from_part,",");
-                                        }
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf," %s.%s",PetraNamePool->getNameString(from_tmp->schema_name),
-                                                                PetraNamePool->getNameString(from_tmp->table_name));
-                                        strcat(from_part,TmpBuf);
-                                        if (from_tmp->dblink_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"@%s ",PetraNamePool->getNameString(from_tmp->dblink_name));
-                                                strcat(from_part,TmpBuf);
-                                        }
-                                        if (from_tmp->alias_name) {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf," %s,",PetraNamePool->getNameString(from_tmp->alias_name));
-                                                strcat(from_part,TmpBuf);
-                                        } else {
-                                                strcat(from_part,",");
-                                        }
-
-                                }
-                        } else {
-                                break;
-                        }
-                        seq++;
-                }
-                from_part[strlen(from_part)-1]=0;
-                delete EXCEPTnC;
+        sprintf(sql_text,
+                "select  schema_name, "
+                " table_name, "
+                " alias_name, "
+                " dblink_name "
+                "from    pct_ms_table "
+                "where   it_tab_id = %lld",
+                it_tab_id);
+        if (sql_handle.execute(sql_text) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                RTHROWnR(e, DgcError(SPOS, "sql_handle execute Failed"), -1);
+            }
         }
-        //
-        // merge part sql into scriptText Buf
-        //
-        if (gen_flag == 0) {
-                sprintf(ScriptText,"explain plan for \n");
-                strcat(ScriptText, insert_part);
-                strcat(ScriptText, insert_select_part);
-                strcat(ScriptText, select_m_list);
-                strcat(ScriptText, select_s_list);
-                strcat(ScriptText, from_part);
-                if (strlen(join_part) > 0) {
-                        strcat(ScriptText,"\n\t\t");
-                        strcat(ScriptText,join_part);
+        dgt_void* rtn_row_ptr = 0;
+        dgt_sint32 seq = 1;
+        while (1) {
+            if (sql_handle.fetch(rtn_row_ptr) < 0) {
+                DgcExcept* e = EXCEPTnC;
+                if (e) {
+                    RTHROWnR(e, DgcError(SPOS, "sql_handle execute failed"),
+                             -1);
                 }
-                strcat(ScriptText," )");
-                if (strlen(where_part) > 0) {
-                        strcat(ScriptText,"\n\t");
-                        strcat(ScriptText,where_part);
+            } else if (rtn_row_ptr) {
+                from_tmp = (from_st*)rtn_row_ptr;
+                if (seq == 1) {
+                    sprintf(from_part, "\n\t\tFROM %s.%s",
+                            PetraNamePool->getNameString(from_tmp->schema_name),
+                            PetraNamePool->getNameString(from_tmp->table_name));
+                    if (from_tmp->dblink_name) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "@%s ",
+                                PetraNamePool->getNameString(
+                                    from_tmp->dblink_name));
+                        strcat(from_part, TmpBuf);
+                    }
+                    if (from_tmp->alias_name) {
+                        *TmpBuf = 0;
+                        sprintf(
+                            TmpBuf, " %s,",
+                            PetraNamePool->getNameString(from_tmp->alias_name));
+                        strcat(from_part, TmpBuf);
+                    } else {
+                        strcat(from_part, ",");
+                    }
+                } else {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, " %s.%s",
+                            PetraNamePool->getNameString(from_tmp->schema_name),
+                            PetraNamePool->getNameString(from_tmp->table_name));
+                    strcat(from_part, TmpBuf);
+                    if (from_tmp->dblink_name) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "@%s ",
+                                PetraNamePool->getNameString(
+                                    from_tmp->dblink_name));
+                        strcat(from_part, TmpBuf);
+                    }
+                    if (from_tmp->alias_name) {
+                        *TmpBuf = 0;
+                        sprintf(
+                            TmpBuf, " %s,",
+                            PetraNamePool->getNameString(from_tmp->alias_name));
+                        strcat(from_part, TmpBuf);
+                    } else {
+                        strcat(from_part, ",");
+                    }
                 }
-                strcat(ScriptText,")");
-        } else if (gen_flag == 1) {
-                *TextBuf=0;
-                strcat(TextBuf, insert_part);
-                strcat(TextBuf, insert_select_part);
-                strcat(TextBuf, select_m_list);
-                strcat(TextBuf, select_s_list);
-                strcat(TextBuf, from_part);
-                if (strlen(join_part) > 0) {
-                        strcat(TextBuf,"\n\t\t");
-                        strcat(TextBuf,join_part);
-                }
-                strcat(TextBuf," )");
-                if (strlen(where_part) > 0) {
-                        strcat(TextBuf,"\n\t");
-                        strcat(TextBuf,where_part);
-                }
-                strcat(TextBuf," )");
-        } else if (gen_flag == 2) {
-                *TextBuf=0;
-                *TmpBuf=0;
-                sprintf(TextBuf,"select count(*) from \n");
-                strcat(TextBuf,select_s_list);
-                strcat(TextBuf, from_part);
-                if (strlen(join_part) > 0) {
-                        strcat(TextBuf,"\n\t\t");
-                        strcat(TextBuf,join_part);
-                }
-                strcat(TextBuf," )");
-                if (strlen(where_part) > 0) {
-                        strcat(TextBuf,"\n\t");
-                        strcat(TextBuf,where_part);
-                }
-        } else if (gen_flag == 3) {
-                *TextBuf=0;
-                *TmpBuf=0;
-                sprintf(TextBuf,"select ");
-                pc_type_col_info* col_info=0;
-                dgt_sint32      seq=0;
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (!strcasecmp(col_info->data_type, "CLOB") ||
-                            !strcasecmp(col_info->data_type, "LONG") ||
-                            !strcasecmp(col_info->data_type, "LONG RAW") ||
-                            !strcasecmp(col_info->data_type, "BLOB")) {
-                                continue;
-                        }
-                        seq++;
-                        if (col_info->status == 1) {
-                                *TmpBuf=0;
-                                if (seq == 1) sprintf(TmpBuf," pls_decrypt_b64_id(target_tab.%s,%lld) ",  col_info->col_name, col_info->enc_col_id);
-                                else sprintf(TmpBuf," || ' | ' || pls_decrypt_b64_id(target_tab.%s,%lld) ",  col_info->col_name, col_info->enc_col_id);
-                        } else {
-                                *TmpBuf=0;
-                                if (seq == 1) sprintf(TmpBuf,"target_tab.%s ", col_info->col_name);
-                                else sprintf(TmpBuf," || ' | ' || target_tab.%s ", col_info->col_name);
-                        }
-                        strcat(TextBuf,TmpBuf);
-                }
-                strcat(TextBuf,TmpBuf);
-                strcat(TextBuf,",");
-                seq=0;
-                ColInfoRows.rewind();
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (!strcasecmp(col_info->data_type, "CLOB") ||
-                            !strcasecmp(col_info->data_type, "LONG") ||
-                            !strcasecmp(col_info->data_type, "LONG RAW") ||
-                            !strcasecmp(col_info->data_type, "BLOB")) {
-                                continue;
-                        }
-                        seq++;
-                        *TmpBuf=0;
-                        if (seq == 1) sprintf(TmpBuf,"src_tab.%s ", col_info->col_name);
-                        else sprintf(TmpBuf," || ' | ' || src_tab.%s ", col_info->col_name);
-                        strcat(TextBuf,TmpBuf);
-                }
-                strcat(TextBuf,TmpBuf);
-                *TmpBuf=0;
-                sprintf(TmpBuf,"\nfrom %s.%s target_tab full outer join ",SchemaName, TabInfo.table_name);
-                strcat(TextBuf,TmpBuf);
-                *TmpBuf=0;
-                strcat(TmpBuf, select_m_list);
-                strcat(TmpBuf, select_s_list);
-                strcat(TmpBuf, from_part);
-                if (strlen(join_part) > 0) {
-                        strcat(TmpBuf,"\n\t\t");
-                        strcat(TmpBuf,join_part);
-                }
-                strcat(TmpBuf," )");
-                if (strlen(where_part) > 0) {
-                        strcat(TmpBuf,"\n\t");
-                        strcat(TmpBuf,where_part);
-                }
-                strcat(TmpBuf," ) src_tab ");
-                strcat(TmpBuf,"\n on ");
-                strcat(TextBuf,TmpBuf);
-                IdxColRows.rewind();
-                dgt_schar* col_name=0;
-                seq=0;
-                while (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-                        seq++;
-                        *TmpBuf=0;
-                        if (seq == 1) {
-                                sprintf(TmpBuf,"target_tab.%s = src_tab.%s ",col_name,col_name);
-                        } else {
-                                sprintf(TmpBuf,"\n\t and target_tab.%s = src_tab.%s",col_name,col_name);
-                        }
-                        strcat(TextBuf,TmpBuf);
-                }
-                strcat(TextBuf,"\nwhere ");
-                IdxColRows.rewind();
-                if (IdxColRows.next() && (col_name=(dgt_schar*)IdxColRows.data())) {
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," target_tab.%s is null \n",col_name);
-                        strcat(TextBuf,TmpBuf);
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," or src_tab.%s is null \n",col_name);
-                        strcat(TextBuf,TmpBuf);
-                }
-                ColInfoRows.rewind();
-                while (ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        if (!strcasecmp(col_info->data_type, "CLOB") ||
-                            !strcasecmp(col_info->data_type, "LONG") ||
-                            !strcasecmp(col_info->data_type, "LONG RAW") ||
-                            !strcasecmp(col_info->data_type, "BLOB")) {
-                                continue;
-                        }
-                        if (col_info->status == 1) {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf," or pls_decrypt_b64_id(target_tab.%s,%lld) != src_tab.%s ",  col_info->col_name, col_info->enc_col_id, col_info->col_name);
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf," or target_tab.%s != src_tab.%s ",  col_info->col_name, col_info->col_name);
-                        }
-                        strcat(TextBuf,TmpBuf);
-                }
-                strcat(TextBuf,TmpBuf);
+            } else {
+                break;
+            }
+            seq++;
         }
-DgcWorker::PLOG.tprintf(0,"[%s]\n",TextBuf);
-	return 0;
-}
-
-
-
-dgt_sint32 PccTiberoScriptBuilder::buildScriptAddCol(dgt_sint64 enc_tab_id,dgt_uint16 version_no) throw(DgcExcept)
-{
-        VersionNo=version_no;
-        if (prepareTabInfo(enc_tab_id) < 0) ATHROWnR(DgcError(SPOS,"prepareTabInfo failed."),-1);
-        if (prepareColInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareColInfo failed."),-1);
-	if (prepareIdxInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-	if (prepareCommentInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-        dgt_sint32 lobFlag=0;
+        from_part[strlen(from_part) - 1] = 0;
+        delete EXCEPTnC;
+    }
+    //
+    // merge part sql into scriptText Buf
+    //
+    if (gen_flag == 0) {
+        sprintf(ScriptText, "explain plan for \n");
+        strcat(ScriptText, insert_part);
+        strcat(ScriptText, insert_select_part);
+        strcat(ScriptText, select_m_list);
+        strcat(ScriptText, select_s_list);
+        strcat(ScriptText, from_part);
+        if (strlen(join_part) > 0) {
+            strcat(ScriptText, "\n\t\t");
+            strcat(ScriptText, join_part);
+        }
+        strcat(ScriptText, " )");
+        if (strlen(where_part) > 0) {
+            strcat(ScriptText, "\n\t");
+            strcat(ScriptText, where_part);
+        }
+        strcat(ScriptText, ")");
+    } else if (gen_flag == 1) {
+        *TextBuf = 0;
+        strcat(TextBuf, insert_part);
+        strcat(TextBuf, insert_select_part);
+        strcat(TextBuf, select_m_list);
+        strcat(TextBuf, select_s_list);
+        strcat(TextBuf, from_part);
+        if (strlen(join_part) > 0) {
+            strcat(TextBuf, "\n\t\t");
+            strcat(TextBuf, join_part);
+        }
+        strcat(TextBuf, " )");
+        if (strlen(where_part) > 0) {
+            strcat(TextBuf, "\n\t");
+            strcat(TextBuf, where_part);
+        }
+        strcat(TextBuf, " )");
+    } else if (gen_flag == 2) {
+        *TextBuf = 0;
+        *TmpBuf = 0;
+        sprintf(TextBuf, "select count(*) from \n");
+        strcat(TextBuf, select_s_list);
+        strcat(TextBuf, from_part);
+        if (strlen(join_part) > 0) {
+            strcat(TextBuf, "\n\t\t");
+            strcat(TextBuf, join_part);
+        }
+        strcat(TextBuf, " )");
+        if (strlen(where_part) > 0) {
+            strcat(TextBuf, "\n\t");
+            strcat(TextBuf, where_part);
+        }
+    } else if (gen_flag == 3) {
+        *TextBuf = 0;
+        *TmpBuf = 0;
+        sprintf(TextBuf, "select ");
+        pc_type_col_info* col_info = 0;
+        dgt_sint32 seq = 0;
         ColInfoRows.rewind();
-	pc_type_col_info* col_info=0;
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 1) {
-                        *TmpBuf=0;
-                        if (!strcasecmp(col_info->data_type, "CLOB") ||
-                            !strcasecmp(col_info->data_type, "BLOB")) {
-                                lobFlag=1;
-                        }
-                }
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                continue;
+            }
+            seq++;
+            if (col_info->status == 1) {
+                *TmpBuf = 0;
+                if (seq == 1)
+                    sprintf(TmpBuf, " pls_decrypt_b64_id(target_tab.%s,%lld) ",
+                            col_info->col_name, col_info->enc_col_id);
+                else
+                    sprintf(
+                        TmpBuf,
+                        " || ' | ' || pls_decrypt_b64_id(target_tab.%s,%lld) ",
+                        col_info->col_name, col_info->enc_col_id);
+            } else {
+                *TmpBuf = 0;
+                if (seq == 1)
+                    sprintf(TmpBuf, "target_tab.%s ", col_info->col_name);
+                else
+                    sprintf(TmpBuf, " || ' | ' || target_tab.%s ",
+                            col_info->col_name);
+            }
+            strcat(TextBuf, TmpBuf);
         }
-        //
-        // delete old scripts
-        //
-        dgt_schar       sql_text[256];
-	if (lobFlag == 1) {
-	        sprintf(sql_text,"delete pct_script where enc_tab_id=%lld and step_no=-2 and stmt_no=-14998",enc_tab_id);
-	} else {
-	        sprintf(sql_text,"delete pct_script where enc_tab_id=%lld and step_no=-2 and stmt_no=-14997",enc_tab_id);
-	}
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"delete failed."),-1);
+        strcat(TextBuf, TmpBuf);
+        strcat(TextBuf, ",");
+        seq = 0;
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                continue;
+            }
+            seq++;
+            *TmpBuf = 0;
+            if (seq == 1)
+                sprintf(TmpBuf, "src_tab.%s ", col_info->col_name);
+            else
+                sprintf(TmpBuf, " || ' | ' || src_tab.%s ", col_info->col_name);
+            strcat(TextBuf, TmpBuf);
         }
+        strcat(TextBuf, TmpBuf);
+        *TmpBuf = 0;
+        sprintf(TmpBuf, "\nfrom %s.%s target_tab full outer join ", SchemaName,
+                TabInfo.table_name);
+        strcat(TextBuf, TmpBuf);
+        *TmpBuf = 0;
+        strcat(TmpBuf, select_m_list);
+        strcat(TmpBuf, select_s_list);
+        strcat(TmpBuf, from_part);
+        if (strlen(join_part) > 0) {
+            strcat(TmpBuf, "\n\t\t");
+            strcat(TmpBuf, join_part);
+        }
+        strcat(TmpBuf, " )");
+        if (strlen(where_part) > 0) {
+            strcat(TmpBuf, "\n\t");
+            strcat(TmpBuf, where_part);
+        }
+        strcat(TmpBuf, " ) src_tab ");
+        strcat(TmpBuf, "\n on ");
+        strcat(TextBuf, TmpBuf);
+        IdxColRows.rewind();
+        dgt_schar* col_name = 0;
+        seq = 0;
+        while (IdxColRows.next() &&
+               (col_name = (dgt_schar*)IdxColRows.data())) {
+            seq++;
+            *TmpBuf = 0;
+            if (seq == 1) {
+                sprintf(TmpBuf, "target_tab.%s = src_tab.%s ", col_name,
+                        col_name);
+            } else {
+                sprintf(TmpBuf, "\n\t and target_tab.%s = src_tab.%s", col_name,
+                        col_name);
+            }
+            strcat(TextBuf, TmpBuf);
+        }
+        strcat(TextBuf, "\nwhere ");
+        IdxColRows.rewind();
+        if (IdxColRows.next() && (col_name = (dgt_schar*)IdxColRows.data())) {
+            *TmpBuf = 0;
+            sprintf(TmpBuf, " target_tab.%s is null \n", col_name);
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf, " or src_tab.%s is null \n", col_name);
+            strcat(TextBuf, TmpBuf);
+        }
+        ColInfoRows.rewind();
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "LONG") ||
+                !strcasecmp(col_info->data_type, "LONG RAW") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                continue;
+            }
+            if (col_info->status == 1) {
+                *TmpBuf = 0;
+                sprintf(
+                    TmpBuf,
+                    " or pls_decrypt_b64_id(target_tab.%s,%lld) != src_tab.%s ",
+                    col_info->col_name, col_info->enc_col_id,
+                    col_info->col_name);
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, " or target_tab.%s != src_tab.%s ",
+                        col_info->col_name, col_info->col_name);
+            }
+            strcat(TextBuf, TmpBuf);
+        }
+        strcat(TextBuf, TmpBuf);
+    }
+    DgcWorker::PLOG.tprintf(0, "[%s]\n", TextBuf);
+    return 0;
+}
+
+dgt_sint32 PccTiberoScriptBuilder::buildScriptAddCol(
+    dgt_sint64 enc_tab_id, dgt_uint16 version_no) throw(DgcExcept) {
+    VersionNo = version_no;
+    if (prepareTabInfo(enc_tab_id) < 0)
+        ATHROWnR(DgcError(SPOS, "prepareTabInfo failed."), -1);
+    if (prepareColInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareColInfo failed."), -1);
+    if (prepareIdxInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    if (prepareCommentInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    dgt_sint32 lobFlag = 0;
+    ColInfoRows.rewind();
+    pc_type_col_info* col_info = 0;
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 1) {
+            *TmpBuf = 0;
+            if (!strcasecmp(col_info->data_type, "CLOB") ||
+                !strcasecmp(col_info->data_type, "BLOB")) {
+                lobFlag = 1;
+            }
+        }
+    }
+    //
+    // delete old scripts
+    //
+    dgt_schar sql_text[256];
+    if (lobFlag == 1) {
+        sprintf(sql_text,
+                "delete pct_script where enc_tab_id=%lld and step_no=-2 and "
+                "stmt_no=-14998",
+                enc_tab_id);
+    } else {
+        sprintf(sql_text,
+                "delete pct_script where enc_tab_id=%lld and step_no=-2 and "
+                "stmt_no=-14997",
+                enc_tab_id);
+    }
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "delete failed."), -1);
+    }
+    delete sql_stmt;
+    //
+    // for new table encryption mode (get Constraints)
+    //
+    if (TabInfo.init_enc_type == 0) {
         //
-        // for new table encryption mode (get Constraints)
+        // add column initial encryption
         //
-        if (TabInfo.init_enc_type == 0) {
-                //
-                // add column initial encryption
-                //
-        } else if (TabInfo.init_enc_type >= 1) {
-                //
-                // new table initial encryption
-                //
-                if (addColStep() < 0) ATHROWnR(DgcError(SPOS,"addColStep failed."),-1);
-        }
-        return 0;
+    } else if (TabInfo.init_enc_type >= 1) {
+        //
+        // new table initial encryption
+        //
+        if (addColStep() < 0)
+            ATHROWnR(DgcError(SPOS, "addColStep failed."), -1);
+    }
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::buildScriptColAdmin(dgt_sint64 enc_tab_id,dgt_uint16 version_no) throw(DgcExcept)
-{
-        VersionNo=version_no;
-        if (prepareTabInfo(enc_tab_id) < 0) ATHROWnR(DgcError(SPOS,"prepareTabInfo failed."),-1);
-        if (prepareColInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareColInfo failed."),-1);
-	if (prepareIdxInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-	if (prepareCommentInfo() < 0) ATHROWnR(DgcError(SPOS,"prepareIdxInfo failed."),-1);
-        //
-        // alter table add, modify, drop column
-        //
-        StepNo=3;
-        StmtNo=1000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        ColInfoRows.rewind();
-        pc_type_col_info* col_info=0;
-        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                if (col_info->status == 3) {
-			//
-			// add column
-			//
-			if (TabInfo.enc_type == 0) {
-				// view table 
-				sprintf(TextBuf,"alter table %s.%s add %s %s",SchemaName, TabInfo.renamed_tab_name, col_info->col_name, col_info->data_type);
-				if (col_info->data_length > 0) {
-					sprintf(TmpBuf,"(%d)",col_info->data_length);
-					strcat(TextBuf,TmpBuf);
-				} else if (col_info->data_precision > 0) {
-                                        if (col_info->data_scale > 0) {
-                                                sprintf(TmpBuf,"(%d,%d)",col_info->data_precision, col_info->data_scale);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                sprintf(TmpBuf,"(%d)",col_info->data_precision);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                }
-				if (col_info->nullable_flag == 0) {
-					sprintf(TmpBuf," not null");
-					strcat(TextBuf,TmpBuf);
-				}
-			} else {
-				// non view table
-				sprintf(TextBuf,"alter table %s.%s add %s %s",SchemaName, TabInfo.table_name, col_info->col_name, col_info->data_type);
-                                if (col_info->data_length > 0) {
-                                        sprintf(TmpBuf,"(%d)",col_info->data_length);
-                                        strcat(TextBuf,TmpBuf);
-                                } else if (col_info->data_precision > 0) {
-                                        if (col_info->data_scale > 0) {
-                                                sprintf(TmpBuf,"(%d,%d)",col_info->data_precision, col_info->data_scale);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                sprintf(TmpBuf,"(%d)",col_info->data_precision);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                }
-                                if (col_info->nullable_flag == 0) {
-                                        sprintf(TmpBuf," not null");
-                                        strcat(TextBuf,TmpBuf);
-                                }
-			}
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                } else if (col_info->status == 4) {
-			//
-			// modify column
-			//
-                        if (TabInfo.enc_type == 0) {
-                                // view table
-                                sprintf(TextBuf,"alter table %s.%s modify %s %s",SchemaName, TabInfo.renamed_tab_name, col_info->col_name, col_info->data_type);
-                                if (col_info->data_length > 0) {
-                                        sprintf(TmpBuf,"(%d)",col_info->data_length);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                                if (col_info->nullable_flag == 0) {
-                                        sprintf(TmpBuf," not null");
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        } else {
-                                // non view table
-                                sprintf(TextBuf,"alter table %s.%s modify %s %s",SchemaName, TabInfo.table_name, col_info->col_name,col_info->data_type);
-                                if (col_info->data_length > 0) {
-                                        sprintf(TmpBuf,"(%d)",col_info->data_length);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                                if (col_info->nullable_flag == 0) {
-                                        sprintf(TmpBuf," not null");
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		} else if (col_info->status == 5) {
-                        //
-                        // drop column
-                        //
-                        if (TabInfo.enc_type == 0) {
-                                // view table
-                                sprintf(TextBuf,"alter table %s.%s drop column %s",SchemaName, TabInfo.renamed_tab_name, col_info->col_name);
-                        } else {
-                                // non view table
-                                sprintf(TextBuf,"alter table %s.%s drop column %s",SchemaName, TabInfo.table_name, col_info->col_name);
-                        }
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-		}
+dgt_sint32 PccTiberoScriptBuilder::buildScriptColAdmin(
+    dgt_sint64 enc_tab_id, dgt_uint16 version_no) throw(DgcExcept) {
+    VersionNo = version_no;
+    if (prepareTabInfo(enc_tab_id) < 0)
+        ATHROWnR(DgcError(SPOS, "prepareTabInfo failed."), -1);
+    if (prepareColInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareColInfo failed."), -1);
+    if (prepareIdxInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    if (prepareCommentInfo() < 0)
+        ATHROWnR(DgcError(SPOS, "prepareIdxInfo failed."), -1);
+    //
+    // alter table add, modify, drop column
+    //
+    StepNo = 3;
+    StmtNo = 1000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    ColInfoRows.rewind();
+    pc_type_col_info* col_info = 0;
+    while (ColInfoRows.next() &&
+           (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+        if (col_info->status == 3) {
+            //
+            // add column
+            //
+            if (TabInfo.enc_type == 0) {
+                // view table
+                sprintf(TextBuf, "alter table %s.%s add %s %s", SchemaName,
+                        TabInfo.renamed_tab_name, col_info->col_name,
+                        col_info->data_type);
+                if (col_info->data_length > 0) {
+                    sprintf(TmpBuf, "(%d)", col_info->data_length);
+                    strcat(TextBuf, TmpBuf);
+                } else if (col_info->data_precision > 0) {
+                    if (col_info->data_scale > 0) {
+                        sprintf(TmpBuf, "(%d,%d)", col_info->data_precision,
+                                col_info->data_scale);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        sprintf(TmpBuf, "(%d)", col_info->data_precision);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                }
+                if (col_info->nullable_flag == 0) {
+                    sprintf(TmpBuf, " not null");
+                    strcat(TextBuf, TmpBuf);
+                }
+            } else {
+                // non view table
+                sprintf(TextBuf, "alter table %s.%s add %s %s", SchemaName,
+                        TabInfo.table_name, col_info->col_name,
+                        col_info->data_type);
+                if (col_info->data_length > 0) {
+                    sprintf(TmpBuf, "(%d)", col_info->data_length);
+                    strcat(TextBuf, TmpBuf);
+                } else if (col_info->data_precision > 0) {
+                    if (col_info->data_scale > 0) {
+                        sprintf(TmpBuf, "(%d,%d)", col_info->data_precision,
+                                col_info->data_scale);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        sprintf(TmpBuf, "(%d)", col_info->data_precision);
+                        strcat(TextBuf, TmpBuf);
+                    }
+                }
+                if (col_info->nullable_flag == 0) {
+                    sprintf(TmpBuf, " not null");
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        } else if (col_info->status == 4) {
+            //
+            // modify column
+            //
+            if (TabInfo.enc_type == 0) {
+                // view table
+                sprintf(TextBuf, "alter table %s.%s modify %s %s", SchemaName,
+                        TabInfo.renamed_tab_name, col_info->col_name,
+                        col_info->data_type);
+                if (col_info->data_length > 0) {
+                    sprintf(TmpBuf, "(%d)", col_info->data_length);
+                    strcat(TextBuf, TmpBuf);
+                }
+                if (col_info->nullable_flag == 0) {
+                    sprintf(TmpBuf, " not null");
+                    strcat(TextBuf, TmpBuf);
+                }
+            } else {
+                // non view table
+                sprintf(TextBuf, "alter table %s.%s modify %s %s", SchemaName,
+                        TabInfo.table_name, col_info->col_name,
+                        col_info->data_type);
+                if (col_info->data_length > 0) {
+                    sprintf(TmpBuf, "(%d)", col_info->data_length);
+                    strcat(TextBuf, TmpBuf);
+                }
+                if (col_info->nullable_flag == 0) {
+                    sprintf(TmpBuf, " not null");
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        } else if (col_info->status == 5) {
+            //
+            // drop column
+            //
+            if (TabInfo.enc_type == 0) {
+                // view table
+                sprintf(TextBuf, "alter table %s.%s drop column %s", SchemaName,
+                        TabInfo.renamed_tab_name, col_info->col_name);
+            } else {
+                // non view table
+                sprintf(TextBuf, "alter table %s.%s drop column %s", SchemaName,
+                        TabInfo.table_name, col_info->col_name);
+            }
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         }
+    }
 
-        StmtNo=2000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (TabInfo.enc_type == 0) {
-                if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.first_view_name);
-                        ColInfoRows.rewind();
-                        pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-				if (col_info->status == 5) continue;
-                                if (col_info->status == 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-                                        	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2),col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        strcat(TextBuf,"rowid row_id");
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName, TabInfo.renamed_tab_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                        *TextBuf=0;
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName, TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-				if (col_info->status == 5) continue;
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                        TextBuf[strlen(TextBuf)-1]=0;   // cut the last ";" off
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," from %s.%s",SchemaName, TabInfo.first_view_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
+    StmtNo = 2000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type == 0) {
+        if (TabInfo.double_flag == 1 && IdxColRows.numRows() == 0) {
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.first_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 5) continue;
+                if (col_info->status == 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
                 } else {
-                        sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.second_view_name);
-                        ColInfoRows.rewind();
-                        pc_type_col_info* col_info=0;
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-				if (col_info->status == 5) continue;
-                                if (col_info->status == 1) {
-                                        if (col_info->cipher_type == 4) {
-                                                *TmpBuf=0;
-                                        	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        } else {
-                                                *TmpBuf=0;
-                                                sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2), col_info->col_name);
-                                                strcat(TextBuf,TmpBuf);
-                                        }
-                                } else {
-                                        sprintf(TmpBuf,"%s,",col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                        TextBuf[strlen(TextBuf)-1]=0;
-                        IdxColRows.rewind();
-                        if (IdxColRows.numRows() == 0) {
-                                strcat(TextBuf,",rowid row_id");
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                                strcat(TextBuf,TmpBuf);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        } else {
-                                *TmpBuf=0;
-                                sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.renamed_tab_name);
-                                strcat(TextBuf,TmpBuf);
-                                if (saveSqlText() < 0) {
-                                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                                }
-                        }
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
-        }
-        StmtNo=3000;
-        *TextBuf=0;
-        *TmpBuf=0;
-        if (TabInfo.enc_type != 0 && TabInfo.user_view_flag == 1) {
-                sprintf(TextBuf,"create or replace view %s.%s as\n select ",SchemaName,TabInfo.first_view_name);
-                ColInfoRows.rewind();
-                pc_type_col_info* col_info=0;
-                while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                        *TmpBuf=0;
-			if (col_info->status == 5) continue;
-                        if (col_info->status == 1) {
-                                if (col_info->cipher_type == 4) {
-                                        *TmpBuf=0;
-                                	sprintf(TmpBuf,"%s %s,",col_info->col_name, col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                } else {
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"%s %s,", getFname(col_info->enc_col_id,2),col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        } else {
-                                sprintf(TmpBuf,"%s,",col_info->col_name);
-                                strcat(TextBuf,TmpBuf);
-                        }
-                }
-                IdxColRows.rewind();
-                if (IdxColRows.numRows() == 0) {
-                        strcat(TextBuf,"rowid row_id");
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.table_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                } else {
-                        TextBuf[strlen(TextBuf)-1]=0;
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n   from %s.%s", SchemaName,TabInfo.table_name);
-                        strcat(TextBuf,TmpBuf);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
-                }
-        }
-
-        *TmpBuf=0;
-        *TextBuf=0;
-        StmtNo=4000;
-        if (TabInfo.dml_trg_flag == 1) {
-                dgt_sint32 ver_flag=0;
-                if (!strcasecmp(DbVersion,"11g")) ver_flag=1;
-                sprintf(TextBuf,"create or replace trigger %s.%s\nbefore insert or update on %s.%s for each row\ndeclare \n",
-                                SchemaName,TabInfo.view_trigger_name, SchemaName, TabInfo.renamed_tab_name);
-                ColInfoRows.rewind();
-                pc_type_col_info*       col_info;
-                //
-                // for 11g trigger (performance issue)
-                //
-                if (ver_flag) {
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-				if (col_info->status == 5) continue;
-                                if (col_info->status == 1) {
-                                        *TmpBuf=0;
-                                        dgt_sint32      enc_len = 0;
-                                        if (!strcasecmp(col_info->data_type,"NUMBER")) enc_len = (col_info->data_precision + 2);
-                                        else if (!strcasecmp(col_info->data_type,"DATE") ||
-                                                 !strcasecmp(col_info->data_type,"TIMESTAMP")) enc_len = 14;
-                                        else if (col_info->multi_byte_flag) enc_len = col_info->data_length * 3;
-                                        else enc_len = col_info->data_length;
-                                        PCI_Context     ctx;
-                                        PCI_initContext(&ctx, 0, col_info->key_size, col_info->cipher_type, col_info->enc_mode,
-                                                        col_info->iv_type, col_info->n2n_flag, col_info->b64_txt_enc_flag,
-                                                        col_info->enc_start_pos, col_info->enc_length);
-                                        enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
-                                        if (col_info->index_type == 1) {
-                                                enc_len += PCI_ophuekLength(col_info->data_length,PCI_SRC_TYPE_CHAR,1);
-						enc_len += 4;
-                                        }
-                                        if (!strcasecmp(col_info->data_type,"CLOB") ||
-                                            !strcasecmp(col_info->data_type,"BLOB")) {
-                                                sprintf(TmpBuf,"\t v_%s BLOB;\n", col_info->col_name);
-                                        } else {
-                                                if (col_info->b64_txt_enc_flag) {
-                                                        sprintf(TmpBuf,"\t v_%s varchar2(%d);\n", col_info->col_name, enc_len);
-                                                } else {
-                                                        sprintf(TmpBuf,"\t v_%s raw(%d);\n", col_info->col_name, enc_len);
-                                                }
-                                        }
-                                        strcat(TextBuf,TmpBuf);
-                                }
-                        }
-                }
-                strcat(TextBuf,"begin\n");
-                //
-                // for check constraint
-                //
-                CheckTrgRows.rewind();
-                typedef struct {
-                        dgt_schar       search_condition[4000];
-                        dgt_schar       default_val[4000];
-                } type_check;
-                type_check*    tmp_search=0;
-                while(CheckTrgRows.next() && (tmp_search=(type_check*)CheckTrgRows.data())) {
-                        if (strlen(tmp_search->default_val) > 2 && strstr(tmp_search->search_condition,"IS NOT NULL")) continue;
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"\n if not ");
-                        strcat(TextBuf,TmpBuf);
-                        *TmpBuf=0;
-                        sprintf(TmpBuf,"( :new.%s )",tmp_search->search_condition);
-                        strcat(TextBuf,TmpBuf);
-                        *TmpBuf=0;
-                        sprintf(TmpBuf," then\n\t raise_application_error(-20001,'%s`s check constraint violated');\n end if;",
-                                        TabInfo.table_name);
-                        strcat(TextBuf,TmpBuf);
-                }
-                *TmpBuf=0;
-                if (ver_flag) {
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-				if (col_info->status == 5) continue;
-                                if (col_info->status == 1) {
-                                        sprintf(TmpBuf,"\t\t if updating('%s') then\n", col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t v_%s := %s;\n",col_info->col_name,getFname(col_info->enc_col_id,1,1));
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t :new.%s := v_%s;\n",col_info->col_name, col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        strcat(TextBuf,"\t\t end if;\n");
-                                }
-                        }
-                } else {
-                        ColInfoRows.rewind();
-                        while(ColInfoRows.next() && (col_info=(pc_type_col_info*)ColInfoRows.data())) {
-                                *TmpBuf=0;
-				if (col_info->status == 5) continue;
-                                if (col_info->status == 1) {
-                                        sprintf(TmpBuf,"\t\t if updating('%s') then\n", col_info->col_name);
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        sprintf(TmpBuf,"\t\t :new.%s := %s;\n",col_info->col_name,getFname(col_info->enc_col_id,1,1));
-                                        strcat(TextBuf,TmpBuf);
-                                        *TmpBuf=0;
-                                        strcat(TextBuf,"\t\t end if;\n");
-                                }
-                        }
-                }
-                strcat(TextBuf,"\t end;\n");
-                if (saveSqlText() < 0) {
-                        ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                }
+            }
+            strcat(TextBuf, "rowid row_id");
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                    TabInfo.renamed_tab_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+            *TextBuf = 0;
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 5) continue;
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;  // cut the last ";" off
+            *TmpBuf = 0;
+            sprintf(TmpBuf, " from %s.%s", SchemaName, TabInfo.first_view_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
         } else {
-                dgt_schar sql_text[2048];
-                memset(sql_text,0,2048);
-                sprintf(sql_text,"select count() from pct_enc_col_index where enc_tab_id = %lld and uniqueness=1 and column_position > 1",
-                                  TabInfo.enc_tab_id);
-                DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                if (count_stmt == 0 || count_stmt->execute() < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete count_stmt;
-                        RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                }
-                dgt_sint64* count_tmp=0;
-                dgt_sint64  count=0;
-                if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                        memcpy(&count,count_tmp,sizeof(dgt_sint64));
-                }
-                delete count_stmt;
-                dgt_sint32 uniq_idx_flag=0;
-                if (count) {
-                        uniq_idx_flag=1;
+            sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                    SchemaName, TabInfo.second_view_name);
+            ColInfoRows.rewind();
+            pc_type_col_info* col_info = 0;
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 5) continue;
+                if (col_info->status == 1) {
+                    if (col_info->cipher_type == 4) {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    } else {
+                        *TmpBuf = 0;
+                        sprintf(TmpBuf, "%s %s,",
+                                getFname(col_info->enc_col_id, 2),
+                                col_info->col_name);
+                        strcat(TextBuf, TmpBuf);
+                    }
                 } else {
-                        memset(sql_text,0,2048);
-                        sprintf(sql_text,"select count() from pct_enc_col_ct where enc_tab_id = %lld and constraint_type=1 and position > 1",TabInfo.enc_tab_id);
-                        DgcSqlStmt* count_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-                        if (count_stmt == 0 || count_stmt->execute() < 0) {
-                                DgcExcept*      e=EXCEPTnC;
-                                delete count_stmt;
-                                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-                        }
-                        dgt_sint64* count_tmp=0;
-                        if ((count_tmp=(dgt_sint64*)count_stmt->fetch())) {
-                                memcpy(&count,count_tmp,sizeof(dgt_sint64));
-                        }
-                        delete count_stmt;
-                        if (count) {
-                                uniq_idx_flag=1;
-                        }
+                    sprintf(TmpBuf, "%s,", col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
-                if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
-                        if (insteadOfTrigger(1,uniq_idx_flag)) {
-                                ATHROWnR(DgcError(SPOS,"insteadOfTigger failed."),-1);
-                        }
+            }
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            IdxColRows.rewind();
+            if (IdxColRows.numRows() == 0) {
+                strcat(TextBuf, ",rowid row_id");
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
                 }
+            } else {
+                *TmpBuf = 0;
+                sprintf(TmpBuf, "\n   from %s.%s", SchemaName,
+                        TabInfo.renamed_tab_name);
+                strcat(TextBuf, TmpBuf);
+                if (saveSqlText() < 0) {
+                    ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+                }
+            }
         }
-	// create comment
-	StmtNo=7000;
-        CommentInfoRows.rewind();
-        dgt_schar* comment_sql;
-        while (CommentInfoRows.next() && (comment_sql=(dgt_schar*)CommentInfoRows.data())) {
-                *TextBuf=0;
-                if (comment_sql && strlen(comment_sql) > 2) {
-                        strcpy(TextBuf,comment_sql);
-                        if (saveSqlText() < 0) {
-                                ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-                        }
+    }
+    StmtNo = 3000;
+    *TextBuf = 0;
+    *TmpBuf = 0;
+    if (TabInfo.enc_type != 0 && TabInfo.user_view_flag == 1) {
+        sprintf(TextBuf, "create or replace view %s.%s as\n select ",
+                SchemaName, TabInfo.first_view_name);
+        ColInfoRows.rewind();
+        pc_type_col_info* col_info = 0;
+        while (ColInfoRows.next() &&
+               (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+            *TmpBuf = 0;
+            if (col_info->status == 5) continue;
+            if (col_info->status == 1) {
+                if (col_info->cipher_type == 4) {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "%s %s,", col_info->col_name,
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                } else {
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "%s %s,", getFname(col_info->enc_col_id, 2),
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
                 }
+            } else {
+                sprintf(TmpBuf, "%s,", col_info->col_name);
+                strcat(TextBuf, TmpBuf);
+            }
         }
+        IdxColRows.rewind();
+        if (IdxColRows.numRows() == 0) {
+            strcat(TextBuf, "rowid row_id");
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName, TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        } else {
+            TextBuf[strlen(TextBuf) - 1] = 0;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n   from %s.%s", SchemaName, TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
 
-	//
-	// for cipher job update status = 0 stmtno = 8001
-	//
-	StmtNo=8000;
-	*TextBuf=0;
-	sprintf(TextBuf,"commit");
-	if (saveSqlText() < 0) {
-        	ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
-	}
+    *TmpBuf = 0;
+    *TextBuf = 0;
+    StmtNo = 4000;
+    if (TabInfo.dml_trg_flag == 1) {
+        dgt_sint32 ver_flag = 0;
+        if (!strcasecmp(DbVersion, "11g")) ver_flag = 1;
+        sprintf(TextBuf,
+                "create or replace trigger %s.%s\nbefore insert or update on "
+                "%s.%s for each row\ndeclare \n",
+                SchemaName, TabInfo.view_trigger_name, SchemaName,
+                TabInfo.renamed_tab_name);
+        ColInfoRows.rewind();
+        pc_type_col_info* col_info;
+        //
+        // for 11g trigger (performance issue)
+        //
+        if (ver_flag) {
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                if (col_info->status == 5) continue;
+                if (col_info->status == 1) {
+                    *TmpBuf = 0;
+                    dgt_sint32 enc_len = 0;
+                    if (!strcasecmp(col_info->data_type, "NUMBER"))
+                        enc_len = (col_info->data_precision + 2);
+                    else if (!strcasecmp(col_info->data_type, "DATE") ||
+                             !strcasecmp(col_info->data_type, "TIMESTAMP"))
+                        enc_len = 14;
+                    else if (col_info->multi_byte_flag)
+                        enc_len = col_info->data_length * 3;
+                    else
+                        enc_len = col_info->data_length;
+                    PCI_Context ctx;
+                    PCI_initContext(
+                        &ctx, 0, col_info->key_size, col_info->cipher_type,
+                        col_info->enc_mode, col_info->iv_type,
+                        col_info->n2n_flag, col_info->b64_txt_enc_flag,
+                        col_info->enc_start_pos, col_info->enc_length);
+                    enc_len = (dgt_sint32)PCI_encryptLength(&ctx, enc_len);
+                    if (col_info->index_type == 1) {
+                        enc_len += PCI_ophuekLength(col_info->data_length,
+                                                    PCI_SRC_TYPE_CHAR, 1);
+                        enc_len += 4;
+                    }
+                    if (!strcasecmp(col_info->data_type, "CLOB") ||
+                        !strcasecmp(col_info->data_type, "BLOB")) {
+                        sprintf(TmpBuf, "\t v_%s BLOB;\n", col_info->col_name);
+                    } else {
+                        if (col_info->b64_txt_enc_flag) {
+                            sprintf(TmpBuf, "\t v_%s varchar2(%d);\n",
+                                    col_info->col_name, enc_len);
+                        } else {
+                            sprintf(TmpBuf, "\t v_%s raw(%d);\n",
+                                    col_info->col_name, enc_len);
+                        }
+                    }
+                    strcat(TextBuf, TmpBuf);
+                }
+            }
+        }
+        strcat(TextBuf, "begin\n");
+        //
+        // for check constraint
+        //
+        CheckTrgRows.rewind();
+        typedef struct {
+            dgt_schar search_condition[4000];
+            dgt_schar default_val[4000];
+        } type_check;
+        type_check* tmp_search = 0;
+        while (CheckTrgRows.next() &&
+               (tmp_search = (type_check*)CheckTrgRows.data())) {
+            if (strlen(tmp_search->default_val) > 2 &&
+                strstr(tmp_search->search_condition, "IS NOT NULL"))
+                continue;
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "\n if not ");
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf, "( :new.%s )", tmp_search->search_condition);
+            strcat(TextBuf, TmpBuf);
+            *TmpBuf = 0;
+            sprintf(TmpBuf,
+                    " then\n\t raise_application_error(-20001,'%s`s check "
+                    "constraint violated');\n end if;",
+                    TabInfo.table_name);
+            strcat(TextBuf, TmpBuf);
+        }
+        *TmpBuf = 0;
+        if (ver_flag) {
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 5) continue;
+                if (col_info->status == 1) {
+                    sprintf(TmpBuf, "\t\t if updating('%s') then\n",
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t v_%s := %s;\n", col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t :new.%s := v_%s;\n",
+                            col_info->col_name, col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    strcat(TextBuf, "\t\t end if;\n");
+                }
+            }
+        } else {
+            ColInfoRows.rewind();
+            while (ColInfoRows.next() &&
+                   (col_info = (pc_type_col_info*)ColInfoRows.data())) {
+                *TmpBuf = 0;
+                if (col_info->status == 5) continue;
+                if (col_info->status == 1) {
+                    sprintf(TmpBuf, "\t\t if updating('%s') then\n",
+                            col_info->col_name);
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    sprintf(TmpBuf, "\t\t :new.%s := %s;\n", col_info->col_name,
+                            getFname(col_info->enc_col_id, 1, 1));
+                    strcat(TextBuf, TmpBuf);
+                    *TmpBuf = 0;
+                    strcat(TextBuf, "\t\t end if;\n");
+                }
+            }
+        }
+        strcat(TextBuf, "\t end;\n");
+        if (saveSqlText() < 0) {
+            ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+        }
+    } else {
+        dgt_schar sql_text[2048];
+        memset(sql_text, 0, 2048);
+        sprintf(sql_text,
+                "select count() from pct_enc_col_index where enc_tab_id = %lld "
+                "and uniqueness=1 and column_position > 1",
+                TabInfo.enc_tab_id);
+        DgcSqlStmt* count_stmt =
+            Database->getStmt(Session, sql_text, strlen(sql_text));
+        if (count_stmt == 0 || count_stmt->execute() < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete count_stmt;
+            RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+        }
+        dgt_sint64* count_tmp = 0;
+        dgt_sint64 count = 0;
+        if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+            memcpy(&count, count_tmp, sizeof(dgt_sint64));
+        }
+        delete count_stmt;
+        dgt_sint32 uniq_idx_flag = 0;
+        if (count) {
+            uniq_idx_flag = 1;
+        } else {
+            memset(sql_text, 0, 2048);
+            sprintf(sql_text,
+                    "select count() from pct_enc_col_ct where enc_tab_id = "
+                    "%lld and constraint_type=1 and position > 1",
+                    TabInfo.enc_tab_id);
+            DgcSqlStmt* count_stmt =
+                Database->getStmt(Session, sql_text, strlen(sql_text));
+            if (count_stmt == 0 || count_stmt->execute() < 0) {
+                DgcExcept* e = EXCEPTnC;
+                delete count_stmt;
+                RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+            }
+            dgt_sint64* count_tmp = 0;
+            if ((count_tmp = (dgt_sint64*)count_stmt->fetch())) {
+                memcpy(&count, count_tmp, sizeof(dgt_sint64));
+            }
+            delete count_stmt;
+            if (count) {
+                uniq_idx_flag = 1;
+            }
+        }
+        if (TabInfo.user_view_flag == 1 || TabInfo.enc_type == 0) {
+            if (insteadOfTrigger(1, uniq_idx_flag)) {
+                ATHROWnR(DgcError(SPOS, "insteadOfTigger failed."), -1);
+            }
+        }
+    }
+    // create comment
+    StmtNo = 7000;
+    CommentInfoRows.rewind();
+    dgt_schar* comment_sql;
+    while (CommentInfoRows.next() &&
+           (comment_sql = (dgt_schar*)CommentInfoRows.data())) {
+        *TextBuf = 0;
+        if (comment_sql && strlen(comment_sql) > 2) {
+            strcpy(TextBuf, comment_sql);
+            if (saveSqlText() < 0) {
+                ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+            }
+        }
+    }
 
+    //
+    // for cipher job update status = 0 stmtno = 8001
+    //
+    StmtNo = 8000;
+    *TextBuf = 0;
+    sprintf(TextBuf, "commit");
+    if (saveSqlText() < 0) {
+        ATHROWnR(DgcError(SPOS, "saveSqlText failed."), -1);
+    }
 
-        return 0;
+    return 0;
 }
-
 
 typedef struct {
-        dgt_sint32      result_code;
-        dgt_schar       result_msg[1024];
+    dgt_sint32 result_code;
+    dgt_schar result_msg[1024];
 } pc_type_inst_agent_user_out;
 
 typedef struct {
-        dgt_schar       instance_name[33];
-        dgt_schar       listen_ip[256];
-        dgt_uint16      listen_port;
-        dgt_uint8       db_type;
+    dgt_schar instance_name[33];
+    dgt_schar listen_ip[256];
+    dgt_uint16 listen_port;
+    dgt_uint8 db_type;
 } pc_type_connect_db;
 
-dgt_sint32 PccTiberoScriptBuilder::checkDB(dgt_sint64 db_agent_id,dgt_schar* sys_uid,dgt_schar* sys_pass,dgt_schar* agent_uid,DgcMemRows* rtn_rows) 
-throw(DgcExcept)
-{
-        //
-        // Connecting test for sys user
-        //
-        dgt_schar       sql_text[2048];
-        memset(sql_text,0,2048);
-        sprintf(sql_text,"select a.instance_name, c.listen_ip, c.listen_port, e.db_type "
-                         "from pt_db_instance a, pct_db_agent b, pt_listen_addr c, pt_listen_service d, pt_database e "
-                         "where a.instance_id = b.instance_id "
-                         "and   a.instance_id = d.instance_id "
-                         "and   d.listen_addr_id  = c.listen_addr_id "
-                         "and   b.db_id = e.db_id "
-                         "and   b.db_agent_id  = %lld",db_agent_id);
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        pc_type_connect_db*  tmp;
-        pc_type_connect_db   conDb;
-        if ((tmp=(pc_type_connect_db*)sql_stmt->fetch()) == 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-                RTHROWnR(e,DgcError(SPOS,"fetch failed"),-1);
-        }
-        memcpy(&conDb, tmp, sizeof(pc_type_connect_db));
-	delete EXCEPTnC;
+dgt_sint32 PccTiberoScriptBuilder::checkDB(
+    dgt_sint64 db_agent_id, dgt_schar* sys_uid, dgt_schar* sys_pass,
+    dgt_schar* agent_uid, DgcMemRows* rtn_rows) throw(DgcExcept) {
+    //
+    // Connecting test for sys user
+    //
+    dgt_schar sql_text[2048];
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select a.instance_name, c.listen_ip, c.listen_port, e.db_type "
+            "from pt_db_instance a, pct_db_agent b, pt_listen_addr c, "
+            "pt_listen_service d, pt_database e "
+            "where a.instance_id = b.instance_id "
+            "and   a.instance_id = d.instance_id "
+            "and   d.listen_addr_id  = c.listen_addr_id "
+            "and   b.db_id = e.db_id "
+            "and   b.db_agent_id  = %lld",
+            db_agent_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    pc_type_connect_db* tmp;
+    pc_type_connect_db conDb;
+    if ((tmp = (pc_type_connect_db*)sql_stmt->fetch()) == 0) {
+        DgcExcept* e = EXCEPTnC;
+        delete sql_stmt;
+        RTHROWnR(e, DgcError(SPOS, "fetch failed"), -1);
+    }
+    memcpy(&conDb, tmp, sizeof(pc_type_connect_db));
+    delete EXCEPTnC;
+    delete sql_stmt;
 
-        pc_type_inst_agent_user_out out;
-	DgcTiberoConnection* conn=0;
-        memset(&out,0,sizeof(pc_type_inst_agent_user_out));
-        if (conDb.db_type == DGC_DB_TYPE_TIBERO) {
-                dgt_schar       conn_string[1024];
-                memset(conn_string,0,1024);
-        	sprintf(conn_string,"SERVER=%s;DB=%s;PORT=%d;UID=%s;PWD=%s;",
-                            conDb.listen_ip, conDb.instance_name, conDb.listen_port, sys_uid, sys_pass);
-	        conn=new DgcTiberoConnection();
-                if (conn->connect(conn_string, nul, sys_uid, sys_pass, nul) != 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        if (e) {
-                                DgcError*       err=e->getErr();
-                                while(err->next()) err=err->next();
-                                sprintf(out.result_msg,"%s",(dgt_schar*)err->message());
-                                out.result_code=-1;
-                        }
-                        delete conn;
-			delete e;
-                        rtn_rows->reset();
-                        rtn_rows->add();
-                        rtn_rows->next();
-                        memset(rtn_rows->data(),0,rtn_rows->rowSize());
-                        memcpy(rtn_rows->data(),&out,sizeof(pc_type_inst_agent_user_out));
-                        rtn_rows->rewind();
-                        return -1;
-                }
+    pc_type_inst_agent_user_out out;
+    DgcTiberoConnection* conn = 0;
+    memset(&out, 0, sizeof(pc_type_inst_agent_user_out));
+    if (conDb.db_type == DGC_DB_TYPE_TIBERO) {
+        dgt_schar conn_string[1024];
+        memset(conn_string, 0, 1024);
+        sprintf(conn_string, "SERVER=%s;DB=%s;PORT=%d;UID=%s;PWD=%s;",
+                conDb.listen_ip, conDb.instance_name, conDb.listen_port,
+                sys_uid, sys_pass);
+        conn = new DgcTiberoConnection();
+        if (conn->connect(conn_string, nul, sys_uid, sys_pass, nul) != 0) {
+            DgcExcept* e = EXCEPTnC;
+            if (e) {
+                DgcError* err = e->getErr();
+                while (err->next()) err = err->next();
+                sprintf(out.result_msg, "%s", (dgt_schar*)err->message());
+                out.result_code = -1;
+            }
+            delete conn;
+            delete e;
+            rtn_rows->reset();
+            rtn_rows->add();
+            rtn_rows->next();
+            memset(rtn_rows->data(), 0, rtn_rows->rowSize());
+            memcpy(rtn_rows->data(), &out, sizeof(pc_type_inst_agent_user_out));
+            rtn_rows->rewind();
+            return -1;
         }
-        //
-        // Agent User duplicate check
-        //
-        memset(sql_text,0,2048);
-        sprintf(sql_text,"select count(*) from dba_users where username = upper('%s')", agent_uid);
-        DgcCliStmt*     stmt=conn->getStmt();
-        if (!stmt) {
-                ATHROWnR(DgcError(SPOS,"getStmt failed."),-1);
-        }
-        if (stmt->execute(sql_text,strlen(sql_text),10) < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete stmt;
-		delete conn;
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
-        }
-        DgcMemRows*     rows=stmt->returnRows();
-        dgt_sint32      count=0;
-        if (rows && rows->numRows() > 0) {
-                if (rows->next()) {
-                        count=strtol((dgt_schar*)rows->data(),0,10);
-                }
-        }
+    }
+    //
+    // Agent User duplicate check
+    //
+    memset(sql_text, 0, 2048);
+    sprintf(sql_text,
+            "select count(*) from dba_users where username = upper('%s')",
+            agent_uid);
+    DgcCliStmt* stmt = conn->getStmt();
+    if (!stmt) {
+        ATHROWnR(DgcError(SPOS, "getStmt failed."), -1);
+    }
+    if (stmt->execute(sql_text, strlen(sql_text), 10) < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete stmt;
-	delete conn;
-        if (count > 0) {
-                rtn_rows->reset();
-                rtn_rows->add();
-                rtn_rows->next();
-                memset(rtn_rows->data(),0,rtn_rows->rowSize());
-                sprintf(out.result_msg,"duplicate user name");
-                out.result_code=-2;
-                memcpy(rtn_rows->data(),&out,sizeof(pc_type_inst_agent_user_out));
-                rtn_rows->rewind();
-                return -1;
+        delete conn;
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    DgcMemRows* rows = stmt->returnRows();
+    dgt_sint32 count = 0;
+    if (rows && rows->numRows() > 0) {
+        if (rows->next()) {
+            count = strtol((dgt_schar*)rows->data(), 0, 10);
         }
-        return 0;
+    }
+    delete stmt;
+    delete conn;
+    if (count > 0) {
+        rtn_rows->reset();
+        rtn_rows->add();
+        rtn_rows->next();
+        memset(rtn_rows->data(), 0, rtn_rows->rowSize());
+        sprintf(out.result_msg, "duplicate user name");
+        out.result_code = -2;
+        memcpy(rtn_rows->data(), &out, sizeof(pc_type_inst_agent_user_out));
+        rtn_rows->rewind();
+        return -1;
+    }
+    return 0;
 }
 
-dgt_sint32 PccTiberoScriptBuilder::setCharset(dgt_sint64 db_agent_id) throw(DgcExcept)
-{
+dgt_sint32 PccTiberoScriptBuilder::setCharset(dgt_sint64 db_agent_id) throw(
+    DgcExcept) {
 #if 0
         if (!getConnection()) {
                 ATHROWnR(DgcError(SPOS,"getConnection failed."),-1);
@@ -7222,121 +8190,124 @@ dgt_sint32 PccTiberoScriptBuilder::setCharset(dgt_sint64 db_agent_id) throw(DgcE
         delete sql_stmt;
 	Connection->disconnect();
 #endif
-        return 0;
-	
+    return 0;
 }
 
 typedef struct {
-        dgt_sint32      result_code;
-        dgt_schar       result_msg[1024];
+    dgt_sint32 result_code;
+    dgt_schar result_msg[1024];
 } pc_type_agent_test_out;
 
-dgt_sint32 PccTiberoScriptBuilder::agentTest(dgt_sint64 db_agent_id,DgcMemRows* rtn_rows) throw(DgcExcept)
-{
-	pc_type_agent_test_out out;
-	memset(&out,0,sizeof(pc_type_agent_test_out));
-        if (!getConnection()) {
-		DgcExcept*      e=EXCEPTnC;
-		if (e) {
-                        DgcError*       err=e->getErr();
-                        while(err->next()) err=err->next();
-                        sprintf(out.result_msg,"%s",(dgt_schar*)err->message());
-			out.result_code=0;
-		}
-		rtn_rows->reset();
-                rtn_rows->add();
-                rtn_rows->next();
-                memset(rtn_rows->data(),0,rtn_rows->rowSize());
-                memcpy(rtn_rows->data(),&out,sizeof(pc_type_agent_test_out));
-                rtn_rows->rewind();
-		delete e;
-                return -1;
+dgt_sint32 PccTiberoScriptBuilder::agentTest(
+    dgt_sint64 db_agent_id, DgcMemRows* rtn_rows) throw(DgcExcept) {
+    pc_type_agent_test_out out;
+    memset(&out, 0, sizeof(pc_type_agent_test_out));
+    if (!getConnection()) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            DgcError* err = e->getErr();
+            while (err->next()) err = err->next();
+            sprintf(out.result_msg, "%s", (dgt_schar*)err->message());
+            out.result_code = 0;
         }
-        dgt_schar       sql_text[256];
-	memset(sql_text,0,256);
-        sprintf(sql_text,
-                "select pls_encrypt_b64_id('AGENT_TEST',1) from dual");
-        DgcCliStmt*     stmt=Connection->getStmt();
-        if (!stmt) {
-		Connection->disconnect();
-                ATHROWnR(DgcError(SPOS,"getStmt failed."),-1);
+        rtn_rows->reset();
+        rtn_rows->add();
+        rtn_rows->next();
+        memset(rtn_rows->data(), 0, rtn_rows->rowSize());
+        memcpy(rtn_rows->data(), &out, sizeof(pc_type_agent_test_out));
+        rtn_rows->rewind();
+        delete e;
+        return -1;
+    }
+    dgt_schar sql_text[256];
+    memset(sql_text, 0, 256);
+    sprintf(sql_text, "select pls_encrypt_b64_id('AGENT_TEST',1) from dual");
+    DgcCliStmt* stmt = Connection->getStmt();
+    if (!stmt) {
+        Connection->disconnect();
+        ATHROWnR(DgcError(SPOS, "getStmt failed."), -1);
+    }
+    if (stmt->execute(sql_text, strlen(sql_text), 10) < 0) {
+        DgcExcept* e = EXCEPTnC;
+        if (e) {
+            DgcError* err = e->getErr();
+            while (err->next()) err = err->next();
+            sprintf(out.result_msg, "%s", (dgt_schar*)err->message());
+            if (strstr(out.result_msg, "00904")) {
+                out.result_code = 0;
+            } else if (strstr(out.result_msg, "29540")) {
+                out.result_code = 1;
+            } else if (strstr(out.result_msg, "29541")) {
+                out.result_code = 2;
+            } else if (strstr(out.result_msg, "PcaOracle")) {
+                out.result_code = 3;
+            } else if (strstr(out.result_msg, "ExceptionInInitializerError")) {
+                out.result_code = 4;
+            } else if (strstr(out.result_msg, "03113")) {
+                out.result_code = 5;
+            } else {
+                out.result_code = 6;
+            }
         }
-        if (stmt->execute(sql_text,strlen(sql_text),10) < 0) {
-                DgcExcept*      e=EXCEPTnC;
-		if (e) {
-                	DgcError*       err=e->getErr();
-                        while(err->next()) err=err->next();
-                        sprintf(out.result_msg,"%s",(dgt_schar*)err->message());
-			if (strstr(out.result_msg,"00904")) {
-                        	out.result_code=0;
-			} else if (strstr(out.result_msg,"29540")) {
-				out.result_code=1;
-			} else if (strstr(out.result_msg,"29541")) {
-				out.result_code=2;
-			} else if (strstr(out.result_msg,"PcaOracle")) {
-				out.result_code=3;
-			} else if (strstr(out.result_msg,"ExceptionInInitializerError")) {
-				out.result_code=4;
-			} else if (strstr(out.result_msg,"03113")) {
-				out.result_code=5;
-			} else {
-				out.result_code=6;
-			}
-                }
-		delete e;
-                delete stmt;
-                rtn_rows->reset();
-                rtn_rows->add();
-                rtn_rows->next();
-                memset(rtn_rows->data(),0,rtn_rows->rowSize());
-                memcpy(rtn_rows->data(),&out,sizeof(pc_type_agent_test_out));
-                rtn_rows->rewind();
-		Connection->disconnect();
-                return -1;
-        }
-        DgcMemRows*     rows=stmt->returnRows();
-        dgt_schar       enc_data[128];
-        memset(enc_data,0,128);
-        while(rows && rows->numRows() > 0) {
-                while(rows->next()) {
-			memcpy(enc_data,rows->data(),128);	
-                }
-                rows->reset();
-                if (stmt->fetch(10) < 0) {
-                        DgcExcept*      e=EXCEPTnC;
-                        delete stmt;
-			Connection->disconnect();
-                        RTHROWnR(e,DgcError(SPOS,"fetch failed"),-1);
-                }
-        }
+        delete e;
         delete stmt;
-
-        memset(sql_text,0,256);
-        sprintf(sql_text,"update pct_db_agent set(inst_step,last_update)=(5,nextLastUpdate('PCT_DB_AGENT', %lld, 2)) where db_agent_id=%lld",db_agent_id,db_agent_id);
-        DgcSqlStmt*     sql_stmt=Database->getStmt(Session,sql_text,strlen(sql_text));
-        if (sql_stmt == 0 || sql_stmt->execute() < 0) {
-                DgcExcept*      e=EXCEPTnC;
-                delete sql_stmt;
-		Connection->disconnect();
-                RTHROWnR(e,DgcError(SPOS,"execute failed."),-1);
+        rtn_rows->reset();
+        rtn_rows->add();
+        rtn_rows->next();
+        memset(rtn_rows->data(), 0, rtn_rows->rowSize());
+        memcpy(rtn_rows->data(), &out, sizeof(pc_type_agent_test_out));
+        rtn_rows->rewind();
+        Connection->disconnect();
+        return -1;
+    }
+    DgcMemRows* rows = stmt->returnRows();
+    dgt_schar enc_data[128];
+    memset(enc_data, 0, 128);
+    while (rows && rows->numRows() > 0) {
+        while (rows->next()) {
+            memcpy(enc_data, rows->data(), 128);
         }
+        rows->reset();
+        if (stmt->fetch(10) < 0) {
+            DgcExcept* e = EXCEPTnC;
+            delete stmt;
+            Connection->disconnect();
+            RTHROWnR(e, DgcError(SPOS, "fetch failed"), -1);
+        }
+    }
+    delete stmt;
+
+    memset(sql_text, 0, 256);
+    sprintf(sql_text,
+            "update pct_db_agent "
+            "set(inst_step,last_update)=(5,nextLastUpdate('PCT_DB_AGENT', "
+            "%lld, 2)) where db_agent_id=%lld",
+            db_agent_id, db_agent_id);
+    DgcSqlStmt* sql_stmt =
+        Database->getStmt(Session, sql_text, strlen(sql_text));
+    if (sql_stmt == 0 || sql_stmt->execute() < 0) {
+        DgcExcept* e = EXCEPTnC;
         delete sql_stmt;
-	Connection->disconnect();
-        return 0;
+        Connection->disconnect();
+        RTHROWnR(e, DgcError(SPOS, "execute failed."), -1);
+    }
+    delete sql_stmt;
+    Connection->disconnect();
+    return 0;
 }
 
 typedef struct {
-        dgt_uint16      parallel_degree;
-        dgt_sint8       domain_index;
-        dgt_sint8       data_type;
-        dgt_sint8       algorithm;
-        dgt_schar       result_msg[1024];
+    dgt_uint16 parallel_degree;
+    dgt_sint8 domain_index;
+    dgt_sint8 data_type;
+    dgt_sint8 algorithm;
+    dgt_schar result_msg[1024];
 } pc_type_agent_table_test_out;
 
-dgt_sint32 PccTiberoScriptBuilder::agentTableTest(dgt_sint64 db_agent_id,DgcMemRows* rtn_rows) throw(DgcExcept)
-{
-	pc_type_agent_table_test_out out_param;
-	memset(&out_param,0,sizeof(pc_type_agent_table_test_out));
+dgt_sint32 PccTiberoScriptBuilder::agentTableTest(
+    dgt_sint64 db_agent_id, DgcMemRows* rtn_rows) throw(DgcExcept) {
+    pc_type_agent_table_test_out out_param;
+    memset(&out_param, 0, sizeof(pc_type_agent_table_test_out));
 #if 0
         if (!getConnection()) {
                 DgcExcept*      e=EXCEPTnC;
@@ -7979,23 +8950,24 @@ dgt_sint32 PccTiberoScriptBuilder::agentTableTest(dgt_sint64 db_agent_id,DgcMemR
         }
         delete sql_stmt;
 	Connection->disconnect();
-	
+
 #endif
-	strcpy(out_param.result_msg,"Sample Table Test Successfully");
-        rtn_rows->add();
-        rtn_rows->next();
-        memset(rtn_rows->data(),0,rtn_rows->rowSize());
-        memcpy(rtn_rows->data(),&out_param,sizeof(pc_type_agent_table_test_out));
-	return 0;
+    strcpy(out_param.result_msg, "Sample Table Test Successfully");
+    rtn_rows->add();
+    rtn_rows->next();
+    memset(rtn_rows->data(), 0, rtn_rows->rowSize());
+    memcpy(rtn_rows->data(), &out_param, sizeof(pc_type_agent_table_test_out));
+    return 0;
 }
 
-typedef	struct {
-	dgt_uint8	os_type;
-	dgt_schar	db_version[33];
-} pc_type_install_script; 
+typedef struct {
+    dgt_uint8 os_type;
+    dgt_schar db_version[33];
+} pc_type_install_script;
 
-dgt_sint32 PccTiberoScriptBuilder::buildInstallScript(dgt_sint64 agent_id,dgt_schar* agent_uid,dgt_schar* agent_pass,dgt_schar* soha_home) throw(DgcExcept)
-{
+dgt_sint32 PccTiberoScriptBuilder::buildInstallScript(
+    dgt_sint64 agent_id, dgt_schar* agent_uid, dgt_schar* agent_pass,
+    dgt_schar* soha_home) throw(DgcExcept) {
 #if 0
 	TabInfo.enc_tab_id=agent_id;
 	//
@@ -8471,5 +9443,5 @@ dgt_sint32 PccTiberoScriptBuilder::buildInstallScript(dgt_sint64 agent_id,dgt_sc
 	if (saveSqlText() < 0) ATHROWnR(DgcError(SPOS,"saveSqlText failed."),-1);
 #endif
 
-	return 0;
+    return 0;
 }

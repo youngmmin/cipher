@@ -15,31 +15,33 @@
 #include "PccCipherAgentSvrSession.h"
 
 class PccCipherAgentSvrSessionPool : public DgcObject {
-  private:
-	static const dgt_sint32		MAX_NUM_AGENT_SVR_SESS	=	5;
-	//
-	//(sess_info=(primary=(ip=)(port=))(secondary=(ip=)(port=)))
-	//
-	dgt_schar			PrimaryIP[257];
-	dgt_uint16			PrimaryPort;
-	dgt_schar			SecondaryIP[257];
-	dgt_uint16			SecondaryPort;
-	PccCipherAgentSvrSession*	AgentSvrSession[MAX_NUM_AGENT_SVR_SESS];
-	dgt_sint32			NumAgentSvrSess;
-  protected:
-  public:
-	PccCipherAgentSvrSessionPool();
-	virtual ~PccCipherAgentSvrSessionPool();
+   private:
+    static const dgt_sint32 MAX_NUM_AGENT_SVR_SESS = 5;
+    //
+    //(sess_info=(primary=(ip=)(port=))(secondary=(ip=)(port=)))
+    //
+    dgt_schar PrimaryIP[257];
+    dgt_uint16 PrimaryPort;
+    dgt_schar SecondaryIP[257];
+    dgt_uint16 SecondaryPort;
+    PccCipherAgentSvrSession* AgentSvrSession[MAX_NUM_AGENT_SVR_SESS];
+    dgt_sint32 NumAgentSvrSess;
 
-	dgt_sint32 numAgentSvrSess() { return NumAgentSvrSess; } 
+   protected:
+   public:
+    PccCipherAgentSvrSessionPool();
+    virtual ~PccCipherAgentSvrSessionPool();
 
-	dgt_sint32 startSessions(PccAgentCryptJobPool& job_pool, dgt_sint32 no_sess_sleep_cnt) throw(DgcExcept);
-	dgt_sint32 stopSessions() throw(DgcExcept);
-	dgt_sint32 cleanBrokenSessions() throw(DgcExcept);
-	dgt_sint32 startNewSessions(PccAgentCryptJobPool& job_pool, dgt_sint32 no_sess_sleep_cnt) throw(DgcExcept);
+    dgt_sint32 numAgentSvrSess() { return NumAgentSvrSess; }
 
-	dgt_sint32 initialize(DgcBgrammer* sess_info) throw(DgcExcept);
+    dgt_sint32 startSessions(PccAgentCryptJobPool& job_pool,
+                             dgt_sint32 no_sess_sleep_cnt) throw(DgcExcept);
+    dgt_sint32 stopSessions() throw(DgcExcept);
+    dgt_sint32 cleanBrokenSessions() throw(DgcExcept);
+    dgt_sint32 startNewSessions(PccAgentCryptJobPool& job_pool,
+                                dgt_sint32 no_sess_sleep_cnt) throw(DgcExcept);
 
+    dgt_sint32 initialize(DgcBgrammer* sess_info) throw(DgcExcept);
 };
 
 #endif

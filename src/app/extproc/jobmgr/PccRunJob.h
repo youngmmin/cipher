@@ -12,19 +12,16 @@
 #ifndef PCC_RUN_JOB_H
 #define PCC_RUN_JOB_H
 
-
 #include "DgcExtProcedure.h"
 
-
 class PccRunJob : public DgcExtProcedure {
-  private:
-  protected:
-  public:
-	PccRunJob(const dgt_schar* name);
-	virtual ~PccRunJob();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PccRunJob(const dgt_schar* name);
+    virtual ~PccRunJob();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

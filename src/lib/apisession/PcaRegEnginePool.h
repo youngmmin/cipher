@@ -16,18 +16,20 @@
 #include "PccSearchEngineFactory.h"
 
 class PcaRegEnginePool : public DgcObject {
-  private :
-	dgt_schar ErrMsg[1024];
-	PccHashTable RegEngineList;
-	dgt_sint8 isInitialize;
-  protected:
-  public:
-	PcaRegEnginePool();
-	virtual ~PcaRegEnginePool();
-	dgt_schar* getErr() { return ErrMsg; }
+   private:
+    dgt_schar ErrMsg[1024];
+    PccHashTable RegEngineList;
+    dgt_sint8 isInitialize;
 
-	PccRegExprSearchEngine* getRegEngine(dgt_sint64 reg_engine_id);
-	PccRegExprSearchEngine* putRegEngine(dgt_sint64 reg_engine_id, dgt_schar* param);
+   protected:
+   public:
+    PcaRegEnginePool();
+    virtual ~PcaRegEnginePool();
+    dgt_schar* getErr() { return ErrMsg; }
+
+    PccRegExprSearchEngine* getRegEngine(dgt_sint64 reg_engine_id);
+    PccRegExprSearchEngine* putRegEngine(dgt_sint64 reg_engine_id,
+                                         dgt_schar* param);
 };
 
 #endif

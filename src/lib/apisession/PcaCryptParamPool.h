@@ -3,7 +3,7 @@
  *   Classes            :       PcaCryptParamPool
  *   Implementor        :       shson
  *   Create Date        :       2018. 11. 20.
- *   Description        :       petra cipher API crypt param pool 
+ *   Description        :       petra cipher API crypt param pool
  *   Modification history
  *   date                    modification
 --------------------------------------------------------------------
@@ -15,17 +15,18 @@
 #include "PccHashTable.h"
 
 class PcaCryptParamPool : public DgcObject {
-  private :
-	dgt_schar ErrMsg[1024];
-	PccHashTable CryptParamList;
-  protected:
-  public:
-	PcaCryptParamPool();
-	virtual ~PcaCryptParamPool();
-	dgt_schar* getErr() { return ErrMsg; }
+   private:
+    dgt_schar ErrMsg[1024];
+    PccHashTable CryptParamList;
 
-	dgt_schar* getCryptParam(dgt_schar* crypt_param_name);
-	dgt_schar* putCryptParam(dgt_schar* crypt_param_name, dgt_schar* param);
+   protected:
+   public:
+    PcaCryptParamPool();
+    virtual ~PcaCryptParamPool();
+    dgt_schar* getErr() { return ErrMsg; }
+
+    dgt_schar* getCryptParam(dgt_schar* crypt_param_name);
+    dgt_schar* putCryptParam(dgt_schar* crypt_param_name, dgt_schar* param);
 };
 
 #endif

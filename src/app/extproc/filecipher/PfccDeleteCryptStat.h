@@ -15,18 +15,17 @@
 #include "DgcExtProcedure.h"
 
 typedef struct {
-	dgt_sint64 dir_id;
+    dgt_sint64 dir_id;
 } pfcc_delete_crypt_stat_in;
 
 class PfccDeleteCryptStat : public DgcExtProcedure {
-  private:
-  protected:
-  public:
-	PfccDeleteCryptStat(const dgt_schar* name);
-	virtual ~PfccDeleteCryptStat();
-	virtual DgcExtProcedure* clone();
-	virtual dgt_sint32 execute() throw(DgcExcept);
+   private:
+   protected:
+   public:
+    PfccDeleteCryptStat(const dgt_schar* name);
+    virtual ~PfccDeleteCryptStat();
+    virtual DgcExtProcedure* clone();
+    virtual dgt_sint32 execute() throw(DgcExcept);
 };
-
 
 #endif

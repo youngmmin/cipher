@@ -12,96 +12,99 @@ extern "C" {
  * Method:    INIT
  * Signature: ([B[B)I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_INIT
-  (JNIEnv *, jclass, jbyteArray, jbyteArray);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_INIT(JNIEnv *, jclass,
+                                                     jbyteArray, jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    OPN
  * Signature: (I[B[B[B[B[B[BI[B[B)I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_OPN
-  (JNIEnv *, jclass, jint, jbyteArray, jbyteArray, jbyteArray, jbyteArray, jbyteArray, jbyteArray, jint, jbyteArray, jbyteArray);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_OPN(
+    JNIEnv *, jclass, jint, jbyteArray, jbyteArray, jbyteArray, jbyteArray,
+    jbyteArray, jbyteArray, jint, jbyteArray, jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    CLS
  * Signature: (I)V
  */
-JNIEXPORT void JNICALL Java_sinsiway_PcaSession_CLS
-  (JNIEnv *, jclass, jint);
+JNIEXPORT void JNICALL Java_sinsiway_PcaSession_CLS(JNIEnv *, jclass, jint);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    ENC
  * Signature: (II[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_ENC
-  (JNIEnv *, jclass, jint, jint, jbyteArray);
+JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_ENC(JNIEnv *, jclass,
+                                                          jint, jint,
+                                                          jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    ENC_NM
  * Signature: (I[B[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_ENC_1NM
-  (JNIEnv *, jclass, jint, jbyteArray, jbyteArray);
+JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_ENC_1NM(JNIEnv *, jclass,
+                                                              jint, jbyteArray,
+                                                              jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    DEC
  * Signature: (II[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_DEC
-  (JNIEnv *, jclass, jint, jint, jbyteArray);
+JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_DEC(JNIEnv *, jclass,
+                                                          jint, jint,
+                                                          jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    DEC_NM
  * Signature: (I[B[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_DEC_1NM
-  (JNIEnv *, jclass, jint, jbyteArray, jbyteArray);
+JNIEXPORT jbyteArray JNICALL Java_sinsiway_PcaSession_DEC_1NM(JNIEnv *, jclass,
+                                                              jint, jbyteArray,
+                                                              jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    ECODE
  * Signature: (I)I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_ECODE
-  (JNIEnv *, jclass, jint);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_ECODE(JNIEnv *, jclass, jint);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    CRYPTFILE
  * Signature: (I[B[B[B)I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_CRYPTFILE
-  (JNIEnv *, jclass, jint, jbyteArray, jbyteArray, jbyteArray);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_CRYPTFILE(JNIEnv *, jclass,
+                                                          jint, jbyteArray,
+                                                          jbyteArray,
+                                                          jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    ISENCRYPTED
  * Signature: ([B)I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_ISENCRYPTED
-  (JNIEnv *, jclass, jbyteArray);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_ISENCRYPTED(JNIEnv *, jclass,
+                                                            jbyteArray);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    NSS
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_NSS
-  (JNIEnv *, jclass);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_NSS(JNIEnv *, jclass);
 
 /*
  * Class:     sinsiway_PcaSession
  * Method:    MAXPS
  * Signature: ()I
  */
-JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_MAXPS
-  (JNIEnv *, jclass);
+JNIEXPORT jint JNICALL Java_sinsiway_PcaSession_MAXPS(JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }
