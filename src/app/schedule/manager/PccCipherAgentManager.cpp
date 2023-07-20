@@ -469,105 +469,88 @@ dgt_void PccCipherAgentManager::out() throw(DgcExcept)
 	DgcWorker::PLOG.tprintf(0,"agent_manager[%lld] ends.\n",EncTgtSysID);
 }
 
-
-dgt_sint32 PccCipherAgentManager::initialize(const dgt_schar* conf_file_path) throw(DgcExcept)
+dgt_sint32 PccCipherAgentManager::initialize(const dgt_schar *conf_file_path) throw(DgcExcept)
 {
 	ConfFilePath = conf_file_path;
-	DgcBgmrList	params(conf_file_path);
-	ATHROWnR(DgcError(SPOS,"parse[%s] failed",conf_file_path),-1);
-	DgcBgrammer*    bg = 0;
-	dgt_schar* val = 0;
-	while((bg=params.getNext())) {
-		if (bg->getNode("manager")) {
-			if ((val=bg->getValue("manager.enc_tgt_sys_id"))) EncTgtSysID = dg_strtoll(val,0,10);
+	DgcBgmrList params(conf_file_path);
+	ATHROWnR(DgcError(SPOS, "parse[%s] failed", conf_file_path), -1);
+	DgcBgrammer *bg = 0;
+	dgt_schar *val = 0;
+	while ((bg = params.getNext()))
+	{
+		if (bg->getNode("manager"))
+		{
+			if ((val = bg->getValue("manager.enc_tgt_sys_id")))
+				EncTgtSysID = dg_strtoll(val, 0, 10);
 
-			// crypt agent binary file path
-			if ((val=bg->getValue("manager.crypt_agent_bin_path"))) {
+			// pcp_crypt_agent binary file path
+			if ((val = bg->getValue("manager.agent_bin_path")))
+			{
 				dgt_sint32 len = dg_strlen(val);
-				CryptAgentBinPath = new dgt_schar[len+1];
-				memset(CryptAgentBinPath,0,len+1);
-				strcpy(CryptAgentBinPath,val);
-			} else if ((val=bg->getValue("manager.agent_bin_path"))) {
-				dgt_sint32 len = dg_strlen(val);
-				CryptAgentBinPath = new dgt_schar[len+1];
-				memset(CryptAgentBinPath,0,len+1);
-				strcpy(CryptAgentBinPath,val);
-			} else {
-				CryptAgentBinPath = new dgt_schar[65];
-				memset(CryptAgentBinPath,0,65);
-				strcpy(CryptAgentBinPath,"./pcp_crypt_agent");
+				CryptAgentBinPath = new dgt_schar[len + 1];
+				memset(CryptAgentBinPath, 0, len + 1);
+				strcpy(CryptAgentBinPath, val);
 			}
-
-			// client agent binary file path
-			if ((val=bg->getValue("manager.client_agent_bin_path"))) {
-				dgt_sint32 len = dg_strlen(val);
-				ClientAgentBinPath = new dgt_schar[len+1];
-				memset(ClientAgentBinPath,0,len+1);
-				strcpy(ClientAgentBinPath,val);
-			} else {
-				ClientAgentBinPath = new dgt_schar[65];
-				memset(ClientAgentBinPath,0,65);
-				strcpy(ClientAgentBinPath,"./pcp_client_agent");
+			else
+			{
+				CryptAgentBinPath = new dgt_schar[65];
+				memset(CryptAgentBinPath, 0, 65);
+				strcpy(CryptAgentBinPath, "./pcp_crypt_agent");
 			}
 
 			// for unix domain socket stream
-			if ((val=bg->getValue("manager.uds_listen_dir"))) {
+			if ((val = bg->getValue("manager.uds_listen_dir")))
+			{
 				dgt_sint32 len = dg_strlen(val);
-				UdsListenDir = new dgt_schar[len+1];
-				memset(UdsListenDir,0,len+1);
-				strcpy(UdsListenDir,val);
-			} else {
+				UdsListenDir = new dgt_schar[len + 1];
+				memset(UdsListenDir, 0, len + 1);
+				strcpy(UdsListenDir, val);
+			}
+			else
+			{
 				UdsListenDir = new dgt_schar[129];
-				memset(UdsListenDir,0,129);
-				strcpy(UdsListenDir,"/var/tmp/.petra");
+				memset(UdsListenDir, 0, 129);
+				strcpy(UdsListenDir, "/var/tmp/.petra");
 			}
 			dgt_sint32 addr_len = dg_strlen(UdsListenDir);
-			UdsListenAddr = new dgt_schar[addr_len+100];
-			sprintf(UdsListenAddr,"%s/pcp_crypt_manager_%lld.s",UdsListenDir,EncTgtSysID);
+			UdsListenAddr = new dgt_schar[addr_len + 100];
+			sprintf(UdsListenAddr, "%s/pcp_crypt_manager_%lld.s", UdsListenDir, EncTgtSysID);
 
-
-			if ((val=bg->getValue("manager.log_file_dir"))) {
+			if ((val = bg->getValue("manager.log_file_dir")))
+			{
 				dgt_sint32 len = dg_strlen(val);
-				LogFileDir = new dgt_schar[len+1];
-				memset(LogFileDir,0,len+1);
-				strcpy(LogFileDir,val);
-			} else {
-				LogFileDir = new dgt_schar[129];
-				memset(LogFileDir,0,129);
-				strcpy(LogFileDir,"/tmp");
+				LogFileDir = new dgt_schar[len + 1];
+				memset(LogFileDir, 0, len + 1);
+				strcpy(LogFileDir, val);
 			}
-			dgt_schar* log_file_path = 0;
-			log_file_path = new dgt_schar[dg_strlen(LogFileDir)+100];
-			if (log_file_path) {
-				sprintf(log_file_path,"%s/pcp_crypt_manager.log",LogFileDir);
+			else
+			{
+				LogFileDir = new dgt_schar[129];
+				memset(LogFileDir, 0, 129);
+				strcpy(LogFileDir, "/var/tmp/.petra");
+			}
+			dgt_schar *log_file_path = 0;
+			log_file_path = new dgt_schar[dg_strlen(LogFileDir) + 100];
+			if (log_file_path)
+			{
+				sprintf(log_file_path, "%s/pcp_crypt_manager.log", LogFileDir);
 				openLogStream(log_file_path);
 				delete log_file_path;
 			}
 
-			if ((val=bg->getValue("manager.master_soha_conn.primary.svc"))) strcpy(PrimarySohaSvc,val);
-			if ((val=bg->getValue("manager.master_soha_conn.secondary.svc"))) strcpy(SecondarySohaSvc,val);
-			if ((val=bg->getValue("manager.master_soha_conn.primary.ip"))) strcpy(PrimarySohaConnIP,val);
-			if ((val=bg->getValue("manager.master_soha_conn.secondary.ip"))) strcpy(SecondarySohaConnIP,val);
-			if ((val=bg->getValue("manager.master_soha_conn.primary.dgnet_port"))) PrimarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("manager.master_soha_conn.secondary.dgnet_port"))) SecondarySohaConnPort = (dgt_uint16)dg_strtoll(val,0,10);
+			if ((val = bg->getValue("manager.master_soha_conn.primary.svc")))
+				strcpy(PrimarySohaSvc, val);
+			if ((val = bg->getValue("manager.master_soha_conn.secondary.svc")))
+				strcpy(SecondarySohaSvc, val);
+			if ((val = bg->getValue("manager.master_soha_conn.primary.ip")))
+				strcpy(PrimarySohaConnIP, val);
+			if ((val = bg->getValue("manager.master_soha_conn.secondary.ip")))
+				strcpy(SecondarySohaConnIP, val);
+			if ((val = bg->getValue("manager.master_soha_conn.primary.dgnet_port")))
+				PrimarySohaConnPort = (dgt_uint16)dg_strtoll(val, 0, 10);
+			if ((val = bg->getValue("manager.master_soha_conn.secondary.dgnet_port")))
+				SecondarySohaConnPort = (dgt_uint16)dg_strtoll(val, 0, 10);
 		}
-#if 0
-		if (bg->getNode("agent")) {
-			if ((val=bg->getValue("agent.max_target_files"))) CryptAgentParam.max_target_files = (dgt_sint32)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("agent.max_use_cores"))) CryptAgentParam.max_use_cores = (dgt_sint32)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("agent.init_managers"))) CryptAgentParam.init_managers = (dgt_sint32)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("agent.no_session_sleep_count"))) CryptAgentParam.no_sess_sleep_conunt = (dgt_sint32)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("agent.collecting_interval"))) CryptAgentParam.collect_interval = (dgt_sint32)dg_strtoll(val,0,10);
-			if ((val=bg->getValue("agent.trace_level"))) CryptAgentParam.trace_level = (dgt_sint32)dg_strtoll(val,0,10);
-		}
-		if (bg->getNode("session")) {
-			if ((val=bg->getValue("session.primary.ip"))) strcpy(CryptAgentParam.primary_sess_ip,val);
-			if ((val=bg->getValue("session.primary.port"))) CryptAgentParam.primary_sess_port = (dgt_uint16)strtol(val,0,10);
-			if ((val=bg->getValue("session.secondary.ip"))) strcpy(CryptAgentParam.secondary_sess_ip,val);
-			if ((val=bg->getValue("session.secondary.port"))) CryptAgentParam.secondary_sess_port = (dgt_uint16)strtol(val,0,10);
-			if ((val=bg->getValue("session.num_sessions"))) CryptAgentParam.num_sessions = (dgt_sint32)strtol(val,0,10);
-		}
-#endif
 	}
 
 	return 0;

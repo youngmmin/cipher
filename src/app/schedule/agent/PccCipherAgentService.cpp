@@ -87,56 +87,102 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job, DgcBgrammer *bg
 	if (JobPool.agentID() == 0)
 		JobPool.setAgentID(agent_id);
 	
-	if ((val = bg->getValue("agent.log_file_path")))
-	openLogStream(val);
+	if ((val = bg->getValue("agent.log_file_path"))){
+		openLogStream(val);
+	}	
+	else {
+		openLogStream("/var/tmp/.petra/pcp_crypt_agent.log");
+	}
+
 	if ((val = bg->getValue("agent.max_target_files")))
 	{
-	file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
-	if (file_queue_size)
-		JobPool.setFileQueueSize(file_queue_size);
-	}
-	if ((val = bg->getValue("agent.max_fail_files")))
-	{
-	fail_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
-	if (fail_file_queue_size)
-		JobPool.setFailFileQueueSize(fail_file_queue_size);
-	}
-	if ((val = bg->getValue("agent.max_nullity_files")))
-	{
-	nullity_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
-	if (nullity_file_queue_size)
-		JobPool.setNullityFileQueueSize(nullity_file_queue_size);
-	}
-	if ((val = bg->getValue("agent.max_use_cores")))
-	max_use_cores = (dgt_sint32)dg_strtoll(val, 0, 10);
-	Repository.corePool().setCores(max_use_cores);
-	if ((val = bg->getValue("agent.init_managers")))
-	NumManagers = (dgt_sint32)dg_strtoll(val, 0, 10);
-	if ((val = bg->getValue("agent.no_session_sleep_count")))
-	NoSessionSleepCount = (dgt_sint32)dg_strtoll(val, 0, 10);
-	if (!NoSessionSleepCount)
-	NoSessionSleepCount = 5;
-	if ((val = bg->getValue("agent.collecting_interval")))
-	{
-	collect_interval = (dgt_sint32)dg_strtoll(val, 0, 10);
-	JobPool.setCollectInterval(collect_interval);
-	}
-	if ((val = bg->getValue("agent.trace_level")))
-	{
-	trace_level = (dgt_sint32)dg_strtoll(val, 0, 10);
-	JobPool.setTraceLevel(trace_level);
-	}
-	// for unix domain socket stream
-	if ((val = bg->getValue("agent.uds_listen_addr")))
-	{
-	dgt_sint32 addr_len = dg_strlen(val) + 100;
-	UdsListenAddr = new dgt_schar[addr_len];
-	sprintf(UdsListenAddr, "%s/pcp_crypt_agent_%lld.s", val, JobPool.agentID());
+		file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
 	}
 	else
 	{
-	UdsListenAddr = new dgt_schar[129];
-	sprintf(UdsListenAddr, "/var/tmp/.petra/pcp_crypt_agent_%lld.s", JobPool.agentID());
+		file_queue_size = 0;
+	}
+	JobPool.setFileQueueSize(file_queue_size);
+
+	if ((val = bg->getValue("agent.max_fail_files")))
+	{
+		fail_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		fail_file_queue_size = 0;
+	}
+	JobPool.setFailFileQueueSize(fail_file_queue_size);
+
+	if ((val = bg->getValue("agent.max_nullity_files")))
+	{
+		nullity_file_queue_size = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		nullity_file_queue_size = 0;
+	}
+	JobPool.setNullityFileQueueSize(nullity_file_queue_size);
+
+	if ((val = bg->getValue("agent.max_use_cores")))
+	{
+		max_use_cores = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		max_use_cores = 4;
+	}
+	Repository.corePool().setCores(max_use_cores);
+
+	if ((val = bg->getValue("agent.init_managers")))
+	{
+		NumManagers = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		NumManagers = 1;
+	}
+
+	if ((val = bg->getValue("agent.no_session_sleep_count")))
+	{
+		NoSessionSleepCount = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		NoSessionSleepCount = 5;
+	}
+
+	if ((val = bg->getValue("agent.collecting_interval")))
+	{
+		collect_interval = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		collect_interval = 10;
+	}
+	JobPool.setCollectInterval(collect_interval);
+
+	if ((val = bg->getValue("agent.trace_level")))
+	{
+		trace_level = (dgt_sint32)dg_strtoll(val, 0, 10);
+	}
+	else
+	{
+		trace_level = 0;
+	}
+	JobPool.setTraceLevel(trace_level);
+
+	// for unix domain socket stream
+	if ((val = bg->getValue("agent.uds_listen_addr")))
+	{
+		dgt_sint32 addr_len = dg_strlen(val) + 100;
+		UdsListenAddr = new dgt_schar[addr_len];
+		sprintf(UdsListenAddr, "%s/pcp_crypt_agent_%lld.s", val, JobPool.agentID());
+	}
+	else
+	{
+		UdsListenAddr = new dgt_schar[129];
+		sprintf(UdsListenAddr, "/var/tmp/.petra/pcp_crypt_agent_%lld.s", JobPool.agentID());
 	}
 	// added by mwpark 18.10.03
 	// for performance test
@@ -145,28 +191,33 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job, DgcBgrammer *bg
 	//              2: no bgrammer, key, header flag, buffer_size (config_file)
 	if ((val = bg->getValue("agent.mode")))
 	{
-	AgentMode = (dgt_sint32)dg_strtoll(val, 0, 10);
+		AgentMode = (dgt_sint32)dg_strtoll(val, 0, 10);
 	}
+	else
+	{
+		AgentMode = 0;
+	}
+
 	if (AgentMode >= 2)
 	{
-	if ((val = bg->getValue("agent.enc_col_name")))
-	{
-		EncColName = new dgt_schar[128];
-		memset(EncColName, 0, 128);
-		memcpy(EncColName, val, strlen(val));
+		if ((val = bg->getValue("agent.enc_col_name")))
+		{
+			EncColName = new dgt_schar[128];
+			memset(EncColName, 0, 128);
+			memcpy(EncColName, val, strlen(val));
+		}
+		if ((val = bg->getValue("agent.header_flag")))
+		{
+			HeaderFlag = new dgt_schar[128];
+			memset(HeaderFlag, 0, 128);
+			memcpy(HeaderFlag, val, strlen(val));
+		}
+		if ((val = bg->getValue("agent.buffer_size")))
+		{
+			BufferSize = (dgt_sint32)dg_strtoll(val, 0, 10);
+		}
 	}
-	if ((val = bg->getValue("agent.header_flag")))
-	{
-		HeaderFlag = new dgt_schar[128];
-		memset(HeaderFlag, 0, 128);
-		memcpy(HeaderFlag, val, strlen(val));
-	}
-	if ((val = bg->getValue("agent.buffer_size")))
-	{
-		BufferSize = (dgt_sint32)dg_strtoll(val, 0, 10);
-	}
-	}
-	
+
 	return 0;
 }
 
