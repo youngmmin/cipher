@@ -17,6 +17,7 @@
 class PccCipherAgentService : public DgcWorker {
    private:
     static const dgt_sint32 INIT_MANAGERS = 10;
+    dgt_sint64 AgentID;
 
     PccAgentCryptJobPool JobPool;
     PccCipherAgentSvrSessionPool SessionPool;
@@ -46,7 +47,7 @@ class PccCipherAgentService : public DgcWorker {
 
     inline dgt_void askStop() { StopFlag = 1; };
     inline const dgt_schar* udsListenAddr() { return UdsListenAddr; };
-    inline dgt_sint64 agentID() { return JobPool.agentID(); };
+    inline dgt_sint64 agentID() { return AgentID; };
     inline PccAgentCryptJobPool* jobPool() { return &JobPool; };
     dgt_sint32 initialize(dgt_sint64 agent_id, dgt_schar* uds_listen_dir,
                           dgt_schar* log_dir, dgt_sint32 max_target_files,

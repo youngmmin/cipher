@@ -135,23 +135,38 @@ dgt_sint32 PccCipherAgentSvrSessionPool::stopSessions() throw(DgcExcept) {
 dgt_sint32 PccCipherAgentSvrSessionPool::initialize(
     DgcBgrammer* sess_info) throw(DgcExcept) {
     dgt_schar* val;
-    if ((val = sess_info->getValue("session.num_sessions")))
+    NumAgentSvrSess = 1;
+
+    if ((val = sess_info->getValue("agent.num_sessions"))) {
         NumAgentSvrSess = (dgt_sint32)strtol(val, 0, 10);
-    if (NumAgentSvrSess > MAX_NUM_AGENT_SVR_SESS)
+    }
+
+    if (NumAgentSvrSess > MAX_NUM_AGENT_SVR_SESS) {
         NumAgentSvrSess = MAX_NUM_AGENT_SVR_SESS;
-    if ((val = sess_info->getValue("session.soha.primary.ip")))
+    }
+
+    if ((val = sess_info->getValue("agent.soha.primary.ip"))) {
         strncpy(PrimaryIP, val, 256);
-    if ((val = sess_info->getValue("session.soha.primary.pfcc_port")))
+    }
+
+    if ((val = sess_info->getValue("agent.soha.primary.pfcc_port"))) {
         PrimaryPort = (dgt_uint16)strtol(val, 0, 10);
-    if ((val = sess_info->getValue("session.soha.secondary.ip")))
+    }
+
+    if ((val = sess_info->getValue("agent.soha.secondary.ip"))) {
         strncpy(SecondaryIP, val, 256);
-    if ((val = sess_info->getValue("session.soha.secondary.pfcc_port")))
+    }
+
+    if ((val = sess_info->getValue("agent.soha.secondary.pfcc_port"))) {
         SecondaryPort = (dgt_uint16)strtol(val, 0, 10);
+    }
+
     if (*PrimaryIP == 0 || PrimaryPort == 0) {
         THROWnR(
             DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,
                           new DgcError(SPOS, "primary ip or port not defined")),
             -1);
     }
+
     return 0;
 }

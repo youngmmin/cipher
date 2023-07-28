@@ -65,7 +65,6 @@ dgt_void PccCipherAgentService::openLogStream(const dgt_schar *log_file_path) {
 dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job,
                                           DgcBgrammer *bg) throw(DgcExcept) {
     dgt_sint32 trace_level = 0;
-    dgt_sint64 agent_id = 0;
     dgt_sint32 file_queue_size = 0;
     dgt_sint32 fail_file_queue_size = 0;
     dgt_sint32 nullity_file_queue_size = 0;
@@ -74,15 +73,17 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job,
     dgt_schar *val;
 
     if ((val = bg->getValue("agent.id"))) {
-        agent_id = dg_strtoll(val, 0, 10);
+        AgentID = dg_strtoll(val, 0, 10);
     } else {
-        THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,
-                              new DgcError(SPOS, "agent.id not defined[%s]",
-                                           bg->getText())),
-                -1);
+        if (agentID() == 0) {
+            THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,
+                                  new DgcError(SPOS, "agent.id not defined[%s]",
+                                               bg->getText())),
+                    -1);
+        }
     }
 
-    if (JobPool.agentID() == 0) JobPool.setAgentID(agent_id);
+    if (JobPool.agentID() == 0) JobPool.setAgentID(AgentID);
 
     if ((val = bg->getValue("agent.log_file_path"))) {
         openLogStream(val);
@@ -133,7 +134,7 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job,
     if ((val = bg->getValue("agent.collecting_interval"))) {
         collect_interval = (dgt_sint32)dg_strtoll(val, 0, 10);
     } else {
-        collect_interval = 10;
+        collect_interval = 1;
     }
     JobPool.setCollectInterval(collect_interval);
 
@@ -148,12 +149,11 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job,
     if ((val = bg->getValue("agent.uds_listen_addr"))) {
         dgt_sint32 addr_len = dg_strlen(val) + 100;
         UdsListenAddr = new dgt_schar[addr_len];
-        sprintf(UdsListenAddr, "%s/pcp_crypt_agent_%lld.s", val,
-                JobPool.agentID());
+        sprintf(UdsListenAddr, "%s/pcp_crypt_agent_%lld.s", val, agentID());
     } else {
         UdsListenAddr = new dgt_schar[129];
         sprintf(UdsListenAddr, "/var/tmp/.petra/pcp_crypt_agent_%lld.s",
-                JobPool.agentID());
+                agentID());
     }
     // added by mwpark 18.10.03
     // for performance test
@@ -188,18 +188,14 @@ dgt_sint32 PccCipherAgentService::setConf(PccAgentCryptJob *job,
                 -1);
     }
 
-    dgt_sint32 rtn = 0;
-    if (val = bg->getValue("session")) {
-        rtn = SessionPool.initialize(bg);
-    } else {
-        THROWnR(DgcBgmrExcept(DGC_EC_BG_INCOMPLETE,
-                              new DgcError(SPOS, "session not defined[%s]",
-                                           bg->getText())),
-                -1);
-    }
-
-    if (rtn) {
-        ATHROWnR(DgcError(SPOS, "setParams failed"), -1);
+    if (SessionPool.initialize(bg) < 0) {
+        THROWnR(
+            DgcBgmrExcept(
+                DGC_EC_BG_INCOMPLETE,
+                new DgcError(
+                    SPOS, "the string '%s' requires a (agent=(soha=...)) node.",
+                    bg->getText())),
+            -1);
     }
 
     return 0;
@@ -223,8 +219,7 @@ dgt_void PccCipherAgentService::in() throw(DgcExcept) {
         RTHROW(e, DgcError(SPOS, "addManagers failed"));
     }
 
-    DgcWorker::PLOG.tprintf(0, "agent[%lld] service starts\n",
-                            JobPool.agentID());
+    DgcWorker::PLOG.tprintf(0, "agent[%lld] service starts\n", agentID());
 }
 
 dgt_sint32 PccCipherAgentService::run() throw(DgcExcept) {
@@ -235,8 +230,7 @@ dgt_sint32 PccCipherAgentService::run() throw(DgcExcept) {
         DgcExcept *e = EXCEPTnC;
         if (e) {
             DgcWorker::PLOG.tprintf(
-                0, *e, "agent[%lld] cleanBrokenSessions failed :\n",
-                JobPool.agentID());
+                0, *e, "agent[%lld] cleanBrokenSessions failed :\n", agentID());
             delete e;
         }
     }
@@ -244,9 +238,8 @@ dgt_sint32 PccCipherAgentService::run() throw(DgcExcept) {
     if (SessionPool.startNewSessions(JobPool, NoSessionSleepCount) < 0) {
         DgcExcept *e = EXCEPTnC;
         if (e) {
-            DgcWorker::PLOG.tprintf(0, *e,
-                                    "agent[%lld] startNewSessions Failed :\n",
-                                    JobPool.agentID());
+            DgcWorker::PLOG.tprintf(
+                0, *e, "agent[%lld] startNewSessions Failed :\n", agentID());
             delete e;
         }
     }
@@ -281,15 +274,14 @@ dgt_void PccCipherAgentService::out() throw(DgcExcept) {
     } else
         CryptJob = 0;
 
-    DgcWorker::PLOG.tprintf(0, "agent[%lld] service ends.\n",
-                            JobPool.agentID());
+    DgcWorker::PLOG.tprintf(0, "agent[%lld] service ends.\n", agentID());
 }
 
 dgt_sint32 PccCipherAgentService::initialize(
     const dgt_schar *conf_file_path, dgt_sint64 agent_id) throw(DgcExcept) {
     DgcBgmrList params(conf_file_path);
     ATHROWnR(DgcError(SPOS, "parse[%s] failed", conf_file_path), -1);
-    DgcBgrammer *bg = 0;
+    DgcBgrammer *bg = params.getBgrammer("agent");
 
     // create job (job_id == 0) to executing PccGetDirEntryStmt
     if ((CryptJob = JobPool.newJob(0)) == 0)
@@ -299,11 +291,13 @@ dgt_sint32 PccCipherAgentService::initialize(
             DgcError(SPOS, "lockShare job_id[%lld] failed", CryptJob->jobID()),
             -1);
 
-    if (agent_id) JobPool.setAgentID(agent_id);
-    while ((bg = params.getNext())) {
-        if (setConf(CryptJob, bg) < 0)
-            ATHROWnR(DgcError(SPOS, "setParams failed"), -1);
+    if (agent_id) {
+        AgentID = agent_id;
+        JobPool.setAgentID(agent_id);
     }
+
+    if (setConf(CryptJob, bg) < 0)
+        ATHROWnR(DgcError(SPOS, "setParams failed"), -1);
 
     return 0;
 }

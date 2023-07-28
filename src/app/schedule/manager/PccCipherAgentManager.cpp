@@ -157,6 +157,7 @@ dgt_sint32 PccCipherAgentManager::getAgentList() throw(DgcExcept) {
     while (rtn_rows->next() && rtn_rows->data() &&
            (agent_info = (pcamt_agent_info*)rtn_rows->data())) {
         AgentList[NumAgents].agent_id = agent_info->agent_id;
+        NumAgents++;
     }
     return 0;
 }
@@ -287,7 +288,6 @@ dgt_void PccCipherAgentManager::in() throw(DgcExcept) {
         DgcWorker::PLOG.tprintf(
             0, "agent_manager[%lld] has no pcp_crypt_agent to monitor\n",
             EncTgtSysID);
-        StopFlag = 1;
     }
 }
 
@@ -300,7 +300,7 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept) {
                 if (execvCryptAgent(AgentList[i].agent_id, "start") < 0) {
                     DgcExcept* e = EXCEPTnC;
                     if (e) {
-                        DgcWorker::PLOG.tprintf(
+                        PLOG.tprintf(
                             0, *e,
                             "agent_manager[%lld] : restarting agent[%lld] "
                             "failed\n",
@@ -457,7 +457,13 @@ dgt_sint32 PccCipherAgentManager::run() throw(DgcExcept) {
 }
 
 dgt_void PccCipherAgentManager::out() throw(DgcExcept) {
-    // stop agents
+    if (!StopFlag) {
+        printf(
+            "pcp_crypt_manager[%lld]'s has terminated unexpectedly.\nFor more "
+            "details, please check the '%s/pcp_crypt_manager.log' file.\n",
+            encTgtSysID(), LogFileDir);
+    }
+
     for (dgt_uint8 i = 0; i < NumAgents; i++) {
         if (execvCryptAgent(AgentList[i].agent_id, "stop") < 0)
             ATHROW(DgcError(SPOS, "startCryptAgent failed"));
@@ -849,7 +855,6 @@ int main(dgt_sint32 argc, dgt_schar** argv) {
 
     // 6. start manager
     agent_manager->wa()->ThreadID = pthread_self();
-    // DgcWorker::entry((dgt_void*)manager);
     if (agent_manager->start() < 0) {
         DgcExcept* e = EXCEPTnC;
         if (e) {
@@ -863,7 +868,7 @@ int main(dgt_sint32 argc, dgt_schar** argv) {
         return 5;
     }
 
-    printf("\npcp_crypt_agent_manager[%lld]'s starting.\n",
+    printf("\npcp_crypt_manager[%lld]'s starting.\n",
            agent_manager->encTgtSysID());
 
     //

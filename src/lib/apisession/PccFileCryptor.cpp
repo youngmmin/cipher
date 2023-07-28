@@ -456,10 +456,10 @@ dgt_sint32 PccFileCryptor::crypt(const dgt_schar* in_file,
     for (; in_file && out_file;) {
 #if 1  // added by shson 2017.6.5 for automatic calculation of the read buffer
        // size when decrypting a whole file
-        // based on the read buffer size being used when encrypting,
-        // which means the size of buffer in decrypting parameters should be the
-        // same as the size of buffer in encrypting parameters
-        //
+       // based on the read buffer size being used when encrypting,
+       // which means the size of buffer in decrypting parameters should be the
+       // same as the size of buffer in encrypting parameters
+       //
         if (SearchEngineFactory.engineType() ==
                 SearchEngineFactory.WHOLE_DECRYPTOR ||
             SearchEngineFactory.engineType() ==
@@ -517,7 +517,7 @@ dgt_sint32 PccFileCryptor::crypt(const dgt_schar* in_file,
                 }
             }
             //			if (session->sharedFlag())
-            //PcaApiSessionPool::returnApiSession(session->sid());
+            // PcaApiSessionPool::returnApiSession(session->sid());
             CryptorFactory.setBufferSize(decrypt_read_buf_size);
             CryptorFactory.setStreamBufferSize(stream_dec_buf_size);
 #if 1  // added by mwpark 2017.06.26 for massive data decrypt control
