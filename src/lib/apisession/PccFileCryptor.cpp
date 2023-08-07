@@ -911,7 +911,7 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
     if (SearchEngineFactory.cryptMode()) {
         // encrypt
         dgt_sint32 i = 0;
-        if (session->isEncryptAudit(enc_col_name)) {
+        if (session->isEncryptAudit(enc_col_name) || true) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
@@ -948,7 +948,7 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
             is_audit_flag = session->isDecryptAudit(enc_col_name);
         }
 
-        if (is_audit_flag) {
+        if (is_audit_flag || true) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
