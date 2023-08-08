@@ -44,7 +44,7 @@ void print_usage() {
         "-in)\n");
     printf("\n");
 
-    printf("  (REQUIRED - if -e, -d, or -c is selected)\n");
+    printf("  (REQUIRED - if -e, -d is selected)\n");
     printf("  -in <file>		Specify the input file\n");
     printf("  -out <file>		Specify the output file\n");
     printf(
