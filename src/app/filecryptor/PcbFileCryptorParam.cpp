@@ -104,12 +104,10 @@ int PcbFileCryptorParam::getParameterString(char *param_string_,
         getModeString(mode_string, MODE_STRING_SIZE);
 
         sprintf(_parameter_string,
-                "(file=(in=%s)(out=%s)(log=%s.log))"
+                "(file=(in=%s)(out=%s))"
                 "(key=(1=(name=%s)(columns=1)))"
-                "(mode=(crypt=%s)(overwrite_flag=on)(header_flag=V2on))"
-                "(session=(program_id=%s_exec_%s))",
-                in_file, out_file, program_name, key_name, mode_string, user,
-                program_name);
+                "(mode=(crypt=%s)(overwrite_flag=on)(header_flag=V2on))",
+                in_file, out_file, key_name, mode_string);
 
         setParameter(_parameter_string);
     }

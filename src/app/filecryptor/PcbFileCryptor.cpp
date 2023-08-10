@@ -63,15 +63,6 @@ void printHelp() {
 }
 
 int main(int argc, char *argv[]) {
-    const char *separator_pos = strrchr(argv[0], PATH_SEPARATOR);
-    const char *binary_name = separator_pos ? separator_pos + 1 : argv[0];
-
-    const char *user = getenv("USER");
-
-    PcbFileCryptorParam *param = new PcbFileCryptorParam();
-    param->setProgramName(binary_name);
-    param->setUser(user);
-
     int i;
     int has_encrypt = 0, has_decrypt = 0, has_param = 0, has_check = 0,
         has_in = 0, has_out = 0, has_key = 0;
