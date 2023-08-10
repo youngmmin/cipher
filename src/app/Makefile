@@ -25,7 +25,7 @@ uninstall_libs:
 uninstall_bins:
 clean:: clean_sub_objs
 
-sub_dir = credentials kredsvr schedule keycontrol extproc
+sub_dir = credentials kredsvr schedule keycontrol extproc filecryptor filecrypt_deprecated
 
 build_sub_objs:
 	$(MAKE) subdirs="$(sub_dir)" tag="build" visit_subdirs

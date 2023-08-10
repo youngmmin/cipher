@@ -57,7 +57,7 @@ build_pcp_key_mgr_objs: $(pcp_key_mgr_objs)
 build_pcp_key_mgr_bin: build_pcp_key_mgr_objs
 	$(MAKE) bin="$(pcp_key_mgr_bin)" \
 	        objs="$(pcp_key_mgr_objs)" \
-		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lextproc -L${petraToolsDir}/lib -ltools" \
+		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra -lextproc -L${petraToolsDir}/lib -ltools" \
 		build_bin
 
 clean_pcp_key_mgr_bin:

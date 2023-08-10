@@ -42,7 +42,7 @@ build_pcp_key_ctrl_objs: $(pcp_key_ctrl_objs)
 build_pcp_key_ctrl_bin: build_pcp_key_ctrl_objs
 	$(MAKE) bin="$(pcp_key_ctrl_bin)" \
 	        objs="$(pcp_key_ctrl_objs)" \
-		opt="-L$(petraRootDir)/lib -lpetra" \
+		opt="-L$(petraRootDir)/lib -lpetra -L$(petraToolsDir)/lib -ltools" \
 		build_bin
 
 clean_pcp_key_ctrl_bin:

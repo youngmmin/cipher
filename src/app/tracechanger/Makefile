@@ -38,7 +38,7 @@ build_pcb_trace_changer_objs: $(pcb_trace_changer_objs)
 build_pcb_trace_changer_bin: $(pcb_trace_changer_objs)
 	$(MAKE) bin="$(pcb_trace_changer_bin)" \
 	        objs="$(pcb_trace_changer_objs)" \
-		opt="-L$(petraRootDir)/lib -lpetra" \
+		opt="-L$(petraRootDir)/lib -lpetra -L${petraToolsDir}/lib -ltools" \
 		build_bin
 
 clean_pcb_trace_changer_bin:

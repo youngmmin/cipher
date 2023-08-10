@@ -58,7 +58,7 @@ build_pcp_job_mgr_objs: $(pcp_job_mgr_objs)
 build_pcp_job_mgr_bin: build_pcp_job_mgr_objs
 	$(MAKE) bin="$(pcp_job_mgr_bin)" \
 	        objs="$(pcp_job_mgr_objs)" \
-		opt="-I$(abs_srcdir)/lib/cipher -L$(petraRootDir)/lib -lextproc -L${petraToolsDir}/lib -ltools" \
+		opt="-I$(abs_srcdir)/lib/cipher -L$(petraRootDir)/lib -lpetra -lextproc -L${petraToolsDir}/lib -ltools" \
 		build_bin
 
 clean_pcp_job_mgr_bin:

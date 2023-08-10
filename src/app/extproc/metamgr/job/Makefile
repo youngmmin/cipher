@@ -62,7 +62,7 @@ build_pcp_job_objs: $(pcp_job_objs)
 build_pcp_job_bin: build_pcp_job_objs
 	$(MAKE) bin="$(pcp_job_bin)" \
 	        objs="$(pcp_job_objs)" \
-		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lextproc -L${petraToolsDir}/lib -ltools" \
+		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra -lextproc -L${petraToolsDir}/lib -ltools" \
 		build_bin
 
 clean_pcp_job_bin:

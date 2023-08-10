@@ -8,8 +8,6 @@
 #
 include ../../Makefile.inc
 
-CXXFLAGS := -DPACKAGE_STRING=$(PACKAGE_STRING) ${CXXFLAGS}
-
 #############################################################################
 # global definitions
 #
@@ -39,7 +37,7 @@ build_pcp_file_crypt_objs: $(pcp_file_crypt_objs)
 build_pcp_file_crypt_bin: $(pcp_file_crypt_objs)
 	$(MAKE) bin="$(pcp_file_crypt_bin)" \
 	        objs="$(pcp_file_crypt_objs)" \
-		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra" \
+		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetrast -L${petraToolsDir}/lib -ltoolsst" \
 		build_bin
 
 clean_pcp_file_crypt_bin:

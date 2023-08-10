@@ -19,10 +19,10 @@ build_libs:
 build_bins: build_pcp_credentials_bin
 install:: 
 install_libs:
-install_bins: install_pcp_credentials_bin
+install_bins: 
 uninstall:: 
 uninstall_libs:
-uninstall_bins: uninstall_pcp_credentials_bin
+uninstall_bins: 
 clean:: clean_pcp_credentials_bin
 
 #############################################################################
@@ -37,7 +37,7 @@ build_pcp_credentials_objs: $(pcp_credentials_objs)
 build_pcp_credentials_bin: $(pcp_credentials_objs)
 	$(MAKE) bin="$(pcp_credentials_bin)" \
 	        objs="$(pcp_credentials_objs)" \
-		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra" \
+		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra -L${petraToolsDir}/lib -ltools" \
 		build_bin
 
 install_pcp_credentials_bin: build_pcp_credentials_bin
