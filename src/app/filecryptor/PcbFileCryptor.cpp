@@ -21,44 +21,45 @@
 #define PATH_SEPARATOR '/'
 #endif
 
-void print_usage() {
-    printf("\n");
-    printf("Usage: pcb_filecryptor [options]\n");
-    printf("options:\n");
-    printf("  (REQUIRED - select exactly one)\n");
-    printf(
-        "  -e, --encrypt			Encrypt the input file (requires: -in, "
-        "-out, "
-        "-key)\n");
-    printf(
-        "  -d, --decrypt			Decrypt the input file (requires: -in, "
-        "-out, "
-        "-key)\n");
-    printf(
-        "  -p, --parameter \"<parameter>\"	Execute the encryption or "
-        "decryption action "
-        "as set in the parameter (requires: none)\n");
-    printf(
-        "  -c, --check			Check if the input file is encrypted "
-        "(requires: "
-        "-in)\n");
-    printf("\n");
+void printHelp() {
+    printf("\nUsage: pcb_filecryptor [OPTION] [ADDITIONAL OPTIONS]\n\n");
 
-    printf("  (REQUIRED - if -e, -d is selected)\n");
-    printf("  -in <file>		Specify the input file\n");
-    printf("  -out <file>		Specify the output file\n");
+    printf("General Options:\n");
+    printf("  -h, --help\t\tDisplay this help message and exit\n");
+    printf("  -q, --quiet\t\tSuppress output messages\n\n");
+
+    printf("Required Options (Choose only one):\n");
+    printf("  -e, --encrypt\t\tEncrypt mode\n");
+    printf("  -d, --decrypt\t\tDecrypt mode\n");
     printf(
-        "  -key <name>		Specify the 'enc_col_name' value "
-        "in petra "
-        "cipher "
-        "kms\n");
-    printf("\n");
+        "  -p, --parameter [parameter_string]\tParameter mode. Format: "
+        "\"(file=(in=plain.dat)...)\"\n");
     printf(
-        "  -v, --verbose		Display encryption/decryption result "
-        "messages\n");
-    printf("  -h, --help		Show this help message\n");
-    printf("\n");
-    printf("\n");
+        "  -c, --check [path]\t\tHeader Check mode. Check the header of the "
+        "specified file.\n\n");
+
+    printf("Additional Options (applicable for encrypt/decrypt modes):\n");
+    printf("  -in   [path]\t\tInput file or directory path\n");
+    printf("  -out  [path]\t\tOutput file or directory path\n");
+    printf("  -key  [name]\t\tSpecify the 'enc_col_name' value\n\n");
+
+    printf("Examples:\n");
+    printf(
+        "  pcb_filecryptor -e -in plain.dat -out plain.dat.enc -key "
+        "aria_256_b64\n");
+    printf(
+        "  pcb_filecryptor --quiet --decrypt -in plain.dat.enc -out "
+        "plain.dat.dec "
+        "-key "
+        "aria_256_b64\n");
+    printf("  pcb_filecryptor -q -p \"(file=(in=plain.dat)...)\"\n");
+    printf("  pcb_filecryptor -c plain.dat\n\n");
+
+    printf("Note:\n");
+    printf("  - You must choose only one option from the Required Options.\n");
+    printf(
+        "  - Based on your choice, you might need to specify additional "
+        "options.\n\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -74,15 +75,22 @@ int main(int argc, char *argv[]) {
     int i;
     int has_encrypt = 0, has_decrypt = 0, has_param = 0, has_check = 0,
         has_in = 0, has_out = 0, has_key = 0;
-    int has_dump = 0;
+    int is_quiet = 0;
+
+    if (argc < 2) {
+        fprintf(stderr,
+                "[ERROR] Invalid arguments. Use -h or --help for usage "
+                "details.\n\n");
+        return 0;
+    }
 
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            print_usage();
+            printHelp();
             return 0;
         }
-        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
-            has_dump = 1;
+        if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
+            is_quiet = 1;
         }
         if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--encrypt") == 0) {
             has_encrypt = 1;
@@ -152,13 +160,13 @@ int main(int argc, char *argv[]) {
     if ((has_encrypt + has_decrypt + has_check + has_param) > 1) {
         fprintf(stderr,
                 "ERROR: Only one option among -e, -d, -p, -c can be set.\n");
-        print_usage();
+        printHelp();
         return 1;  // failure
     } else if ((has_encrypt + has_decrypt + has_check + has_param) == 0) {
         fprintf(
             stderr,
             "ERROR: At least one option among -e, -d, -p, -c must be set.\n");
-        print_usage();
+        printHelp();
         return 1;  // failure
     }
 
@@ -166,7 +174,7 @@ int main(int argc, char *argv[]) {
     // (-in, -out, and -key) are also provided.
     if ((has_encrypt || has_decrypt) && !(has_in && has_out && has_key)) {
         fprintf(stderr, "ERROR: -in, -out, and -key options are required\n");
-        print_usage();
+        printHelp();
         return 1;
     }
 
@@ -195,7 +203,7 @@ int main(int argc, char *argv[]) {
             printf("ERROR: crypt failed. error code '%d'\n", rtn);
         } else {
             // If the -dump flag is provided, print the result of the operation.
-            if (has_dump) {
+            if (!is_quiet) {
                 if (param->getMode() == PcbFileCryptorParam::FCB_MODE_ENCRYPT) {
                     printf("INFO: '%s' to '%s' (encrypted successfully).\n",
                            param->getInFile(), param->getOutFile());

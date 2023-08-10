@@ -38,7 +38,7 @@ build_pcb_file_cryptor_objs: $(pcb_file_cryptor_objs)
 build_pcb_file_cryptor_bin: $(pcb_file_cryptor_objs)
 	$(MAKE) bin="$(pcb_file_cryptor_bin)" \
 	        objs="$(pcb_file_cryptor_objs)" \
-		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetra" \
+		opt="-L$(abs_srcdir)/lib/apisession -lcipherapisession -L$(petraRootDir)/lib -lpetrast -L${petraToolsDir}/lib -ltoolsst" \
 		build_bin
 
 clean_pcb_file_cryptor_bin:
