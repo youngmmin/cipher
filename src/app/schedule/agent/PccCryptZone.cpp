@@ -231,6 +231,10 @@ dgt_sint32 PccCryptZone::setZoneParams(DgcBgrammer* bg,
             if (strncasecmp(val, "fp3", 3) == 0) EncryptFlag = 12;
             if (strncasecmp(val, "fp4", 3) == 0) EncryptFlag = 13;
             if (strncasecmp(val, "fp5", 3) == 0) EncryptFlag = 14;
+            // 2023.08.10 added by mwpark
+            // for kyobo bmt requirement
+            // file(plain,encrypted) backup
+            if (strncasecmp(val, "backup", 6) == 0) EncryptFlag = 3;
         }
         if ((val = bg->getValue("zone.file_format")) == 0 || *val == 0) {
             sprintf(err_string, "file_format not found");
@@ -448,6 +452,11 @@ dgt_sint32 PccCryptZone::buildParam(
             sprintf(crypt_mode, "%s", "fp4");
         } else if (EncryptFlag == 14) {
             sprintf(crypt_mode, "%s", "fp5");
+        } else if (EncryptFlag == 3) {
+            // 2023.08.10 added by mwpark
+            // for kyobo bmt requirement
+            // file(plain,encrypted) backup
+            sprintf(crypt_mode, "%s", "backup");
         } else {
             sprintf(crypt_mode, "%s", "decrypt");
         }

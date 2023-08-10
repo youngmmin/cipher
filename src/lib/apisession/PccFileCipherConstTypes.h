@@ -47,6 +47,7 @@ static const dgt_sint32 PFC_CRYPT_MODE_DECRYPT = 0;
 static const dgt_sint32 PFC_CRYPT_MODE_ENCRYPT = 1;
 static const dgt_sint32 PFC_CRYPT_MODE_VALIDATION = 2;
 static const dgt_sint32 PFC_CRYPT_MODE_MIGRATION = 3;
+static const dgt_sint32 PFC_CRYPT_MODE_BACKUP = 4;
 
 static const dgt_sint32 PFC_DETECT_MODE_ALL = 0;
 static const dgt_sint32 PFC_DETECT_MODE_TEXT = 1;

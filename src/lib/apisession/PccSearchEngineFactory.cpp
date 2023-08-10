@@ -104,7 +104,7 @@ dgt_sint32 PccRegExprSearchEngine::pttnSearch(dgt_schar* buf,
 #else  // WIN32 else
 #ifdef KERNEL_MODE
                     // not using in kernel mode
-#else  // KERNEL_MODE else
+#else              // KERNEL_MODE else
                     try {
                         std::tr1::smatch m;
                         std::string tmp_str(str);
@@ -125,8 +125,8 @@ dgt_sint32 PccRegExprSearchEngine::pttnSearch(dgt_schar* buf,
                         DgcWorker::PLOG.tprintf(0, "std::tr1::regex_error\n");
                         str = 0;
                     }
-#endif  // KERNEL_MODE end
-#endif  // WIN32 end
+#endif             // KERNEL_MODE end
+#endif             // WIN32 end
                 }  // while
             }      // if
         }          // for
@@ -151,7 +151,7 @@ dgt_sint32 PccRegExprSearchEngine::addRegExpr(dgt_sint32 col_no,
 
 dgt_sint32 PccRegExprSearchEngine::getHandoverSize(PccCryptBuffer* crypt_buf) {
     //	if (MaxLineLen && crypt_buf->SrcLength >= MaxLineLen) return
-    //getLineHandoverSize(crypt_buf);
+    // getLineHandoverSize(crypt_buf);
     dgt_sint32 handover_size = 0;
     handover_size = getLineHandoverSize(crypt_buf);
     if (handover_size) return handover_size;
@@ -451,10 +451,10 @@ dgt_sint32 PccFormatSearchEngine::getSkipSize(PccCryptBuffer* crypt_buf,
                     break;
                 }  // if (numDelimiter -1 == TailLine) end
             }      // if (isRowDelimiter(crypt_buf->SrcDataPtr +
-               // crypt_buf->SrcLength - i) end
-        }  // for(dgt_sint32 i = skip_size + 1/*null size*/; i <=
-           // crypt_buf->SrcLength; i++) end
-    } else {                   // when first buffer
+                   // crypt_buf->SrcLength - i) end
+        }          // for(dgt_sint32 i = skip_size + 1/*null size*/; i <=
+                   // crypt_buf->SrcLength; i++) end
+    } else {       // when first buffer
         if (HeaderSkipSize) {  // when exist header_skip_size parameter
             return HeaderSkipSize;
         }
@@ -734,7 +734,7 @@ dgt_sint32 PccFixedSearchEngine::patternSearch(PccCryptBuffer* crypt_buf) {
                     rowDelimiterLen() -
                     1;  // move offset so rowDelimiterLen, -1 is added because
                         // of first line_offset++ to upline
-        } else {  // MultiRecordLength encrypt case
+        } else {        // MultiRecordLength encrypt case
             if (MultiRecordLength == header_skip_size) header_skip_size = 0;
             while ((line_offset % MultiRecordLength) != header_skip_size)
                 line_offset++;  // move to the end of line
@@ -787,6 +787,14 @@ dgt_void PccSearchEngineFactory::setCryptMode(const dgt_schar* crypt_mode) {
                    0) {  // when migration mode
         CryptMode = 3;
         EngineType = WHOLE_MIGRATOR;
+    } else if (crypt_mode && strlen(crypt_mode) &&
+               strncasecmp(crypt_mode, "backup", 6) ==
+                   0) {  // when backup files
+        // 2023.08.10 added by mwpark
+        // for kyobo bmt requirement
+        // file(plain,encrypted) backup
+        CryptMode = 4;
+        EngineType = BYPASS_ENCRYPTOR;
     }
 }
 

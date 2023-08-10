@@ -177,6 +177,12 @@ PccCryptor* PccCryptorFactory::getCryptor(
             case PccSearchEngineFactory::WHOLE_MIGRATOR:
                 cryptor = new PccWholeMigrator(session, KeyMap, HeaderFlag);
                 break;
+            // 2023.08.10 added by mwpark
+            // for kyobo bmt requirement
+            // file(plain,encrypted) backup
+            case PccSearchEngineFactory::BYPASS_ENCRYPTOR:
+                cryptor = new PccBypassEncryptor(session, KeyMap);
+                break;
         }
     }
     for (;;) {

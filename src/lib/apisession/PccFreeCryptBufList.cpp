@@ -29,7 +29,8 @@ PccFreeCryptBufList::PccFreeCryptBufList(dgt_sint32 crypt_mode,
         DstBufLen = SrcBufLen * 3 * 1.4;  // in case of encrypting the length of
                                           // output is bigger than input
     else if (CryptMode == PFC_CRYPT_MODE_DECRYPT ||
-             CryptMode == PFC_CRYPT_MODE_MIGRATION)
+             CryptMode == PFC_CRYPT_MODE_MIGRATION ||
+             CryptMode == PFC_CRYPT_MODE_BACKUP)
         DstBufLen = SrcBufLen;
     else {
         DgcWorker::PLOG.tprintf(0, "unknown CryptMode [%d]\n", CryptMode);

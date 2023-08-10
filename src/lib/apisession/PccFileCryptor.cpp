@@ -908,7 +908,8 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
             }
         }
     }
-    if (SearchEngineFactory.cryptMode()) {
+    if (SearchEngineFactory.cryptMode() == 1 ||
+        SearchEngineFactory.cryptMode() == 3) {
         // encrypt
         dgt_sint32 i = 0;
         if (session->isEncryptAudit(enc_col_name) || true) {
@@ -933,6 +934,28 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
 #endif
             file_request.file_size = InFileSize;
             file_request.processed_byte = OutBufLen;
+            if (strlen(ErrString))
+                memcpy(file_request.err_msg, ErrString, 255);
+            else
+                sprintf(file_request.err_msg, "success");
+            session->logFileRequest(&file_request);
+        }
+    } else if (SearchEngineFactory.cryptMode() == 4) {
+        // 2023.08.10 added by mwpark
+        // for kyobo bmt requirement
+        // file(plain,encrypted) backup
+        // logging backup file
+        dgt_sint32 i = 0;
+        if (session->isEncryptAudit(enc_col_name) || true) {
+            memcpy(file_request.file_name, InFileName, strlen(InFileName));
+            memcpy(file_request.system_name, SystemName, strlen(SystemName));
+            memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
+            memcpy(file_request.zone_name, ZoneName, strlen(ZoneName));
+            sprintf(file_request.enc_type, "BACKUP");
+            file_request.mode = 1;
+            sprintf(file_request.key_name, "n/a");
+            file_request.file_size = InFileSize;
+            file_request.processed_byte = InFileSize;
             if (strlen(ErrString))
                 memcpy(file_request.err_msg, ErrString, 255);
             else
@@ -1033,7 +1056,8 @@ dgt_void PccFileCryptor::userCryptLogging(dgt_uint32 start_time,
             }
         }
     }
-    if (SearchEngineFactory.cryptMode()) {
+    if (SearchEngineFactory.cryptMode() == 1 ||
+        SearchEngineFactory.cryptMode() == 3) {
         // encrypt
         dgt_sint32 i = 0;
         if (session->isEncryptAudit(enc_col_name)) {
@@ -1060,6 +1084,28 @@ dgt_void PccFileCryptor::userCryptLogging(dgt_uint32 start_time,
 #endif
             file_request.file_size = InFileSize;
             file_request.processed_byte = OutBufLen;
+            if (strlen(ErrString))
+                memcpy(file_request.err_msg, ErrString, 255);
+            else
+                sprintf(file_request.err_msg, "success");
+            session->logUserFileRequest(&file_request);
+        }
+    } else if (SearchEngineFactory.cryptMode() == 4) {
+        // 2023.08.10 added by mwpark
+        // for kyobo bmt requirement
+        // file(plain,encrypted) backup
+        // logging backup file
+        dgt_sint32 i = 0;
+        if (session->isEncryptAudit(enc_col_name) || true) {
+            memcpy(file_request.file_name, InFileName, strlen(InFileName));
+            memcpy(file_request.system_name, SystemName, strlen(SystemName));
+            memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
+            memcpy(file_request.zone_name, ZoneName, strlen(ZoneName));
+            sprintf(file_request.enc_type, "BACKUP");
+            file_request.mode = 1;
+            sprintf(file_request.key_name, "n/a");
+            file_request.file_size = InFileSize;
+            file_request.processed_byte = InFileSize;
             if (strlen(ErrString))
                 memcpy(file_request.err_msg, ErrString, 255);
             else
