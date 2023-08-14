@@ -912,7 +912,7 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
         SearchEngineFactory.cryptMode() == 3) {
         // encrypt
         dgt_sint32 i = 0;
-        if (session->isEncryptAudit(enc_col_name) || true) {
+        if (session->isEncryptAudit(enc_col_name)) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
@@ -946,13 +946,13 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
         // file(plain,encrypted) backup
         // logging backup file
         dgt_sint32 i = 0;
-        if (session->isEncryptAudit(enc_col_name) || true) {
+        if (session->isEncryptAudit(enc_col_name)) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
             memcpy(file_request.zone_name, ZoneName, strlen(ZoneName));
             sprintf(file_request.enc_type, "BACKUP");
-            file_request.mode = 1;
+            file_request.mode = 3;
             sprintf(file_request.key_name, "n/a");
             file_request.file_size = InFileSize;
             file_request.processed_byte = InFileSize;
@@ -971,7 +971,7 @@ dgt_void PccFileCryptor::cryptLogging(dgt_uint32 start_time,
             is_audit_flag = session->isDecryptAudit(enc_col_name);
         }
 
-        if (is_audit_flag || true) {
+        if (is_audit_flag) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
@@ -1096,13 +1096,13 @@ dgt_void PccFileCryptor::userCryptLogging(dgt_uint32 start_time,
         // file(plain,encrypted) backup
         // logging backup file
         dgt_sint32 i = 0;
-        if (session->isEncryptAudit(enc_col_name) || true) {
+        if (session->isEncryptAudit(enc_col_name)) {
             memcpy(file_request.file_name, InFileName, strlen(InFileName));
             memcpy(file_request.system_name, SystemName, strlen(SystemName));
             memcpy(file_request.system_ip, SystemIp, strlen(SystemIp));
             memcpy(file_request.zone_name, ZoneName, strlen(ZoneName));
             sprintf(file_request.enc_type, "BACKUP");
-            file_request.mode = 1;
+            file_request.mode = 3;
             sprintf(file_request.key_name, "n/a");
             file_request.file_size = InFileSize;
             file_request.processed_byte = InFileSize;
