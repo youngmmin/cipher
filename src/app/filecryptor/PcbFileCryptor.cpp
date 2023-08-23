@@ -68,8 +68,6 @@ int main(int argc, char *argv[]) {
         has_in = 0, has_out = 0, has_key = 0;
     int is_quiet = 0;
 
-    PcbFileCryptorParam *param = new PcbFileCryptorParam();
-
     if (argc < 2) {
         fprintf(stderr,
                 "[ERROR] Invalid arguments. Use -h or --help for usage "

@@ -32,7 +32,7 @@ static dgt_sint32 PCC_ENC_TRAILER_LENGTH = 4;
     (((_tlr_[0] & 0x03) << 1) + \
      ((_tlr_[1] & 0x80) >> 7))  // initial vector type
 #define PCC_REMAINS(_tlr_) \
-    (_tlr_[1] & 0x3f)                  // effective bytes in the last block
+    (_tlr_[1] & 0x3f)  // effective bytes in the last block
 #define PCC_OPH_POS(_tlr_) (_tlr_[2])  // ophuek end position
 
 static const dgt_uint8 PCI_INBS[32] =  // Instead of Null Block SEED
@@ -107,11 +107,6 @@ dgt_sint32 PCI_initContext(PCI_Context* ctx, const dgt_uint8* key,
                            dgt_uint8 enc_start_pos, dgt_uint32 enc_length,
                            dgt_uint8 oph_flag, dgt_uint8 u_trailer_size,
                            const dgt_schar* u_trailer_char) {
-    // for kyobo bmt.
-    if (cipher_type == PCI_CIPHER_AES || cipher_type == PCI_CIPHER_ARIA) {
-        cipher_type = PCI_CIPHER_AES;
-        key_size = 128;
-    }
 #ifdef PCI_TEST
     printf("PCI_initContext-INPUT::\n");
     printf("	ctx => [%p]\n", ctx);
@@ -1294,7 +1289,7 @@ dgt_sint32 PCI_decrypt(PCI_Context* ctx, dgt_uint8* src, dgt_sint32 src_len,
                 //  bug fix : 2022.07.22  by dhkim
                 //  add a condition that runs
                 //	unconditionally if it is an A condition
-                // old-base64(ctx->b64_txt_enc_flag <= 1)
+                //old-base64(ctx->b64_txt_enc_flag <= 1)
                 //
                 if (ctx->b64_txt_enc_flag <= 1) {
                     output_len -= ctx->cipher->blockSize();
@@ -1590,8 +1585,7 @@ printf("]\n");
 #endif
 
     if (b64_flag) {
-        // dgt_sint32	enc_len = DgcBase64::encode(dst, *dst_len,
-        // (dgt_schar*)od,
+        // dgt_sint32	enc_len = DgcBase64::encode(dst, *dst_len, (dgt_schar*)od,
         // (*dst_len+3)*2, 1);
         dgt_sint32 enc_len = DgcBase64::encode(
             allo_buf, allo_size, (dgt_schar*)od, (*dst_len + 3) * 2, 1);
