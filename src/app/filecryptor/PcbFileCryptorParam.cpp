@@ -5,6 +5,7 @@ PcbFileCryptorParam::PcbFileCryptorParam()
       key_name(NULL),
       in_file(NULL),
       out_file(NULL),
+      threads(NULL),
       mode(FCB_MODE_NONE) {}
 
 void PcbFileCryptorParam::setUser(const char *user_) {
@@ -45,6 +46,14 @@ void PcbFileCryptorParam::setOutFile(const char *out_file_) {
     }
     out_file = new char[strlen(out_file_) + 1];
     strcpy(out_file, out_file_);
+}
+
+void PcbFileCryptorParam::setThreads(const char *threads_) {
+    if (threads != NULL) {
+        delete[] threads;
+    }
+    threads = new char[strlen(threads_) + 1];
+    strcpy(threads, threads_);
 }
 
 void PcbFileCryptorParam::setEncryptMode() { mode = FCB_MODE_ENCRYPT; }
@@ -108,6 +117,11 @@ int PcbFileCryptorParam::getParameterString(char *param_string_,
                 "(key=(1=(name=%s)(columns=1)))"
                 "(mode=(crypt=%s)(overwrite_flag=on)(header_flag=V2on))",
                 in_file, out_file, key_name, mode_string);
+
+        if (threads != NULL) {
+            sprintf(_parameter_string + strlen(_parameter_string),
+                    "(parallel=(threads=%s))", threads);
+        }
 
         setParameter(_parameter_string);
     }

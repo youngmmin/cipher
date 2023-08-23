@@ -10,6 +10,7 @@ class PcbFileCryptorParam : public DgcObject {
     char *key_name;
     char *in_file;
     char *out_file;
+    char *threads;
     int mode;
 
     static const int PARAM_BUFFER_SIZE = 2048;
@@ -31,6 +32,7 @@ class PcbFileCryptorParam : public DgcObject {
     void setKeyName(const char *key_name_);
     void setInFile(const char *in_file_);
     void setOutFile(const char *out_file_);
+    void setThreads(const char *threads_);
     void setParameter(const char *parameter_string_);
 
     void setEncryptMode();

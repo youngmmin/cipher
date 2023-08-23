@@ -9,6 +9,8 @@
 --------------------------------------------------------------------
 
 ********************************************************************/
+#include <time.h>
+
 #include <cstdlib>
 
 #include "PcbFileCryptorParam.h"
@@ -39,9 +41,10 @@ void printHelp() {
         "specified file.\n\n");
 
     printf("Additional Options (applicable for encrypt/decrypt modes):\n");
-    printf("  -in   [path]\t\tInput file or directory path\n");
-    printf("  -out  [path]\t\tOutput file or directory path\n");
-    printf("  -key  [name]\t\tSpecify the 'enc_col_name' value\n\n");
+    printf("  -in      [path]\tInput file or directory path\n");
+    printf("  -out     [path]\tOutput file or directory path\n");
+    printf("  -key     [name]\tSpecify the 'enc_col_name' value\n");
+    printf("  -threads [number]\tNumber of threads to be used\n");
 
     printf("Examples:\n");
     printf(
@@ -67,6 +70,8 @@ int main(int argc, char *argv[]) {
     int has_encrypt = 0, has_decrypt = 0, has_param = 0, has_check = 0,
         has_in = 0, has_out = 0, has_key = 0;
     int is_quiet = 0;
+
+    PcbFileCryptorParam *param = new PcbFileCryptorParam();
 
     if (argc < 2) {
         fprintf(stderr,
@@ -146,6 +151,18 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
         }
+        if (strcmp(argv[i], "-threads") == 0) {
+            if (i + 1 < argc) {
+                i++;  // Skip next argument
+                has_key = 1;
+                param->setThreads(argv[i]);
+                continue;
+            } else {
+                fprintf(stderr,
+                        "ERROR: -threads or option requires an argument\n");
+                return 1;
+            }
+        }
     }
 
     if ((has_encrypt + has_decrypt + has_check + has_param) > 1) {
@@ -187,25 +204,35 @@ int main(int argc, char *argv[]) {
 
         // Initialize the file cryptor and perform the chosen operation.
         PccFileCryptor cryptor;
+
+        struct timespec start_time, end_time;
+        clock_gettime(CLOCK_REALTIME, &start_time);
+
         int rtn = cryptor.crypt(-1, param_list, 0, 0);
+
+        clock_gettime(CLOCK_REALTIME, &end_time);
+
+        double elapsed_time_ms =
+            (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+            (end_time.tv_nsec - start_time.tv_nsec) / 1000000.0;
 
         // Handle the result of the operation.
         if (rtn < 0) {
             printf("ERROR: crypt failed. error code '%d'\n", rtn);
         } else {
-            // If the -dump flag is provided, print the result of the operation.
             if (!is_quiet) {
                 if (param->getMode() == PcbFileCryptorParam::FCB_MODE_ENCRYPT) {
-                    printf("INFO: '%s' to '%s' (encrypted successfully).\n",
+                    printf("INFO: '%s' to '%s' (encrypted successfully). ",
                            param->getInFile(), param->getOutFile());
                 } else if (param->getMode() ==
                            PcbFileCryptorParam::FCB_MODE_DECRYPT) {
-                    printf("INFO: '%s' to '%s' (decrypted successfully).\n",
+                    printf("INFO: '%s' to '%s' (decrypted successfully). ",
                            param->getInFile(), param->getOutFile());
                 } else if (param->getMode() ==
                            PcbFileCryptorParam::FCB_MODE_PARAMETER) {
-                    printf("INFO: parameter executed successfully.\n");
+                    printf("INFO: parameter executed successfully. ");
                 }
+                printf("elapse time '%.0f' ms\n", elapsed_time_ms);
             }
         }
         // If the check operation is chosen, determine if the file is encrypted.
