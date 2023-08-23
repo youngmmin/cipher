@@ -234,10 +234,6 @@ class PccSearchEngineFactory : public DgcObject {
     static const dgt_sint32 WHOLE_DECRYPTOR = 5;
     static const dgt_sint32 WHOLE_ENCRYPTOR = 6;
     static const dgt_sint32 WHOLE_MIGRATOR = 7;
-    // 2023.08.10 added by mwpark
-    // for kyobo bmt requirement
-    // file(plain,encrypted) backup
-    static const dgt_sint32 BYPASS_ENCRYPTOR = 8;
 
     PccSearchEngineFactory(PccKeyMap& key_map, const dgt_schar* crypt_mode = 0);
     virtual ~PccSearchEngineFactory();

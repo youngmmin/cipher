@@ -402,11 +402,6 @@ dgt_sint32 PfccAgentParamBuilder::buildEncZoneParams(
         } else if (enc_zone->crypt_type == 14) {
             // decoding
             sprintf(crypt_mode, "%s", "fp5");
-        } else if (enc_zone->crypt_type == 3) {
-            // 2023.08.10 added by mwpark
-            // for kyobo bmt requirement
-            // file(plain,encrypted) backup
-            sprintf(crypt_mode, "%s", "backup");
         } else {
             sprintf(crypt_mode, "%s", "decrypt");
         }
@@ -1028,7 +1023,7 @@ dgt_sint32 PfccAgentParamBuilder::buildJobParams(dgt_sint64 job_id) throw(
             continue;
 
         // 2018.07.11 added by shson
-        //  get dir_rule
+        // get dir_rule
         pfct_type_enc_zone_dir_rule dir_rule_row;
         dir_rule_row.enc_job_tgt_id = job_tgt->enc_job_tgt_id;
         dir_rule_row.version = 0;
