@@ -150,6 +150,7 @@ class PccCryptDir : public DgcObject {
                                 dgt_schar* err_string) throw(DgcExcept);
     dgt_sint32 isTargetDir(const dgt_schar* src_dir);
     dgt_sint32 isTargetFile(const dgt_schar* src_file);
+
     
     dgt_sint32 pttnsFindAster(PccRegExprList* DirExprs); //FileCipher DirPttn all encrypt fix 
 };
