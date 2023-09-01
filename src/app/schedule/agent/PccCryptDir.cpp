@@ -401,7 +401,22 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir, dgt_schar* src_dir,
         memset(&TmpCryptStat, 0, sizeof(TmpCryptStat));
     }
 }
+dgt_sint32 PccCryptDir::pttnsFindAster(PccRegExprList* DirExprs) {
+    exp_type* preg;
+    DirExprs->rewind();
+    
+    while ((preg = DirExprs->nextPttn())) {  // each dir pattern
+        // Check if the pattern contains an asterisk '*'
+        printf ("==============(preg->exp start2=============\n");
+        printf ("(preg->exp : %s\n", preg->exp);
+        printf ("==============(preg->exp end2=============\n");
+        if ((strcmp(preg->exp, ".*") == 0) || strcmp(preg->exp, "..*") == 0) {
+            return 1;  // found an asterisk in the pattern
+        }
+    }
 
+    return 0;  // no asterisk found in any pattern
+}
 dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir, const dgt_schar* src_dir,
                               const dgt_schar* dst_dir,
                               dgt_uint8 is_target_dir) throw(DgcExcept) {
@@ -534,6 +549,20 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir, const dgt_schar* src_dir,
                 }
             }
         } else if (S_ISREG(fstat.st_mode)) {  // file
+            
+            if((CurrDirDepth == 0 && DirExprs != 0) || pttnsFindAster(DirExprs)){
+
+                printf("============CurrDirDepth start2==========\n");
+                printf("CurrDirDepth : %d\n" ,CurrDirDepth );
+                printf("============CurrDirDepth end2==========\n");
+                int temp = pttnsFindAster(DirExprs);
+                printf("============pttnsFindAster start2==========\n");
+                printf("pttnsFindAster : %d\n" ,temp );
+                printf("============pttnsFindAster end2==========\n");
+                continue;
+            }
+            
+            
             //
             // need method which returns crypting status, cryptStatus(const
             // dgt_schar* file_path) with return values: 0 -> text, 1 ->
