@@ -402,17 +402,17 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir, dgt_schar* src_dir,
     }
 }
 //2023.09.01  Function to find * in pattern
-dgt_sint32 PccCryptDir::pttnsFindAster(PccRegExprList* DirExprs) {
+dgt_sint32 PccCryptDir::pttnsFindAster(PccRegExprList* Exprs) {
     
-    if(DirExprs == 0){
+    if(Exprs == 0){
         return 0;
     }
     exp_type* preg;
-    DirExprs->rewind();
+    Exprs->rewind();
     
-    while ((preg = DirExprs->nextPttn())) {
+    while ((preg = Exprs->nextPttn())) {
         // Check if the pattern contains an asterisk '*'
-        if ((strcmp(preg->exp, ".*") == 0) || strcmp(preg->exp, "..*") == 0) {
+        if ((strcmp(preg->exp, ".*") == 0) || strcmp(preg->exp, "..*") == 0 || strcmp(preg->exp, "..*.*") == 0) {
             return 1;  // found an asterisk in the pattern
         }
     }
@@ -554,7 +554,7 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir, const dgt_schar* src_dir,
             
 
             //2023.09.01 Process root directory encryption exclusion
-            if((CurrDirDepth == 0 && DirExprs != 0) || pttnsFindAster(DirExprs)){
+            if((CurrDirDepth == 0 && DirExprs != 0) && !pttnsFindAster(DirExprs)){
                 continue;
             }
             
@@ -829,14 +829,7 @@ dgt_sint32 PccCryptDir::filter() throw(DgcExcept) {
                     filter1(CryptMir, SrcDir,
                             DstDir && *DstDir ? DstDir : SrcDir, 1);
                     break;
-                case 2:  // Full directory depth filter (pattern detect)
-                    CryptStat.output_files = loadDetectRqst(CryptMir);
-                    filter2(CryptMir, TmpSrcPath, isEncDirDepth(0));
-                    break;
-                default:  // Full directory depth filter (crypt)
-                    filter0(CryptMir, TmpSrcPath, TmpDstPath,
-                            isEncDirDepth(0));  // old filter version
-                    break;
+
             }
             CryptMir->closeMir();  // added by jhpark 2017.11.21
         }
