@@ -317,115 +317,145 @@ dgt_void PccCipherAgentService::getCryptAgentStatus(pcct_agent_status *status) {
 #include "revision.h"
 
 void help_message() {
-    printf("Usage: pcp_crypt_agent [OPTIONS] <start|stop|status>\n");
-    printf("\n Examples:\n");
+    // Print the usage information
     printf(
-        "    pcp_crypt_agent start\t\t\t\t# start the agent using "
-        "agent.conf\n");
-    printf(
-        "    pcp_crypt_agent -c agent2.conf -i 377 start\t\t# start the agent "
-        "using agent2.conf and agent_id 377\n");
-    printf(
-        "    pcp_crypt_agent -c agent2.conf -i 377 stop\t\t# stop the agent "
-        "using agent2.conf and agent_id 377\n");
-    printf(
-        "    pcp_crypt_agent -c agent2.conf -i 377 -v status\t# display the "
-        "agent's detailed status using agent2.conf and agent_id 377\n");
+        "\nUsage: pcp_crypt_agent [COMMAND] [OPTION] [ADDITIONAL OPTIONS]\n\n");
 
-    printf("\n Options:\n");
-    printf("    -h\t display this help and exit\n");
-    printf("    -c\t set configure file path [default: agent.conf]\n");
-    printf("    -i\t use specified agent_id (overrides -c options) \n");
+    // Print the general options
+    printf("Commands (Choose only one):\n");
+    printf("  start\t\tStart the agent\n");
+    printf("  stop\t\tStop the agent\n");
+    printf("  status\tCheck the agent's status\n\n");
+
+    // Print the required options
+    printf("Options:\n");
+    printf("  -c, --config [configfile]\tSpecify the configuration file\n");
+    printf("  -i, --id [agent_id]\t\tSpecify the agent ID\n");
+    printf("  -v, --version\t\t\tDisplay the version information\n");
+    printf("  -h, --help\t\t\tDisplay this help message and exit\n\n");
+
+    // Print the notes
+    printf("Note:\n");
+    printf("  - You must specify one command (start, stop, status).\n");
     printf(
-        "    -v\t display detailed agent job status (with status command)\n");
+        "  - Based on your choice, you might need to specify additional "
+        "options.\n\n");
+}
+
+// Function to print enhanced version information
+void printVersionInfo() {
+    printf("PCP Crypt Agent version: 1.0\n");
+    printf(
+        "Built on: 2023-09-15 | Developed by Sinsiway Corporate Research "
+        "Center\n\n");
+
+    printf("Petra File Cipher (Subcomponent) v3.2\n");
+    printf("Advanced Encryption for Your Data Security\n\n");
+
+    printf("Copyright 2023 Sinsiway. All Rights Reserved.\n");
 }
 
 int main(dgt_sint32 argc, dgt_schar **argv) {
-    dgt_sint32 verbose_flag = 0;
+    int has_start = 0, has_stop = 0, has_status = 0;
+    int has_config = 0, has_id = 0;
+    const char *config_file = NULL;
     dgt_sint64 agent_id = 0;
-    dgt_schar conf_file_path[2048];
-    memset(conf_file_path, 0, sizeof(conf_file_path));
 
     if (argc < 2) {
-        printf("revision : %d\n", cipher_revision());
-        //		printf("usage: pcp_crypt_agent <conf file path>
-        //<start|stop|status> [agent_id]\n");
         help_message();
         return -1;
     }
 
-    dgt_schar ch;
-    while ((ch = dg_getopt(argc, argv, "hvc:i:")) != (dgt_schar)EOF) {
-        switch (ch) {
-            case 'h':
-                help_message();
-                return 0;
-            case 'v':
-                verbose_flag = 1;
-                break;
-            case 'c':
-                memcpy(conf_file_path, optarg, strlen(optarg));
-                break;
-            case 'i':
-                agent_id = dg_strtoll(optarg, 0, 10);
-                break;
-            case '?':
-                help_message();
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            help_message();
+            return 0;
+        }
+
+        // Version option
+        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            printVersionInfo();
+            return 0;
+        }
+
+        if (strcmp(argv[i], "start") == 0) {
+            has_start = 1;
+            continue;
+        }
+
+        if (strcmp(argv[i], "stop") == 0) {
+            has_stop = 1;
+            continue;
+        }
+
+        if (strcmp(argv[i], "status") == 0) {
+            has_status = 1;
+            continue;
+        }
+
+        if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--config") == 0) {
+            if (i + 1 < argc) {
+                i++;
+                has_config = 1;
+                config_file = argv[i];
+                continue;
+            } else {
+                fprintf(stderr, "ERROR: -c option requires an argument.\n");
                 return -1;
+            }
+        }
+
+        if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--id") == 0) {
+            if (i + 1 < argc) {
+                i++;
+                has_id = 1;
+                agent_id = dg_strtoll(argv[i], 0, 10);
+                continue;
+            } else {
+                fprintf(stderr, "ERROR: -i option requires an argument.\n");
+                return -1;
+            }
         }
     }
-    if (!strlen(conf_file_path)) sprintf(conf_file_path, "agent.conf");
 
-    dgt_schar *cmd = 0;
-    dgt_sint32 remain_param = argc - optind;
-    if (remain_param == 1) {
-        cmd = argv[optind];
-    } else if (remain_param == 2) {  // for compatibility; pcp_crypt_agent <conf
-                                     // file path> <start|stop|staus>
-        sprintf(conf_file_path, argv[optind]);
-        cmd = argv[optind + 1];
-    } else if (remain_param ==
-               3) {  // fro compatibility; pcp_crypt_agent <conf file path>
-                     // <start|stop|status> [agent_id]
-        sprintf(conf_file_path, argv[optind]);
-        cmd = argv[optind + 1];
-        agent_id = dg_strtoll(argv[optind + 2], 0, 10);
-    } else {
-        printf(
-            "command <start|stop|status> is not entered or there are too many "
-            "arguments\n");
+    // Check command validity
+    if ((has_start + has_stop + has_status) > 1) {
+        fprintf(stderr,
+                "ERROR: Only one command among 'start', 'stop', 'status' can "
+                "be set.\n");
         help_message();
-        exit(100);
+        return -1;
+    } else if ((has_start + has_stop + has_status) == 0) {
+        fprintf(stderr,
+                "ERROR: At least one command among 'start', 'stop', 'status' "
+                "must be set.\n");
+        help_message();
+        return -1;
+    }
+
+    // Set default value for config_file if it remains NULL
+    if (config_file == NULL) {
+        config_file = "manager.conf";  // Set default value
     }
 
     PccCipherAgentService *agent_service = new PccCipherAgentService();
 
-    if (agent_service->initialize(conf_file_path, agent_id) < 0) {
+    if (agent_service->initialize(config_file, agent_id) < 0) {
         DgcExcept *e = EXCEPTnC;
         e->print();
-        DgcWorker::PLOG.tprintf(0, *e, "initialize[%s] failed:\n",
-                                conf_file_path);
+        DgcWorker::PLOG.tprintf(0, *e, "initialize[%s] failed:\n", config_file);
         delete e;
-        printf("initialize[%s] failed.\n", conf_file_path);
+        printf("initialize[%s] failed.\n", config_file);
         return -2;
     }
 
-    if (strcasecmp(cmd, "start")) {
+    if (has_start == 0) {
         DgcExcept *msg_e = 0;
         // set msg_type
-        if (!strcasecmp(cmd, "stop")) {
+        if (has_stop == 1) {
             msg_e = new DgcExcept(PCC_AGENT_UDS_MSG_TYPE_STOP, 0);
-        } else if (!strcasecmp(cmd, "status")) {
-            if (!verbose_flag) {
-                msg_e = new DgcExcept(PCC_AGENT_UDS_MSG_TYPE_STATUS, 0);
-            } else {
-                msg_e = new DgcExcept(PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS, 0);
-            }
-        } else {
-            printf("invalid command [%s], it should be <start|stop|status>\n",
-                   cmd);
-            help_message();
-            exit(100);
+        } else if (has_status == 1) {
+            msg_e = new DgcExcept(PCC_AGENT_UDS_MSG_TYPE_DETAIL_STATUS, 0);
         }
 
         DgcUnixClient client_stream;
@@ -460,7 +490,7 @@ int main(dgt_sint32 argc, dgt_schar **argv) {
 
         // recv result
         DgcMessage *msg = 0;
-        if (!strcasecmp(cmd, "stop")) {
+        if (has_stop == 1) {
             for (;;) {
                 if (msg_stream.recvMessage(10) <= 0) {
                     DgcExcept *e = EXCEPTnC;
@@ -498,7 +528,7 @@ int main(dgt_sint32 argc, dgt_schar **argv) {
                            result_e->errCode(), agent_service->agentID());
                 }
             }
-        } else if (!strcasecmp(cmd, "status")) {
+        } else if (has_status == 1) {
             if (msg_stream.recvMessage(10) <= 0) {
                 DgcExcept *e = EXCEPTnC;
                 if (e) {
@@ -536,32 +566,31 @@ int main(dgt_sint32 argc, dgt_schar **argv) {
                     }
                     letter = (PtMsgDgiLetter *)msg;
                     printf("- %s\n", letter->getBody());
-                    if (verbose_flag) {
-                        dgt_sint32 num_dirs =
-                            (dgt_sint32)dg_strtoll(letter->getPs(), 0, 10);
-                        if (num_dirs > 0) {
-                            for (dgt_sint32 j = 0; j < num_dirs; j++) {
-                                if (msg_stream.recvMessage(10) <= 0) {
-                                    DgcExcept *e = EXCEPTnC;
-                                    if (e) {
-                                        e->print();
-                                        delete e;
-                                    } else {
-                                        printf(
-                                            "recvMessage[job_status_msg] time "
-                                            "out\n");
-                                    }
-                                    exit(103);
+
+                    dgt_sint32 num_dirs =
+                        (dgt_sint32)dg_strtoll(letter->getPs(), 0, 10);
+                    if (num_dirs > 0) {
+                        for (dgt_sint32 j = 0; j < num_dirs; j++) {
+                            if (msg_stream.recvMessage(10) <= 0) {
+                                DgcExcept *e = EXCEPTnC;
+                                if (e) {
+                                    e->print();
+                                    delete e;
+                                } else {
+                                    printf(
+                                        "recvMessage[job_status_msg] time "
+                                        "out\n");
                                 }
-                                if ((msg = msg_stream.currMsg())->opi() !=
-                                    PTDGILETTER) {
-                                    printf("not PTDGILETTER message[%d]\n",
-                                           msg->opi());
-                                    exit(104);
-                                }
-                                letter = (PtMsgDgiLetter *)msg;
-                                printf("    - %s\n", letter->getBody());
+                                exit(103);
                             }
+                            if ((msg = msg_stream.currMsg())->opi() !=
+                                PTDGILETTER) {
+                                printf("not PTDGILETTER message[%d]\n",
+                                       msg->opi());
+                                exit(104);
+                            }
+                            letter = (PtMsgDgiLetter *)msg;
+                            printf("    - %s\n", letter->getBody());
                         }
                     }
                 }

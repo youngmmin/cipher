@@ -599,102 +599,135 @@ dgt_void PccCipherAgentManager::getCryptManagerStatus(
 }
 
 void help_message() {
-    printf("Usage: pcp_crypt_manager [OPTIONS] <start|stop|status>\n");
-    printf("\n Examples:\n");
+    // Main usage description
     printf(
-        "    pcp_crypt_manager start\t\t\t\t# start the manager using "
-        "manager.conf\n");
-    printf(
-        "    pcp_crypt_manager -c manager2.conf start\t\t# start the manager "
-        "using manager2.conf \n");
-    printf(
-        "    pcp_crypt_manager -c manager2.conf stop\t\t# stop the manager "
-        "using manager2.conf \n");
-    printf(
-        "    pcp_crypt_manager -c manager2.conf -v status\t# display the "
-        "manager's detailed status using manager2.conf \n");
+        "\nUsage: pcp_crypt_manager [COMMAND] [OPTION] [ADDITIONAL "
+        "OPTIONS]\n\n");
 
-    printf("\n Options:\n");
-    printf("    -h\t display this help and exit\n");
-    printf("    -c\t set configure file path [default: manager.conf]\n");
+    // List of required commands
+    printf("Required Commands (Choose only one):\n");
+    printf("  start\t\tStart the encryption or decryption process\n");
+    printf("  stop\t\tStop the encryption or decryption process\n");
+    printf("  status\tCheck the current status of the process\n\n");
+
+    // General options that can be used with the required commands
+    printf("General Options:\n");
+    printf("  -c, --config [configfile]\tSpecify the configuration file\n");
+    printf("  -v, --version\t\t\tDisplay the version information and exit\n");
+    printf("  -h, --help\t\t\tDisplay this help message and exit\n\n");
+
+    // Additional notes
+    printf("Note:\n");
     printf(
-        "    -v\t display detailed manager agent status (with status "
-        "command)\n");
+        "  - You must choose only one command from the Required Commands.\n");
+    printf(
+        "  - Based on your choice, you might need to specify additional "
+        "options.\n\n");
+}
+
+// Function to print enhanced version information
+void printVersionInfo() {
+    printf("PCP Crypt Manager version: 1.0\n");
+    printf(
+        "Built on: 2023-09-15 | Developed by Sinsiway Corporate Research "
+        "Center\n\n");
+
+    printf("Petra File Cipher (Subcomponent) v3.2\n");
+    printf("Advanced Encryption for Your Data Security\n\n");
+
+    printf("Copyright 2023 Sinsiway. All Rights Reserved.\n");
 }
 
 int main(dgt_sint32 argc, dgt_schar** argv) {
-    dgt_sint32 verbose_flag = 0;
-    dgt_schar conf_file_path[2048];
-    memset(conf_file_path, 0, sizeof(conf_file_path));
+    int i;
+    int has_start = 0, has_stop = 0, has_status = 0;
+    int has_config = 0;
+    const char* config_file = NULL;
 
     if (argc < 2) {
-        //		printf("usage: pcp_crypt_manager <conf_file_path>
-        //<start|stop|status> [all(default) | crypt_agent | client_agent]\n");
         help_message();
         return -1;
     }
 
-    dgt_schar ch;
-    while ((ch = dg_getopt(argc, argv, "hvc:")) != (dgt_schar)EOF) {
-        switch (ch) {
-            case 'h':
-                help_message();
-                return 0;
-            case 'v':
-                verbose_flag = 1;
-                break;
-            case 'c':
-                memcpy(conf_file_path, optarg, strlen(optarg));
-                break;
-            case '?':
-                help_message();
-                return -1;
+    for (i = 1; i < argc; ++i) {
+        // Help option
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            help_message();
+            return 0;
+        }
+        // Version option
+        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            printVersionInfo();
+            return 0;
+        }
+        // Start command
+        if (strcmp(argv[i], "start") == 0) {
+            has_start = 1;
+            continue;
+        }
+        // Stop command
+        if (strcmp(argv[i], "stop") == 0) {
+            has_stop = 1;
+            continue;
+        }
+        // Status command
+        if (strcmp(argv[i], "status") == 0) {
+            has_status = 1;
+            continue;
+        }
+        // Config option
+        if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--config") == 0) {
+            if (i + 1 < argc) {
+                i++;
+                has_config = 1;
+                config_file = argv[i];
+            } else {
+                fprintf(stderr,
+                        "ERROR: -c or --config option requires an argument\n");
+                return 1;
+            }
+            continue;
         }
     }
-    if (!strlen(conf_file_path)) sprintf(conf_file_path, "manager.conf");
 
-    dgt_schar* cmd = 0;
-    dgt_sint32 remain_param = argc - optind;
-    if (remain_param == 1) {
-        cmd = argv[optind];
-    } else if (remain_param == 2 ||
-               remain_param ==
-                   3) {  // for compatibility; pcp_crypt_manager <conf file
-                         // path> <start|stop|staus> [all(default] | crypt_agent
-                         // | client_agent]
-        sprintf(conf_file_path, argv[optind]);
-        cmd = argv[optind + 1];
-    } else {
-        printf(
-            "command <start|stop|status> is not entered or there are too many "
-            "arguments\n");
+    // Check that only one of start, stop, status is chosen
+    if ((has_start + has_stop + has_status) > 1) {
+        fprintf(
+            stderr,
+            "ERROR: Only one command among start, stop, status can be set.\n");
         help_message();
-        exit(100);
+        return 1;  // failure
+    } else if ((has_start + has_stop + has_status) == 0) {
+        fprintf(stderr,
+                "ERROR: At least one command among start, stop, status must be "
+                "set.\n");
+        help_message();
+        return 1;  // failure
+    }
+
+    // Set default value for config_file if it remains NULL
+    if (config_file == NULL) {
+        config_file = "manager.conf";  // Set default value
     }
 
     PccCipherAgentManager* agent_manager = new PccCipherAgentManager();
-    if (agent_manager->initialize(conf_file_path) < 0) {
+    if (agent_manager->initialize(config_file) < 0) {
         DgcExcept* e = EXCEPTnC;
         e->print();
-        DgcWorker::PLOG.tprintf(0, *e, "initialize[%s] failed:\n",
-                                conf_file_path);
+        DgcWorker::PLOG.tprintf(0, *e, "initialize[%s] failed:\n", config_file);
         delete e;
-        printf("initialize[%s] failed.\n", conf_file_path);
+        printf("initialize[%s] failed.\n", config_file);
         return -2;
     }
-    if (strcasecmp(cmd, "start")) {
+    if (has_start == 0) {
         DgcExcept* msg_e = 0;
         // set msg_type
-        if (!strcasecmp(cmd, "stop")) {
+        if (has_stop == 1) {
             msg_e = new DgcExcept(PCC_MANAGER_UDS_MSG_TYPE_STOP, 0);
-        } else if (!strcasecmp(cmd, "status")) {
+        } else if (has_status == 1) {
             msg_e = new DgcExcept(PCC_MANAGER_UDS_MSG_TYPE_STATUS, 0);
-        } else {
-            printf("invalid command [%s], it should be <start|stop|status>\n",
-                   cmd);
-            help_message();
-            exit(100);
         }
+
         DgcUnixClient client_stream;
         if (client_stream.connectServer(agent_manager->udsListenAddr(), 10) <
             0) {
@@ -728,7 +761,7 @@ int main(dgt_sint32 argc, dgt_schar** argv) {
 
         // recv result
         DgcMessage* msg = 0;
-        if (!strcasecmp(cmd, "stop")) {
+        if (has_stop == 1) {
             for (;;) {
                 if (msg_stream.recvMessage(5) <= 0) {
                     DgcExcept* e = EXCEPTnC;
@@ -767,7 +800,7 @@ int main(dgt_sint32 argc, dgt_schar** argv) {
                     // stopped...\n",result_e->errCode(),agent_manager->encTgtSysID());
                 }
             }
-        } else if (!strcasecmp(cmd, "status")) {
+        } else if (has_status == 1) {
             if (msg_stream.recvMessage(10) <= 0) {
                 DgcExcept* e = EXCEPTnC;
                 if (e) {
@@ -804,7 +837,7 @@ int main(dgt_sint32 argc, dgt_schar** argv) {
                         exit(104);
                     }
                     letter = (PtMsgDgiLetter*)msg;
-                    if (verbose_flag) printf("%s\n", letter->getBody());
+                    printf("%s\n", letter->getBody());
                 }
             }
             printf("\n");
