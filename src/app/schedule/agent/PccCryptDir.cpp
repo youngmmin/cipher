@@ -401,7 +401,24 @@ dgt_void PccCryptDir::filter0(PccCryptMir* parent_mir, dgt_schar* src_dir,
         memset(&TmpCryptStat, 0, sizeof(TmpCryptStat));
     }
 }
+//2023.09.01  Function to find * in pattern
+dgt_sint32 PccCryptDir::pttnsFindAster(PccRegExprList* Exprs) {
+    
+    if(Exprs == 0){
+        return 0;
+    }
+    exp_type* preg;
+    Exprs->rewind();
+    
+    while ((preg = Exprs->nextPttn())) {
+        // Check if the pattern contains an asterisk '*'
+        if ((strcmp(preg->exp, ".*") == 0) || strcmp(preg->exp, "..*") == 0 || strcmp(preg->exp, "..*.*") == 0) {
+            return 1;  // found an asterisk in the pattern
+        }
+    }
 
+    return 0;  // no asterisk found in any pattern
+}
 dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir, const dgt_schar* src_dir,
                               const dgt_schar* dst_dir,
                               dgt_uint8 is_target_dir) throw(DgcExcept) {
@@ -534,6 +551,14 @@ dgt_void PccCryptDir::filter1(PccCryptMir* parent_mir, const dgt_schar* src_dir,
                 }
             }
         } else if (S_ISREG(fstat.st_mode)) {  // file
+            
+
+            //2023.09.01 Process root directory encryption exclusion
+            if((CurrDirDepth == 0 && DirExprs != 0) && !pttnsFindAster(DirExprs)){
+                continue;
+            }
+            
+            
             //
             // need method which returns crypting status, cryptStatus(const
             // dgt_schar* file_path) with return values: 0 -> text, 1 ->
@@ -804,14 +829,7 @@ dgt_sint32 PccCryptDir::filter() throw(DgcExcept) {
                     filter1(CryptMir, SrcDir,
                             DstDir && *DstDir ? DstDir : SrcDir, 1);
                     break;
-                case 2:  // Full directory depth filter (pattern detect)
-                    CryptStat.output_files = loadDetectRqst(CryptMir);
-                    filter2(CryptMir, TmpSrcPath, isEncDirDepth(0));
-                    break;
-                default:  // Full directory depth filter (crypt)
-                    filter0(CryptMir, TmpSrcPath, TmpDstPath,
-                            isEncDirDepth(0));  // old filter version
-                    break;
+
             }
             CryptMir->closeMir();  // added by jhpark 2017.11.21
         }
