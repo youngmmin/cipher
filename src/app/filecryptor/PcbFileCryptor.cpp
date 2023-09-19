@@ -28,6 +28,7 @@ void printHelp() {
 
     printf("General Options:\n");
     printf("  -h, --help\t\tDisplay this help message and exit\n");
+    printf("  -v, --version\t\tDisplay the version information and exit\n");
     printf("  -q, --quiet\t\tSuppress output messages\n\n");
 
     printf("Required Options (Choose only one):\n");
@@ -65,11 +66,29 @@ void printHelp() {
         "options.\n\n");
 }
 
+// Function to print enhanced version information
+void printVersionInfo() {
+    printf("PCB File Cryptor version: 1.0\n");
+    printf(
+        "Built on: 2023-09-15 | Developed by Sinsiway Corporate Research "
+        "Center\n\n");
+
+    printf("Petra File Cipher (Subcomponent) v3.2\n");
+    printf("Advanced Encryption for Your Data Security\n\n");
+
+    printf("Copyright 2023 Sinsiway. All Rights Reserved.\n");
+}
+
 int main(int argc, char *argv[]) {
     int i;
     int has_encrypt = 0, has_decrypt = 0, has_param = 0, has_check = 0,
         has_in = 0, has_out = 0, has_key = 0;
     int is_quiet = 0;
+
+    const char *separator_pos = strrchr(argv[0], PATH_SEPARATOR);
+    const char *binary_name = separator_pos ? separator_pos + 1 : argv[0];
+
+    const char *os_user = getenv("USER");
 
     PcbFileCryptorParam *param = new PcbFileCryptorParam();
 
@@ -85,6 +104,12 @@ int main(int argc, char *argv[]) {
             printHelp();
             return 0;
         }
+
+        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            printVersionInfo();
+            return 0;
+        }
+
         if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
             is_quiet = 1;
         }
@@ -200,15 +225,23 @@ int main(int argc, char *argv[]) {
         param->getParameterString(param_list, sizeof(param_list));
 
         // Uncomment below line to print the parameter string for debugging
-        // purposes. printf("Parameter: %s\n", param_list);
+        // purposes.printf("Parameter: %s\n", param_list);
 
         // Initialize the file cryptor and perform the chosen operation.
+        int sid = -1;
+
+        if ((sid = PcaApiSessionPool::getApiSession("", "", binary_name, "", "",
+                                                    os_user, 0)) < 0) {
+            printf("getApiSession failed[%d]", sid);
+            return 1;
+        }
+
         PccFileCryptor cryptor;
 
         struct timespec start_time, end_time;
         clock_gettime(CLOCK_REALTIME, &start_time);
 
-        int rtn = cryptor.crypt(-1, param_list, 0, 0);
+        int rtn = cryptor.crypt(sid, param_list, 0, 0);
 
         clock_gettime(CLOCK_REALTIME, &end_time);
 
@@ -235,7 +268,8 @@ int main(int argc, char *argv[]) {
                 printf("elapse time '%.0f' ms\n", elapsed_time_ms);
             }
         }
-        // If the check operation is chosen, determine if the file is encrypted.
+        // If the check operation is chosen, determine if the file is
+        // encrypted.
     } else if (has_check) {
         PccHeaderManager header_manager;
 

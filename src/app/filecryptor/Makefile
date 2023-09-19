@@ -25,6 +25,8 @@ uninstall_libs:
 uninstall_bins:
 clean:: clean_pcb_file_cryptor_bin
 
+CXXFLAGS := -I../../lib/apisession ${CXXFLAGS}
+
 #############################################################################
 # petra cipher file_crypt manager
 #

@@ -362,8 +362,8 @@ dgt_sint64 PccKredSessionPool::getUserSID(
                 goto RETRY_GET_CONNECTION;
             }  // if (strncmp(link->name ,Agent.name, sizeof(Agent.name)) == 0
                // && sess_user.psu_id == 0) end
-        }  // if (sess_user.psu_id == 0) end
-    }      // if (uinfo->db_sid) end
+        }      // if (sess_user.psu_id == 0) end
+    }          // if (uinfo->db_sid) end
 
     //
     // build ps_user
@@ -434,125 +434,7 @@ dgt_sint64 PccKredSessionPool::getUserSID(
     // try to get PTU_ID for user_id, client ip, db_sess_user
     //
     dgt_sint64* ptu_id = 0;
-#if 0
-	if (ps_user.auth_user && *ps_user.auth_user) {
-		//
-		// try to get petra user id by employee id
-		//
-		DgcMemRows      v_bind(1);
-                v_bind.addAttr(DGC_SCHR,65,"auth_user");
-                v_bind.reset();
-                v_bind.add();
-                v_bind.next();
-                memcpy(v_bind.getColPtr(1),ps_user.auth_user, 65);
-                v_bind.rewind();
-		dg_sprintf(sql_text,"select ptu_id "
-				    "from pt_user a, "
-				    "     pt_user_auth_user b "
-				    "where a.org_uid = b.org_uid "
-				    "and   b.auth_user = :1 and a.status=0");
-		sql_stmt = DgcDbProcess::db().getStmt(DgcDbProcess::sess(), sql_text, strlen(sql_text));
-		if (sql_stmt && sql_stmt->execute(&v_bind,0) >= 0 && (ptu_id=(dgt_sint64*)sql_stmt->fetch())) ps_user.ptu_id = *ptu_id;
-		delete EXCEPTnC;
-		delete sql_stmt;
-	}
-	if (ps_user.ptu_id == 0) {
-		//
-		// try to get petra user id by user machine info
-		//
-		DgcMemRows      v_bind(2);
-                v_bind.addAttr(DGC_SCHR,65,"ip");
-                v_bind.addAttr(DGC_SCHR,65,"mac");
-                v_bind.reset();
-                v_bind.add();
-                v_bind.next();
-                memcpy(v_bind.getColPtr(1),ps_user.client_ip, 65);
-                memcpy(v_bind.getColPtr(2),ps_user.client_mac, 65);
-                v_bind.rewind();
-		dg_sprintf(sql_text,
-			"select a.ip, a.mac, b.ptu_id "
-                        "from pt_user_machine a, pt_user b "
-                        "where ((a.ip != '' and a.ip = :1) or (a.mac != '' and a.mac = :2)) "
-                        "   and a.org_uid = b.org_uid "
-                        "   and b.status = 0");
-		sql_stmt = DgcDbProcess::db().getStmt(DgcDbProcess::sess(), sql_text, strlen(sql_text));
-		if (sql_stmt && sql_stmt->execute(&v_bind, 0) >= 0) {
-			struct u_machine {
-				dgt_schar	ip[65];
-				dgt_schar	mac[65];
-				dgt_sint64	ptu_id;
-			};
-			struct u_machine*	frow = 0;
-			dgt_uint16		cscore = 0;	
-			while ((frow=(struct u_machine*)sql_stmt->fetch())) {
-				dgt_uint16	tmp_score = 0;
-				if (strncmp(frow->ip, ps_user.client_ip, 64) == 0) tmp_score = 100;
-				if (strncmp(frow->mac, ps_user.client_mac, 64) == 0) tmp_score += 10;
-				if (tmp_score > cscore) ps_user.ptu_id = frow->ptu_id;
-			}
-		}
-		delete EXCEPTnC;
-		delete sql_stmt;
-	}
-	if (ps_user.ptu_id == 0 && ps_user.db_sess_user &&*ps_user.db_sess_user) {
-		//
-		// try to get petra user id by database user id
-		//
-		DgcMemRows      v_bind(2);
-                v_bind.addAttr(DGC_SB8,0,"ip");
-                v_bind.addAttr(DGC_SCHR,33,"db_user");
-                v_bind.reset();
-                v_bind.add();
-                v_bind.next();
-                memcpy(v_bind.getColPtr(1),&ps_user.instance_id, sizeof(dgt_sint64));
-                memcpy(v_bind.getColPtr(2),ps_user.db_sess_user, 33);
-                v_bind.rewind();
 
-		dg_sprintf(sql_text,
-			"select b.ptu_id"
-			"  from pt_user_db_sess_user a, pt_user b"
-			" where (a.instance_id = 0 or a.instance_id = :1)" // zero db_id means user_id is applied to all databases
-			"   and a.db_sess_user = :2"
-			"   and a.org_uid = b.org_uid"
-			"   and b.status = 0");
-
-		sql_stmt = DgcDbProcess::db().getStmt(DgcDbProcess::sess(), sql_text, strlen(sql_text));
-		if (sql_stmt && sql_stmt->execute(&v_bind, 0) >= 0 && (ptu_id=(dgt_sint64*)sql_stmt->fetch())) ps_user.ptu_id = *ptu_id;
-		delete EXCEPTnC;
-		delete sql_stmt;
-	}
-        if (ps_user.ptu_id == 0 && ps_user.os_user && *ps_user.os_user) {
-                //
-                // try to get petra user id by user machine info
-                //
-		DgcMemRows      v_bind(1);
-                v_bind.addAttr(DGC_SCHR,65,"os_user");
-                v_bind.reset();
-                v_bind.add();
-                v_bind.next();
-                memcpy(v_bind.getColPtr(1),ps_user.os_user, 65);
-                v_bind.rewind();
-                dg_sprintf(sql_text,
-			"select  a.os_user, b.ptu_id "
-                        "  from pt_user_os_user a, pt_user b "
-                        " where  a.os_user != '' and a.os_user = :1 "
-                        "   and a.org_uid = b.org_uid "
-                        "   and b.status = 0 ");
-                sql_stmt = DgcDbProcess::db().getStmt(DgcDbProcess::sess(), sql_text, strlen(sql_text));
-                if (sql_stmt && sql_stmt->execute(&v_bind, 0) >= 0) {
-                        struct u_osuser {
-                                dgt_schar       os_user[65];
-                                dgt_sint64      ptu_id;
-                        };
-                        struct u_osuser*       frow = 0;
-                        if ((frow=(struct u_osuser*)sql_stmt->fetch())) {
-                                ps_user.ptu_id = frow->ptu_id;
-                        }
-                }
-                delete EXCEPTnC;
-                delete sql_stmt;
-        }
-#endif
     //
     // search for a session
     //
